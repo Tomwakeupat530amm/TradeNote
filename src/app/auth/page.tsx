@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-import { ShieldAlert, Activity } from "lucide-react";
+import { Activity } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
@@ -29,8 +29,8 @@ export default function AuthPage() {
         toast.success("Account created successfully!");
       }
       router.push("/");
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }

@@ -85,7 +85,7 @@ export default function JournalPage() {
       setNotes("");
       setScreenshot(null);
       setIsAdding(false);
-    } catch (error) {
+    } catch {
       toast.error("Failed to save trade.");
     } finally {
       setSaving(false);
@@ -96,7 +96,7 @@ export default function JournalPage() {
     try {
       await deleteTrade(id);
       toast.success("Trade deleted.");
-    } catch (error) {
+    } catch {
       toast.error("Failed to delete trade.");
     }
   };

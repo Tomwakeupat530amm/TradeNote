@@ -23,6 +23,8 @@ export default function AccountsPage() {
   const [consistencyPercent, setConsistencyPercent] = useState("50");
   const [trailingMaxDrawdown, setTrailingMaxDrawdown] = useState("1000");
   const [drawdownMode, setDrawdownMode] = useState<DrawdownMode>("End of Day");
+  const [maxDailyLoss, setMaxDailyLoss] = useState("500");
+  const [maxDailyLossType, setMaxDailyLossType] = useState<"%" | "$">("$");
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +38,8 @@ export default function AccountsPage() {
         consistencyPercent: Number(consistencyPercent),
         trailingMaxDrawdown: Number(trailingMaxDrawdown),
         drawdownMode,
+        maxDailyLoss: maxDailyLoss ? Number(maxDailyLoss) : undefined,
+        maxDailyLossType,
       },
     });
     setIsAdding(false);
@@ -138,6 +142,29 @@ export default function AccountsPage() {
                     <option className="bg-gray-800" value="End of Day">End of Day</option>
                     <option className="bg-gray-800" value="Intraday">Intraday</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="sm:col-span-4">
+                <label htmlFor="maxDailyLoss" className="block text-sm font-medium leading-6 text-white">Max Daily Loss</label>
+                <div className="mt-2 flex rounded-md shadow-sm">
+                  <select
+                    value={maxDailyLossType}
+                    onChange={(e) => setMaxDailyLossType(e.target.value as "%" | "$")}
+                    className="inline-flex items-center rounded-l-md border-0 bg-white/5 py-1.5 pl-3 pr-8 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-green-500 sm:text-sm sm:leading-6"
+                  >
+                    <option className="bg-gray-800" value="$">Amount ($)</option>
+                    <option className="bg-gray-800" value="%">Percent (%)</option>
+                  </select>
+                  <input
+                    type="number"
+                    name="maxDailyLoss"
+                    id="maxDailyLoss"
+                    value={maxDailyLoss}
+                    onChange={(e) => setMaxDailyLoss(e.target.value)}
+                    className="block w-full min-w-0 flex-1 rounded-none rounded-r-md border-0 bg-white/5 py-1.5 px-3 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-green-500 sm:text-sm sm:leading-6"
+                    placeholder="e.g. 500"
+                  />
                 </div>
               </div>
 

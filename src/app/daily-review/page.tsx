@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useReviewStore } from "@/store/useReviewStore";
+import { useReviewStore, DailyReview } from "@/store/useReviewStore";
 import { format } from "date-fns";
 import { Save, Calendar, Sun, Moon, Star } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -26,7 +26,9 @@ export default function DailyReviewPage() {
     fetchReviewForDate(selectedDate);
   }, [selectedDate, fetchReviewForDate]);
 
-  useEffect(() => {
+  const [prevReview, setPrevReview] = useState<DailyReview | null>(currentReview);
+  if (currentReview !== prevReview) {
+    setPrevReview(currentReview);
     if (currentReview) {
       setFormData({
         preMarketBias: currentReview.preMarketBias || "",
@@ -46,7 +48,7 @@ export default function DailyReviewPage() {
         rating: 3,
       });
     }
-  }, [currentReview]);
+  }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +59,7 @@ export default function DailyReviewPage() {
         ...formData
       });
       toast.success("Daily review saved successfully!");
-    } catch (error) {
+    } catch {
       toast.error("Failed to save daily review.");
     } finally {
       setSaving(false);

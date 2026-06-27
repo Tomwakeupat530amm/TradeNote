@@ -3,8 +3,8 @@
 import { useTradeStore } from "@/store/useTradeStore";
 import { useAccountStore } from "@/store/useAccountStore";
 import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  BarChart, Bar, Cell, PieChart, Pie, Area, AreaChart
+  BarChart, Bar, Cell, PieChart, Pie, Area, AreaChart,
+  XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer
 } from "recharts";
 import { format, parseISO } from "date-fns";
 import { useMemo } from "react";
@@ -159,7 +159,7 @@ export default function AnalyticsPage() {
                   <RechartsTooltip 
                     contentStyle={{ backgroundColor: '#111827E6', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', color: '#fff', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}
                     itemStyle={{ color: '#10b981', fontWeight: 'bold' }}
-                    formatter={(value: any) => [`$${value.toLocaleString()}`, 'Balance']}
+                    formatter={(value: number) => [`$${value.toLocaleString()}`, 'Balance']}
                   />
                   <Area type="monotone" dataKey="balance" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorBalance)" />
                 </AreaChart>
@@ -184,7 +184,7 @@ export default function AnalyticsPage() {
                   <RechartsTooltip 
                     cursor={{ fill: '#ffffff05' }} 
                     contentStyle={{ backgroundColor: '#111827E6', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', color: '#fff' }}
-                    formatter={(value: any) => [`${value}%`, 'Win Rate']}
+                    formatter={(value: number) => [`${value}%`, 'Win Rate']}
                   />
                   <Bar dataKey="winRate" fill="#3b82f6" radius={[6, 6, 0, 0]}>
                     {setupData.map((entry, index) => (
@@ -227,7 +227,7 @@ export default function AnalyticsPage() {
                       </Pie>
                       <RechartsTooltip 
                         contentStyle={{ backgroundColor: '#111827E6', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', color: '#fff' }}
-                        formatter={(value: any, name: any, props: any) => [`$${props.payload.value.toLocaleString()}`, 'Total PnL']}
+                        formatter={(value: number, name: string, props: { payload: { value: number } }) => [`$${props.payload.value.toLocaleString()}`, 'Total PnL']}
                       />
                     </PieChart>
                   </ResponsiveContainer>

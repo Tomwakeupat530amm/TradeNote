@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from './useAuthStore';
+import { useAccountStore } from './useAccountStore';
+import { useNotificationStore } from './useNotificationStore';
 
 export type TradeResult = "Win" | "Loss" | "Break Even";
 export type SetupTag = "Breakout" | "Pullback" | "Reversal" | "Continuation" | "Other";
@@ -134,6 +136,58 @@ export const useTradeStore = create<TradeState>((set, get) => ({
       };
       
       set(state => ({ trades: [newTrade, ...state.trades] }));
+
+      // --- Rule Checking & Notifications ---
+      const accountStore = useAccountStore.getState();
+      const account = accountStore.accounts.find(a => a.id === data.account_id);
+      if (account) {
+        const { rules } = account;
+        const addNotification = useNotificationStore.getState().addNotification;
+
+        // Check if a mistake was made (broken rule)
+        if (newTrade.mistake !== "None") {
+          addNotification({
+            title: "Rule Broken!",
+            message: `You recorded a mistake: ${newTrade.mistake} on ${newTrade.asset}. Stick to your plan!`,
+            type: "warning",
+            accountId: account.id
+          });
+        }
+
+        // Check Max Daily Loss
+        if (rules.maxDailyLoss) {
+          // Calculate today's total PnL for this account
+          const today = new Date().toISOString().split('T')[0];
+          const allTrades = get().trades;
+          const todayTrades = allTrades.filter(t => t.accountId === account.id && t.date.startsWith(today));
+          const todayPnl = todayTrades.reduce((sum, t) => sum + t.pnl, 0);
+
+          let lossLimit = rules.maxDailyLoss;
+          if (rules.maxDailyLossType === '%') {
+             lossLimit = account.initialBalance * (rules.maxDailyLoss / 100);
+          }
+          
+          if (todayPnl < 0) {
+            const currentLoss = Math.abs(todayPnl);
+            // If loss exceeds limit
+            if (currentLoss >= lossLimit) {
+              addNotification({
+                title: "Max Daily Loss Exceeded!",
+                message: `You have hit your max daily loss limit of ${rules.maxDailyLossType === '%' ? rules.maxDailyLoss + '%' : '$' + rules.maxDailyLoss}. Stop trading for today!`,
+                type: "error",
+                accountId: account.id
+              });
+            } else if (currentLoss >= lossLimit * 0.8) {
+              addNotification({
+                title: "Approaching Max Daily Loss",
+                message: `You are at 80% of your max daily loss limit. Be careful!`,
+                type: "warning",
+                accountId: account.id
+              });
+            }
+          }
+        }
+      }
     }
   },
 

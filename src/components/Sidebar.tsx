@@ -20,7 +20,7 @@ export function Sidebar() {
   const { signOut } = useAuthStore();
 
   return (
-    <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-gray-900/60 backdrop-blur-2xl border-r border-white/5 px-6 pb-4 shadow-2xl relative z-50">
+    <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-gray-900 border-r border-white/5 px-6 pb-4 shadow-2xl relative z-50">
       <div className="flex h-16 shrink-0 items-center border-b border-white/5 mt-4 pb-4">
         <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
           <div className="bg-green-500/20 p-2 rounded-xl">

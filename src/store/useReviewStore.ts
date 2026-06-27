@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from './useAuthStore';
-import { format } from 'date-fns';
+
 
 export interface DailyReview {
   id: string;
@@ -21,7 +21,7 @@ interface ReviewState {
   saveReview: (review: Omit<DailyReview, 'id'>) => Promise<void>;
 }
 
-export const useReviewStore = create<ReviewState>((set, get) => ({
+export const useReviewStore = create<ReviewState>((set) => ({
   currentReview: null,
   isLoading: false,
 

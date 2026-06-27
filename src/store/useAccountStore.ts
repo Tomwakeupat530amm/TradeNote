@@ -8,6 +8,8 @@ export interface AccountRules {
   trailingMaxDrawdown: number;
   consistencyPercent?: number;
   profitTarget?: number;
+  maxDailyLoss?: number;
+  maxDailyLossType?: "%" | "$";
 }
 
 export interface Account {
@@ -25,6 +27,7 @@ interface AccountState {
   setActiveAccount: (id: string) => void;
   fetchAccounts: () => Promise<void>;
   addAccount: (account: Omit<Account, 'id'>) => Promise<void>;
+  updateAccount: (id: string, updates: Partial<Account>) => Promise<void>;
   deleteAccount: (id: string) => Promise<void>;
 }
 
@@ -110,6 +113,29 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       set({ accounts: [...currentAccounts, newAccount] });
       get().setActiveAccount(newAccount.id);
     }
+  },
+
+  updateAccount: async (id, updates) => {
+    const { error } = await supabase
+      .from('accounts')
+      .update({
+        name: updates.name,
+        type: updates.type,
+        initial_balance: updates.initialBalance,
+        rules: updates.rules
+      })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating account:', error);
+      throw error;
+    }
+
+    const currentAccounts = get().accounts;
+    const newAccounts = currentAccounts.map(a => 
+      a.id === id ? { ...a, ...updates } : a
+    );
+    set({ accounts: newAccounts });
   },
   
   deleteAccount: async (id) => {
