@@ -10,6 +10,9 @@ export interface AccountRules {
   profitTarget?: number;
   maxDailyLoss?: number;
   maxDailyLossType?: "%" | "$";
+  dailyLossAlertThreshold?: number; // e.g. 80 (%)
+  drawdownAlertThreshold?: number; // e.g. 80 (%)
+  enableHardStop?: boolean;
 }
 
 export interface Account {

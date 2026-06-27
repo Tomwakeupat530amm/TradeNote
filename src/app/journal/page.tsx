@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useTradeStore, TradeResult, SetupTag, EmotionTag, MistakeTag } from "@/store/useTradeStore";
+import { useTradeStore, TradeResult, SetupTag, EmotionTag, MistakeTag, Trade } from "@/store/useTradeStore";
 import { useAccountStore } from "@/store/useAccountStore";
+import { usePreferenceStore } from "@/store/usePreferenceStore";
+import TradeDetailsModal from "@/components/TradeDetailsModal";
 import { PlusCircle, Image as ImageIcon, Save, X, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
@@ -17,7 +19,9 @@ const MISTAKES: MistakeTag[] = ["None", "Moved SL", "Early Entry", "Late Entry",
 export default function JournalPage() {
   const { accounts, activeAccountId } = useAccountStore();
   const { trades, addTrade, deleteTrade } = useTradeStore();
+  const { preferences, fetchPreferences } = usePreferenceStore();
   const [isAdding, setIsAdding] = useState(false);
+  const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
 
   // Form State
   const [asset, setAsset] = useState("XAUUSD");
@@ -25,6 +29,7 @@ export default function JournalPage() {
   const [pnl, setPnl] = useState("0");
   const [result, setResult] = useState<TradeResult>("Win");
   const [setup, setSetup] = useState<SetupTag>("Breakout");
+  const [confluences, setConfluences] = useState<string[]>([]);
   const [emotion, setEmotion] = useState<EmotionTag>("Calm");
   const [mistake, setMistake] = useState<MistakeTag>("None");
   const [notes, setNotes] = useState("");
@@ -33,6 +38,10 @@ export default function JournalPage() {
 
   const activeAccount = accounts.find(a => a.id === activeAccountId);
   const accountTrades = trades.filter(t => t.accountId === activeAccountId);
+
+  useEffect(() => {
+    fetchPreferences();
+  }, [fetchPreferences]);
 
   // Paste image handler
   useEffect(() => {
@@ -73,6 +82,7 @@ export default function JournalPage() {
         pnl: Number(pnl),
         result,
         setup,
+        confluences,
         emotion,
         mistake,
         notes,
@@ -83,6 +93,7 @@ export default function JournalPage() {
       // Reset basic form
       setPnl("0");
       setNotes("");
+      setConfluences([]);
       setScreenshot(null);
       setIsAdding(false);
     } catch {
@@ -210,9 +221,25 @@ export default function JournalPage() {
                 </div>
 
                 <div className="sm:col-span-6 space-y-3">
+                  <label className="block text-sm font-medium text-gray-300">Confluences</label>
+                  <div className="flex flex-wrap gap-2">
+                    {(preferences?.confluenceTags || []).map(c => (
+                      <button 
+                        key={c} 
+                        type="button" 
+                        onClick={() => setConfluences(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])} 
+                        className={clsx("px-4 py-1.5 rounded-full text-sm font-semibold transition-all border", confluences.includes(c) ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-400 shadow-[0_0_10px_rgba(99,102,241,0.3)]' : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10')}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="sm:col-span-6 space-y-3">
                   <label className="block text-sm font-medium text-gray-300">Emotion</label>
                   <div className="flex flex-wrap gap-2">
-                    {EMOTIONS.map(e => (
+                    {(preferences?.psychologyTags || EMOTIONS).map(e => (
                       <button key={e} type="button" onClick={() => setEmotion(e)} className={clsx("px-4 py-1.5 rounded-full text-sm font-semibold transition-all border", emotion === e ? 'bg-purple-500/20 border-purple-500/50 text-purple-400 shadow-[0_0_10px_rgba(139,92,246,0.3)]' : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10')}>
                         {e}
                       </button>
@@ -223,7 +250,7 @@ export default function JournalPage() {
                 <div className="sm:col-span-6 space-y-3">
                   <label className="block text-sm font-medium text-gray-300">Mistakes</label>
                   <div className="flex flex-wrap gap-2">
-                    {MISTAKES.map(m => (
+                    {(preferences?.mistakeTags || MISTAKES).map(m => (
                       <button key={m} type="button" onClick={() => setMistake(m)} className={clsx("px-4 py-1.5 rounded-full text-sm font-semibold transition-all border", mistake === m ? (m === 'None' ? 'bg-green-500/20 border-green-500/50 text-green-400' : 'bg-orange-500/20 border-orange-500/50 text-orange-400 shadow-[0_0_10px_rgba(249,115,22,0.3)]') : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10')}>
                         {m}
                       </button>
@@ -303,7 +330,8 @@ export default function JournalPage() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: -20 }}
-                    className="hover:bg-white/[0.02] transition-colors group"
+                    onClick={() => setSelectedTrade(trade)}
+                    className="hover:bg-white/[0.02] transition-colors group cursor-pointer"
                   >
                     <td className="whitespace-nowrap py-4 pl-6 pr-3 text-sm text-gray-300">
                       {format(new Date(trade.date), "MMM d, HH:mm")}
@@ -311,10 +339,15 @@ export default function JournalPage() {
                     <td className="whitespace-nowrap px-3 py-4 text-sm font-semibold text-white">{trade.asset}</td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-400">{trade.lotSize}</td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-300">
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <span className="inline-flex items-center rounded-md bg-blue-500/10 border border-blue-500/20 px-2 py-1 text-xs font-medium text-blue-400">
                           {trade.setup}
                         </span>
+                        {trade.confluences?.map(c => (
+                          <span key={c} className="inline-flex items-center rounded-md bg-indigo-500/10 border border-indigo-500/20 px-2 py-1 text-xs font-medium text-indigo-400">
+                            {c}
+                          </span>
+                        ))}
                         <span className="inline-flex items-center rounded-md bg-purple-500/10 border border-purple-500/20 px-2 py-1 text-xs font-medium text-purple-400">
                           {trade.emotion}
                         </span>
@@ -329,7 +362,7 @@ export default function JournalPage() {
                       ${trade.pnl > 0 ? `+${trade.pnl}` : trade.pnl}
                     </td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-6 text-right text-sm font-medium">
-                      <button onClick={() => handleDelete(trade.id)} className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-red-500/10 rounded-lg">
+                      <button onClick={(e) => { e.stopPropagation(); handleDelete(trade.id); }} className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-red-500/10 rounded-lg">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </td>
@@ -345,6 +378,12 @@ export default function JournalPage() {
           )}
         </div>
       </div>
+
+      <TradeDetailsModal
+        isOpen={selectedTrade !== null}
+        onClose={() => setSelectedTrade(null)}
+        trade={selectedTrade}
+      />
     </div>
   );
 }

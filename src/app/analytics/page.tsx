@@ -3,7 +3,7 @@
 import { useTradeStore } from "@/store/useTradeStore";
 import { useAccountStore } from "@/store/useAccountStore";
 import { 
-  BarChart, Bar, Cell, PieChart, Pie, Area, AreaChart,
+  BarChart, Bar, Cell, PieChart, Pie, Area, AreaChart, ComposedChart, Line, Legend,
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer
 } from "recharts";
 import { format, parseISO } from "date-fns";
@@ -48,6 +48,21 @@ export default function AnalyticsPage() {
     });
   }, [accountTrades, activeAccount]);
 
+  // Summary Stats
+  const summaryStats = useMemo(() => {
+    let netPnl = 0;
+    let wins = 0;
+    let losses = 0;
+    accountTrades.forEach(t => {
+      netPnl += t.pnl;
+      if (t.result === "Win") wins++;
+      else if (t.result === "Loss") losses++;
+    });
+    const total = wins + losses;
+    const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
+    return { netPnl, wins, losses, winRate, totalTrades: accountTrades.length };
+  }, [accountTrades]);
+
   // Win Rate by Setup
   const setupData = useMemo(() => {
     const stats: Record<string, { wins: number; total: number; pnl: number }> = {};
@@ -81,6 +96,59 @@ export default function AnalyticsPage() {
 
   // Convert negative values to positive for PieChart radius, but keep original for tooltip
   const absoluteEmotionData = emotionData.map(e => ({
+    ...e,
+    displayValue: Math.abs(e.value),
+    isNegative: e.value < 0
+  }));
+
+  // Mistake Impact
+  const mistakeData = useMemo(() => {
+    const stats: Record<string, number> = {};
+    accountTrades.forEach((t) => {
+      if (t.mistake === "None" || !t.mistake) return;
+      if (!stats[t.mistake]) stats[t.mistake] = 0;
+      stats[t.mistake] += t.pnl;
+    });
+
+    return Object.keys(stats).map((key) => ({
+      name: key,
+      value: stats[key],
+    })).filter(e => e.value !== 0);
+  }, [accountTrades]);
+
+  // Session Impact
+  const sessionData = useMemo(() => {
+    const stats: Record<string, { wins: number; total: number; pnl: number }> = {
+      "Asian": { wins: 0, total: 0, pnl: 0 },
+      "London": { wins: 0, total: 0, pnl: 0 },
+      "New York": { wins: 0, total: 0, pnl: 0 },
+      "Other": { wins: 0, total: 0, pnl: 0 }
+    };
+
+    accountTrades.forEach((t) => {
+      const date = new Date(t.date);
+      const utcHour = date.getUTCHours();
+      let session = "Other";
+      if (utcHour >= 0 && utcHour < 8) session = "Asian";
+      else if (utcHour >= 8 && utcHour < 13) session = "London";
+      else if (utcHour >= 13 && utcHour < 23) session = "New York";
+
+      stats[session].total += 1;
+      stats[session].pnl += t.pnl;
+      if (t.result === "Win") stats[session].wins += 1;
+    });
+
+    return Object.keys(stats)
+      .filter(key => stats[key].total > 0)
+      .map((key) => ({
+        name: key,
+        winRate: Math.round((stats[key].wins / stats[key].total) * 100),
+        pnl: stats[key].pnl,
+        total: stats[key].total
+      }));
+  }, [accountTrades]);
+
+  const absoluteMistakeData = mistakeData.map(e => ({
     ...e,
     displayValue: Math.abs(e.value),
     isNegative: e.value < 0
@@ -134,9 +202,32 @@ export default function AnalyticsPage() {
           variants={containerVariants}
           initial="hidden"
           animate="show"
-          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          className="space-y-6"
         >
-          {/* Equity Curve */}
+          {/* Summary Cards */}
+          <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gray-900/40 backdrop-blur-xl border border-white/5 p-6 rounded-3xl shadow-lg">
+              <p className="text-gray-400 text-sm mb-1">Net PnL</p>
+              <h3 className={`text-2xl font-bold ${summaryStats.netPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {summaryStats.netPnl >= 0 ? '+' : ''}${summaryStats.netPnl.toLocaleString()}
+              </h3>
+            </div>
+            <div className="bg-gray-900/40 backdrop-blur-xl border border-white/5 p-6 rounded-3xl shadow-lg">
+              <p className="text-gray-400 text-sm mb-1">Win Rate</p>
+              <h3 className="text-2xl font-bold text-white">{summaryStats.winRate}%</h3>
+            </div>
+            <div className="bg-gray-900/40 backdrop-blur-xl border border-white/5 p-6 rounded-3xl shadow-lg">
+              <p className="text-gray-400 text-sm mb-1">Win / Loss</p>
+              <h3 className="text-2xl font-bold text-white">{summaryStats.wins} / {summaryStats.losses}</h3>
+            </div>
+            <div className="bg-gray-900/40 backdrop-blur-xl border border-white/5 p-6 rounded-3xl shadow-lg">
+              <p className="text-gray-400 text-sm mb-1">Total Trades</p>
+              <h3 className="text-2xl font-bold text-white">{summaryStats.totalTrades}</h3>
+            </div>
+          </motion.div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Equity Curve */}
           <motion.div variants={itemVariants} className="col-span-1 lg:col-span-2 rounded-3xl bg-gray-900/40 backdrop-blur-xl border border-white/5 p-6 shadow-2xl">
             <div className="flex items-center gap-2 mb-6">
               <div className="p-2 bg-green-500/20 rounded-xl">
@@ -159,7 +250,7 @@ export default function AnalyticsPage() {
                   <RechartsTooltip 
                     contentStyle={{ backgroundColor: '#111827E6', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', color: '#fff', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}
                     itemStyle={{ color: '#10b981', fontWeight: 'bold' }}
-                    formatter={(value: number) => [`$${value.toLocaleString()}`, 'Balance']}
+                    formatter={(value: any) => [`$${Number(value).toLocaleString()}`, 'Balance']}
                   />
                   <Area type="monotone" dataKey="balance" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorBalance)" />
                 </AreaChart>
@@ -184,7 +275,7 @@ export default function AnalyticsPage() {
                   <RechartsTooltip 
                     cursor={{ fill: '#ffffff05' }} 
                     contentStyle={{ backgroundColor: '#111827E6', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', color: '#fff' }}
-                    formatter={(value: number) => [`${value}%`, 'Win Rate']}
+                    formatter={(value: any) => [`${value}%`, 'Win Rate']}
                   />
                   <Bar dataKey="winRate" fill="#3b82f6" radius={[6, 6, 0, 0]}>
                     {setupData.map((entry, index) => (
@@ -192,6 +283,36 @@ export default function AnalyticsPage() {
                     ))}
                   </Bar>
                 </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+
+          {/* Performance by Session */}
+          <motion.div variants={itemVariants} className="col-span-1 lg:col-span-2 rounded-3xl bg-gray-900/40 backdrop-blur-xl border border-white/5 p-6 shadow-2xl">
+            <div className="flex items-center gap-2 mb-6">
+              <div className="p-2 bg-indigo-500/20 rounded-xl">
+                <Activity className="w-5 h-5 text-indigo-400" />
+              </div>
+              <h2 className="text-xl font-bold text-white">Performance by Session (UTC)</h2>
+            </div>
+            <div className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={sessionData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                  <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} dy={10} />
+                  <YAxis yAxisId="left" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}`} />
+                  <YAxis yAxisId="right" orientation="right" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}%`} />
+                  <RechartsTooltip 
+                    contentStyle={{ backgroundColor: '#111827E6', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', color: '#fff' }}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                  <Bar yAxisId="left" dataKey="pnl" name="Net PnL ($)" fill="#10b981" radius={[4, 4, 0, 0]}>
+                    {sessionData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#10b981' : '#ef4444'} />
+                    ))}
+                  </Bar>
+                  <Line yAxisId="right" type="monotone" dataKey="winRate" name="Win Rate (%)" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, fill: '#3b82f6', strokeWidth: 0 }} />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </motion.div>
@@ -227,7 +348,7 @@ export default function AnalyticsPage() {
                       </Pie>
                       <RechartsTooltip 
                         contentStyle={{ backgroundColor: '#111827E6', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', color: '#fff' }}
-                        formatter={(value: number, name: string, props: { payload: { value: number } }) => [`$${props.payload.value.toLocaleString()}`, 'Total PnL']}
+                        formatter={(value: any, name: any, props: any) => [`$${props.payload.value.toLocaleString()}`, 'Total PnL']}
                       />
                     </PieChart>
                   </ResponsiveContainer>
@@ -250,6 +371,62 @@ export default function AnalyticsPage() {
               </div>
             )}
           </motion.div>
+
+          {/* PnL by Mistake */}
+          <motion.div variants={itemVariants} className="rounded-3xl bg-gray-900/40 backdrop-blur-xl border border-white/5 p-6 shadow-2xl flex flex-col">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-red-500/20 rounded-xl">
+                <Activity className="w-5 h-5 text-red-400" />
+              </div>
+              <h2 className="text-xl font-bold text-white">PnL Impact by Mistake</h2>
+            </div>
+            
+            {absoluteMistakeData.length > 0 ? (
+              <div className="flex-1 flex flex-col justify-center">
+                <div className="h-56 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={absoluteMistakeData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={85}
+                        paddingAngle={5}
+                        dataKey="displayValue"
+                        stroke="rgba(255,255,255,0.05)"
+                        strokeWidth={2}
+                      >
+                        {absoluteMistakeData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.isNegative ? '#ef4444' : COLORS[(index + 2) % COLORS.length]} opacity={0.8} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip 
+                        contentStyle={{ backgroundColor: '#111827E6', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', color: '#fff' }}
+                        formatter={(value: any, name: any, props: any) => [`$${props.payload.value.toLocaleString()}`, 'Total PnL']}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-4 flex flex-wrap justify-center gap-3">
+                  {absoluteMistakeData.map((entry, index) => (
+                    <div key={entry.name} className="flex items-center gap-2 text-sm text-gray-300 bg-white/5 px-3 py-1.5 rounded-lg border border-white/5">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.isNegative ? '#ef4444' : COLORS[(index + 2) % COLORS.length] }} />
+                      <span className="font-medium">{entry.name}:</span> 
+                      <span className={entry.isNegative ? 'text-red-400 font-bold' : 'text-green-400 font-bold'}>
+                        {entry.value > 0 ? '+' : ''}${entry.value.toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <p className="text-gray-500 text-sm">No mistake data with PnL impact yet.</p>
+              </div>
+            )}
+          </motion.div>
+          </div>
         </motion.div>
       )}
     </div>

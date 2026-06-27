@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useAccountStore } from "@/store/useAccountStore";
 import { useTradeStore } from "@/store/useTradeStore";
+import { usePlaybookStore } from "@/store/usePlaybookStore";
 import { useRouter, usePathname } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
@@ -30,6 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user) {
       useAccountStore.getState().fetchAccounts();
       useTradeStore.getState().fetchTrades();
+      usePlaybookStore.getState().fetchPlaybooks();
     }
   }, [user]);
 

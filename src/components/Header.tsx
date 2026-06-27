@@ -5,6 +5,7 @@ import { Bell, Search, Sparkles, Check, Trash2, Info, AlertTriangle, AlertCircle
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useNotificationStore } from "@/store/useNotificationStore";
+import { usePreferenceStore } from "@/store/usePreferenceStore";
 import clsx from "clsx";
 import { formatDistanceToNow } from "date-fns";
 
@@ -14,12 +15,14 @@ export function Header() {
   const userInitial = userEmail.charAt(0).toUpperCase();
 
   const { notifications, unreadCount, fetchNotifications, markAsRead, markAllAsRead, clearAll } = useNotificationStore();
+  const { preferences, fetchPreferences } = usePreferenceStore();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchNotifications();
-  }, [fetchNotifications]);
+    fetchPreferences();
+  }, [fetchNotifications, fetchPreferences]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -155,18 +158,24 @@ export function Header() {
 
           {/* Profile dropdown */}
           <div className="flex items-center gap-x-4">
-            <motion.div 
-              whileHover={{ scale: 1.05 }}
-              className="relative flex items-center justify-center h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 text-sm font-bold text-white shadow-lg cursor-pointer border border-white/20"
-            >
-              {userInitial}
+            <div className="relative">
+              <motion.div 
+                whileHover={{ scale: 1.05 }}
+                className="flex items-center justify-center h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 text-sm font-bold text-white shadow-lg cursor-pointer border border-white/20 overflow-hidden"
+              >
+                {preferences?.avatarUrl ? (
+                  <img src={preferences.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  userInitial
+                )}
+              </motion.div>
               <div className="absolute -bottom-1 -right-1 bg-gray-900 rounded-full p-0.5">
                 <Sparkles className="w-3 h-3 text-yellow-400" />
               </div>
-            </motion.div>
+            </div>
             <span className="hidden lg:flex lg:flex-col lg:items-start cursor-pointer group">
               <span className="text-sm font-bold leading-5 text-white group-hover:text-blue-400 transition-colors">
-                Pro Trader
+                {preferences?.displayName || "Pro Trader"}
               </span>
               <span className="text-xs font-medium text-gray-500 truncate w-32">
                 {userEmail}

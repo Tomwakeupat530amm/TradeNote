@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { useAccountStore } from "@/store/useAccountStore";
+import { useAccountStore, Account } from "@/store/useAccountStore";
 import { PlusCircle, Save } from "lucide-react";
 
 type AccountStatus = "Challenge" | "Funded";
 type DrawdownMode = "End of Day" | "Intraday";
 
 export default function AccountsPage() {
-  const { accounts, addAccount, deleteAccount, activeAccountId, setActiveAccount } = useAccountStore();
+  const { accounts, addAccount, updateAccount, deleteAccount, activeAccountId, setActiveAccount } = useAccountStore();
   const [isAdding, setIsAdding] = useState(false);
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
 
   // Form State
   const [name, setName] = useState("");
@@ -26,9 +27,44 @@ export default function AccountsPage() {
   const [maxDailyLoss, setMaxDailyLoss] = useState("500");
   const [maxDailyLossType, setMaxDailyLossType] = useState<"%" | "$">("$");
 
+  const handleAddNew = () => {
+    setName("");
+    setPlatform("");
+    setInitialBalance("50000");
+    setStatus("Challenge");
+    setProfitTarget("1500");
+    setMaxPositions("20");
+    setConsistencyPercent("50");
+    setTrailingMaxDrawdown("1000");
+    setDrawdownMode("End of Day");
+    setMaxDailyLoss("500");
+    setMaxDailyLossType("$");
+    setEditingAccountId(null);
+    setIsAdding(true);
+  };
+
+  const handleEdit = (account: Account) => {
+    setName(account.name);
+    const [plat, stat] = account.type.split(" - ");
+    setPlatform(plat || "");
+    setStatus((stat as AccountStatus) || "Challenge");
+    setInitialBalance(account.initialBalance.toString());
+    
+    setProfitTarget(account.rules.profitTarget?.toString() || "");
+    setMaxPositions(account.rules.maxPositions?.toString() || "");
+    setConsistencyPercent(account.rules.consistencyPercent?.toString() || "");
+    setTrailingMaxDrawdown(account.rules.trailingMaxDrawdown?.toString() || "");
+    setDrawdownMode(account.rules.drawdownMode || "End of Day");
+    setMaxDailyLoss(account.rules.maxDailyLoss?.toString() || "");
+    setMaxDailyLossType(account.rules.maxDailyLossType || "$");
+    
+    setEditingAccountId(account.id);
+    setIsAdding(true);
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    addAccount({
+    const accountData = {
       name,
       type: `${platform} - ${status}`,
       initialBalance: Number(initialBalance),
@@ -41,8 +77,15 @@ export default function AccountsPage() {
         maxDailyLoss: maxDailyLoss ? Number(maxDailyLoss) : undefined,
         maxDailyLossType,
       },
-    });
+    };
+
+    if (editingAccountId) {
+      updateAccount(editingAccountId, accountData);
+    } else {
+      addAccount(accountData);
+    }
     setIsAdding(false);
+    setEditingAccountId(null);
   };
 
   return (
@@ -58,7 +101,7 @@ export default function AccountsPage() {
         </div>
         {!isAdding && (
           <button
-            onClick={() => setIsAdding(true)}
+            onClick={handleAddNew}
             className="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
           >
             <PlusCircle className="-ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
@@ -69,7 +112,7 @@ export default function AccountsPage() {
 
       {isAdding && (
         <form onSubmit={handleSave} className="bg-gray-900 shadow-sm ring-1 ring-gray-800 sm:rounded-xl p-6">
-          <h3 className="text-lg font-medium leading-6 text-white mb-4">Add New Account</h3>
+          <h3 className="text-lg font-medium leading-6 text-white mb-4">{editingAccountId ? "Edit Account" : "Add New Account"}</h3>
           <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
             <div className="sm:col-span-2">
               <label htmlFor="name" className="block text-sm font-medium leading-6 text-white">Account Name (e.g. Topstep 50k)</label>
@@ -172,7 +215,7 @@ export default function AccountsPage() {
           </div>
 
           <div className="mt-6 flex items-center justify-end gap-x-6">
-            <button type="button" onClick={() => setIsAdding(false)} className="text-sm font-semibold leading-6 text-white">
+            <button type="button" onClick={() => { setIsAdding(false); setEditingAccountId(null); }} className="text-sm font-semibold leading-6 text-white">
               Cancel
             </button>
             <button type="submit" className="inline-flex justify-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600">
@@ -219,6 +262,12 @@ export default function AccountsPage() {
                 {activeAccountId === account.id ? 'Active' : 'Set Active'}
               </button>
               <button 
+                onClick={() => handleEdit(account)}
+                className="rounded-md bg-blue-500/10 px-3 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20"
+              >
+                Edit
+              </button>
+              <button 
                 onClick={() => deleteAccount(account.id)}
                 className="rounded-md bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-400 hover:bg-red-500/20"
               >
@@ -232,7 +281,7 @@ export default function AccountsPage() {
             <h3 className="mt-2 text-sm font-semibold text-white">No accounts</h3>
             <p className="mt-1 text-sm text-gray-400">Get started by creating a new prop firm account.</p>
             <div className="mt-6">
-              <button onClick={() => setIsAdding(true)} type="button" className="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600">
+              <button onClick={handleAddNew} type="button" className="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600">
                 <PlusCircle className="-ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
                 New Account
               </button>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Activity, Settings, LogOut, ReceiptText, CalendarDays } from "lucide-react";
+import { LayoutDashboard, Users, Activity, Settings, LogOut, ReceiptText, CalendarDays, BookOpen } from "lucide-react";
 import clsx from "clsx";
 import { useAuthStore } from "@/store/useAuthStore";
 import { motion } from "framer-motion";
@@ -10,9 +10,11 @@ import { motion } from "framer-motion";
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard, color: "text-blue-400" },
   { name: "Trade Journal", href: "/journal", icon: ReceiptText, color: "text-green-400" },
-  { name: "Daily Review", href: "/daily-review", icon: CalendarDays, color: "text-purple-400" },
+  { name: "Reviews", href: "/daily-review", icon: CalendarDays, color: "text-purple-400" },
   { name: "Accounts", href: "/accounts", icon: Users, color: "text-orange-400" },
   { name: "Analytics", href: "/analytics", icon: Activity, color: "text-pink-400" },
+  { name: "Calendar", href: "/calendar", icon: CalendarDays, color: "text-yellow-400" },
+  { name: "Playbook", href: "/playbook", icon: BookOpen, color: "text-indigo-400" },
 ];
 
 export function Sidebar() {

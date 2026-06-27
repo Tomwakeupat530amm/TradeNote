@@ -1,39 +1,94 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAccountStore, Account } from "@/store/useAccountStore";
-import { Save, ShieldAlert, Bell, User } from "lucide-react";
+import { usePreferenceStore } from "@/store/usePreferenceStore";
+import { useAuthStore } from "@/store/useAuthStore";
+import { supabase } from "@/lib/supabase";
+import { Save, ShieldAlert, Tag, Settings, Trash, Plus, EyeOff, Lock, User, Upload, Key, Mail } from "lucide-react";
 import { toast } from "sonner";
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export default function SettingsPage() {
+  const { user } = useAuthStore();
   const { accounts, activeAccountId, updateAccount } = useAccountStore();
+  const { preferences, fetchPreferences, updatePreferences, isLoading: prefsLoading } = usePreferenceStore();
   
   const activeAccount = accounts.find(a => a.id === activeAccountId);
   
-  const [maxDailyLoss, setMaxDailyLoss] = useState("");
-  const [maxDailyLossType, setMaxDailyLossType] = useState<"%" | "$">("$");
-  const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<"profile" | "risk" | "preferences" | "app">("profile");
+
+  // --- Risk Form State ---
+  const [dailyLossAlertThreshold, setDailyLossAlertThreshold] = useState<number>(80);
+  const [drawdownAlertThreshold, setDrawdownAlertThreshold] = useState<number>(80);
+  const [enableHardStop, setEnableHardStop] = useState<boolean>(false);
+  const [isSavingRisk, setIsSavingRisk] = useState(false);
+
+  // --- Profile Form State ---
+  const [displayName, setDisplayName] = useState("");
+  const [timezone, setTimezone] = useState("UTC");
+  const [baseCurrency, setBaseCurrency] = useState("USD");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  
+  // --- Security Form State ---
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isUpdatingAuth, setIsUpdatingAuth] = useState(false);
+
+  // --- Avatar Upload State ---
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  // --- Preferences Form State ---
+  const [newPsychTag, setNewPsychTag] = useState("");
+  const [newMistakeTag, setNewMistakeTag] = useState("");
+  const [newConfluenceTag, setNewConfluenceTag] = useState("");
 
   const [prevAccount, setPrevAccount] = useState<Account | undefined>(activeAccount);
   if (activeAccount !== prevAccount) {
     setPrevAccount(activeAccount);
     if (activeAccount && activeAccount.rules) {
-      setMaxDailyLoss(activeAccount.rules.maxDailyLoss?.toString() || "");
-      setMaxDailyLossType(activeAccount.rules.maxDailyLossType || "$");
+      setDailyLossAlertThreshold(activeAccount.rules.dailyLossAlertThreshold ?? 80);
+      setDrawdownAlertThreshold(activeAccount.rules.drawdownAlertThreshold ?? 80);
+      setEnableHardStop(activeAccount.rules.enableHardStop ?? false);
     }
   }
+
+  useEffect(() => {
+    fetchPreferences();
+  }, [fetchPreferences]);
+
+  useEffect(() => {
+    if (preferences) {
+      setDisplayName(preferences.displayName || "");
+      setTimezone(preferences.timezone || "UTC");
+      setBaseCurrency(preferences.baseCurrency || "USD");
+    }
+  }, [preferences]);
+
+  useEffect(() => {
+    if (user?.email) {
+      setEmail(user.email);
+    }
+  }, [user]);
 
   const handleSaveRisk = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeAccount) return;
 
-    setIsSaving(true);
+    setIsSavingRisk(true);
     try {
       await updateAccount(activeAccount.id, {
         rules: {
           ...activeAccount.rules,
-          maxDailyLoss: maxDailyLoss ? Number(maxDailyLoss) : undefined,
-          maxDailyLossType
+          dailyLossAlertThreshold,
+          drawdownAlertThreshold,
+          enableHardStop
         }
       });
       toast.success("Risk settings saved successfully!");
@@ -41,117 +96,580 @@ export default function SettingsPage() {
       console.error(error);
       toast.error("Failed to save risk settings.");
     } finally {
-      setIsSaving(false);
+      setIsSavingRisk(false);
     }
   };
 
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingProfile(true);
+    try {
+      await updatePreferences({ displayName, timezone, baseCurrency });
+      toast.success("Profile settings saved!");
+    } catch (error) {
+      toast.error("Failed to save profile settings.");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleUpdateEmail = async () => {
+    if (!email || email === user?.email) return;
+    setIsUpdatingAuth(true);
+    const { error } = await supabase.auth.updateUser({ email });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Check both emails to confirm the change.");
+    }
+    setIsUpdatingAuth(false);
+  };
+
+  const handleUpdatePassword = async () => {
+    if (!password) return;
+    setIsUpdatingAuth(true);
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Password updated successfully!");
+      setPassword("");
+    }
+    setIsUpdatingAuth(false);
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    
+    setIsUploadingAvatar(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}-${Math.random()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      
+      await updatePreferences({ avatarUrl: data.publicUrl });
+      toast.success("Avatar updated!");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to upload avatar");
+    } finally {
+      setIsUploadingAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleAddPsychTag = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPsychTag.trim() || !preferences) return;
+    const tags = [...preferences.psychologyTags, newPsychTag.trim()];
+    await updatePreferences({ psychologyTags: tags });
+    setNewPsychTag("");
+    toast.success("Tag added!");
+  };
+
+  const handleRemovePsychTag = async (tagToRemove: string) => {
+    if (!preferences) return;
+    const tags = preferences.psychologyTags.filter(t => t !== tagToRemove);
+    await updatePreferences({ psychologyTags: tags });
+  };
+
+  const handleAddMistakeTag = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMistakeTag.trim() || !preferences) return;
+    const tags = [...preferences.mistakeTags, newMistakeTag.trim()];
+    await updatePreferences({ mistakeTags: tags });
+    setNewMistakeTag("");
+    toast.success("Tag added!");
+  };
+
+  const handleRemoveMistakeTag = async (tagToRemove: string) => {
+    if (!preferences) return;
+    const tags = preferences.mistakeTags.filter(t => t !== tagToRemove);
+    await updatePreferences({ mistakeTags: tags });
+  };
+
+  const handleAddConfluenceTag = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newConfluenceTag.trim() || !preferences) return;
+    const tags = [...preferences.confluenceTags, newConfluenceTag.trim()];
+    await updatePreferences({ confluenceTags: tags });
+    setNewConfluenceTag("");
+    toast.success("Tag added!");
+  };
+
+  const handleRemoveConfluenceTag = async (tagToRemove: string) => {
+    if (!preferences) return;
+    const tags = preferences.confluenceTags.filter(t => t !== tagToRemove);
+    await updatePreferences({ confluenceTags: tags });
+  };
+
+  const handleTogglePrivacy = async () => {
+    if (!preferences) return;
+    await updatePreferences({ privacyMode: !preferences.privacyMode });
+    toast.success(`Privacy mode ${!preferences.privacyMode ? "enabled" : "disabled"}`);
+  };
+
   return (
-    <div className="space-y-8 max-w-4xl">
+    <div className="space-y-8 max-w-5xl">
       <div>
         <h2 className="text-2xl font-bold leading-7 text-white sm:truncate sm:text-3xl sm:tracking-tight">
           Settings
         </h2>
         <p className="mt-1 text-sm text-gray-400">
-          Manage your application preferences and risk rules.
+          Manage your risk rules, trading tags, and app preferences.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         
-        {/* Sidebar Nav (mock) */}
-        <div className="md:col-span-1 space-y-2">
-          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-green-500/10 text-green-400 border border-green-500/20 font-medium">
-            <ShieldAlert className="w-5 h-5" />
-            Risk Management
-          </button>
-          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-medium transition-colors">
+        {/* Sidebar Nav */}
+        <div className="lg:col-span-1 space-y-2">
+          <button 
+            onClick={() => setActiveTab("profile")}
+            className={cn("w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors border",
+              activeTab === "profile" 
+                ? "bg-green-500/10 text-green-400 border-green-500/20" 
+                : "text-gray-400 border-transparent hover:bg-white/5 hover:text-white"
+            )}>
             <User className="w-5 h-5" />
-            Profile Settings
+            Profile
           </button>
-          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-medium transition-colors">
-            <Bell className="w-5 h-5" />
-            Notifications
+          <button 
+            onClick={() => setActiveTab("risk")}
+            className={cn("w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors border",
+              activeTab === "risk" 
+                ? "bg-green-500/10 text-green-400 border-green-500/20" 
+                : "text-gray-400 border-transparent hover:bg-white/5 hover:text-white"
+            )}>
+            <ShieldAlert className="w-5 h-5" />
+            Risk Alerts
+          </button>
+          <button 
+            onClick={() => setActiveTab("preferences")}
+            className={cn("w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors border",
+              activeTab === "preferences" 
+                ? "bg-green-500/10 text-green-400 border-green-500/20" 
+                : "text-gray-400 border-transparent hover:bg-white/5 hover:text-white"
+            )}>
+            <Tag className="w-5 h-5" />
+            Trading Tags
+          </button>
+          <button 
+            onClick={() => setActiveTab("app")}
+            className={cn("w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors border",
+              activeTab === "app" 
+                ? "bg-green-500/10 text-green-400 border-green-500/20" 
+                : "text-gray-400 border-transparent hover:bg-white/5 hover:text-white"
+            )}>
+            <Settings className="w-5 h-5" />
+            App Preferences
           </button>
         </div>
 
         {/* Content Area */}
-        <div className="md:col-span-2 space-y-6">
+        <div className="lg:col-span-3 space-y-6">
           
-          <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 sm:p-8">
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-white">Risk Management</h3>
-              <p className="text-sm text-gray-400 mt-1">
-                Set up automated warnings when you breach your risk rules. These apply to your currently active account: <span className="text-green-400 font-medium">{activeAccount?.name || 'None'}</span>
-              </p>
-            </div>
-
-            {activeAccount ? (
-              <form onSubmit={handleSaveRisk} className="space-y-6">
-                <div>
-                  <label htmlFor="maxDailyLoss" className="block text-sm font-medium text-gray-300">
-                    Max Daily Loss
-                  </label>
-                  <div className="mt-2 flex rounded-md shadow-sm">
-                    <select
-                      value={maxDailyLossType}
-                      onChange={(e) => setMaxDailyLossType(e.target.value as "%" | "$")}
-                      className="inline-flex items-center rounded-l-md border-0 bg-white/5 py-1.5 pl-3 pr-8 text-gray-400 ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-green-500 sm:text-sm sm:leading-6"
-                    >
-                      <option value="$">Amount ($)</option>
-                      <option value="%">Percent (%)</option>
-                    </select>
-                    <input
-                      type="number"
-                      name="maxDailyLoss"
-                      id="maxDailyLoss"
-                      value={maxDailyLoss}
-                      onChange={(e) => setMaxDailyLoss(e.target.value)}
-                      className="block w-full min-w-0 flex-1 rounded-none rounded-r-md border-0 bg-white/5 py-1.5 px-3 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-green-500 sm:text-sm sm:leading-6"
-                      placeholder={maxDailyLossType === '$' ? "e.g. 500" : "e.g. 2"}
-                    />
+          {/* PROFILE TAB */}
+          {activeTab === "profile" && (
+            <div className="space-y-6">
+              {/* Basic Info & Trading Preferences */}
+              <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 sm:p-8">
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Profile Information</h3>
+                    <p className="text-sm text-gray-400 mt-1">Update your display name, avatar, and trading preferences.</p>
                   </div>
-                  <p className="mt-2 text-xs text-gray-500">
-                    You will receive a warning when your daily loss reaches 80% of this limit, and an error when exceeded.
-                  </p>
+                  {/* Avatar Upload */}
+                  <div className="flex items-center gap-4">
+                    <div className="h-16 w-16 rounded-full bg-gray-800 overflow-hidden border border-gray-700">
+                      {preferences?.avatarUrl ? (
+                        <img src={preferences.avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-gray-500">
+                          <User className="w-8 h-8" />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleAvatarUpload} />
+                      <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingAvatar}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-sm text-white rounded-lg transition-colors border border-gray-700"
+                      >
+                        <Upload className="w-4 h-4" />
+                        {isUploadingAvatar ? "Uploading..." : "Change"}
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="pt-4 flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={isSaving}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <Save className="w-4 h-4" />
-                    {isSaving ? "Saving..." : "Save Risk Rules"}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div className="py-8 text-center border-2 border-dashed border-gray-800 rounded-xl">
-                <p className="text-gray-400 text-sm">Please select an active account from the Accounts page first.</p>
+                <form onSubmit={handleSaveProfile} className="space-y-6">
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300">Display Name</label>
+                      <input
+                        type="text"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        placeholder="e.g. John Doe"
+                        className="mt-2 block w-full rounded-xl border-0 bg-white/5 py-2.5 px-4 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-green-500 sm:text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300">Base Currency</label>
+                      <select
+                        value={baseCurrency}
+                        onChange={(e) => setBaseCurrency(e.target.value)}
+                        className="mt-2 block w-full rounded-xl border-0 bg-gray-800 py-2.5 px-4 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-green-500 sm:text-sm [&>option]:bg-gray-900"
+                      >
+                        <option value="USD">USD - US Dollar</option>
+                        <option value="EUR">EUR - Euro</option>
+                        <option value="GBP">GBP - British Pound</option>
+                        <option value="AUD">AUD - Australian Dollar</option>
+                        <option value="CAD">CAD - Canadian Dollar</option>
+                        <option value="JPY">JPY - Japanese Yen</option>
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-medium text-gray-300">Timezone</label>
+                      <select
+                        value={timezone}
+                        onChange={(e) => setTimezone(e.target.value)}
+                        className="mt-2 block w-full rounded-xl border-0 bg-gray-800 py-2.5 px-4 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-green-500 sm:text-sm [&>option]:bg-gray-900"
+                      >
+                        <option value="UTC">UTC (Coordinated Universal Time)</option>
+                        <option value="America/New_York">EST/EDT (New York)</option>
+                        <option value="America/Chicago">CST/CDT (Chicago)</option>
+                        <option value="America/Denver">MST/MDT (Denver)</option>
+                        <option value="America/Los_Angeles">PST/PDT (Los Angeles)</option>
+                        <option value="Europe/London">GMT/BST (London)</option>
+                        <option value="Europe/Berlin">CET/CEST (Berlin)</option>
+                        <option value="Asia/Tokyo">JST (Tokyo)</option>
+                        <option value="Asia/Ho_Chi_Minh">ICT (Ho Chi Minh / Hanoi)</option>
+                        <option value="Australia/Sydney">AEST/AEDT (Sydney)</option>
+                      </select>
+                      <p className="mt-2 text-xs text-gray-500">This timezone is used to sync your Daily Loss reset and trading history.</p>
+                    </div>
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="submit"
+                      disabled={isSavingProfile}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-500 disabled:opacity-50 transition-colors"
+                    >
+                      <Save className="w-4 h-4" />
+                      {isSavingProfile ? "Saving..." : "Save Profile"}
+                    </button>
+                  </div>
+                </form>
               </div>
-            )}
-          </div>
 
-          <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 sm:p-8 opacity-50 pointer-events-none">
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-white">Application Preferences</h3>
-              <p className="text-sm text-gray-400 mt-1">
-                General app settings (Coming soon)
-              </p>
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-300">Dark Mode</p>
-                  <p className="text-xs text-gray-500">Enable dark theme across the app</p>
+              {/* Security */}
+              <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 sm:p-8">
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-white">Security</h3>
+                  <p className="text-sm text-gray-400 mt-1">Update your email address or change your password.</p>
                 </div>
-                <div className="w-11 h-6 bg-green-500 rounded-full relative">
-                  <div className="w-4 h-4 bg-white rounded-full absolute right-1 top-1"></div>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-4 sm:items-end">
+                    <div className="sm:col-span-3">
+                      <label className="block text-sm font-medium text-gray-300">Email Address</label>
+                      <div className="relative mt-2">
+                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                          <Mail className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="block w-full rounded-xl border-0 bg-white/5 py-2.5 pl-10 pr-4 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-green-500 sm:text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <button
+                        onClick={handleUpdateEmail}
+                        disabled={isUpdatingAuth || email === user?.email}
+                        className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-700 disabled:opacity-50 transition-colors border border-gray-700"
+                      >
+                        Update Email
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-4 sm:items-end pt-4 border-t border-gray-800">
+                    <div className="sm:col-span-3">
+                      <label className="block text-sm font-medium text-gray-300">New Password</label>
+                      <div className="relative mt-2">
+                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                          <Key className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <input
+                          type="password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="Leave blank to keep current"
+                          className="block w-full rounded-xl border-0 bg-white/5 py-2.5 pl-10 pr-4 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-green-500 sm:text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <button
+                        onClick={handleUpdatePassword}
+                        disabled={isUpdatingAuth || !password}
+                        className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-700 disabled:opacity-50 transition-colors border border-gray-700"
+                      >
+                        Change Password
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* RISK MANAGEMENT TAB */}
+          {activeTab === "risk" && (
+            <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 sm:p-8">
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-white">Risk Alerts & Tilt Guard</h3>
+                <p className="text-sm text-gray-400 mt-1">
+                  Configure warning thresholds and enforcement. Applies to active account: <span className="text-green-400 font-medium">{activeAccount?.name || 'None'}</span>
+                </p>
+              </div>
+
+              {activeAccount ? (
+                <form onSubmit={handleSaveRisk} className="space-y-8">
+                  <div className="space-y-6">
+                    {/* Daily Loss Alert */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300">
+                        Daily Loss Alert Threshold (%)
+                      </label>
+                      <p className="text-xs text-gray-500 mb-3">Notify me when I reach this percentage of my Daily Loss limit.</p>
+                      <div className="flex items-center gap-4">
+                        <input
+                          type="range"
+                          min="50" max="100" step="5"
+                          value={dailyLossAlertThreshold}
+                          onChange={(e) => setDailyLossAlertThreshold(Number(e.target.value))}
+                          className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-green-500"
+                        />
+                        <span className="text-white font-mono bg-white/10 px-3 py-1 rounded-lg w-16 text-center">{dailyLossAlertThreshold}%</span>
+                      </div>
+                    </div>
+
+                    {/* Drawdown Alert */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300">
+                        Max Drawdown Alert Threshold (%)
+                      </label>
+                      <p className="text-xs text-gray-500 mb-3">Notify me when I reach this percentage of my Trailing/Max Drawdown limit.</p>
+                      <div className="flex items-center gap-4">
+                        <input
+                          type="range"
+                          min="50" max="100" step="5"
+                          value={drawdownAlertThreshold}
+                          onChange={(e) => setDrawdownAlertThreshold(Number(e.target.value))}
+                          className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-green-500"
+                        />
+                        <span className="text-white font-mono bg-white/10 px-3 py-1 rounded-lg w-16 text-center">{drawdownAlertThreshold}%</span>
+                      </div>
+                    </div>
+
+                    {/* Tilt Guard / Hard Stop */}
+                    <div className="pt-4 border-t border-gray-800">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-red-400 flex items-center gap-2">
+                            <Lock className="w-4 h-4" /> Tilt Guard (Hard Stop)
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1 max-w-md">
+                            When enabled, you will be blocked from logging new trades if you breach your Max Daily Loss limit for the day.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEnableHardStop(!enableHardStop)}
+                          className={cn(
+                            "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-900",
+                            enableHardStop ? "bg-red-500" : "bg-gray-700"
+                          )}
+                        >
+                          <span className={cn(
+                            "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                            enableHardStop ? "translate-x-5" : "translate-x-0"
+                          )} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isSavingRisk}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-500 disabled:opacity-50 transition-colors"
+                    >
+                      <Save className="w-4 h-4" />
+                      {isSavingRisk ? "Saving..." : "Save Risk Rules"}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="py-8 text-center border-2 border-dashed border-gray-800 rounded-xl">
+                  <p className="text-gray-400 text-sm">Please select an active account from the Accounts page first.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* PREFERENCES TAB */}
+          {activeTab === "preferences" && (
+            <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 sm:p-8 space-y-8">
+              <div>
+                <h3 className="text-lg font-semibold text-white">Trading Tags Manager</h3>
+                <p className="text-sm text-gray-400 mt-1">
+                  Customize the tags you use when logging trades for better psychological review.
+                </p>
+              </div>
+
+              {prefsLoading ? (
+                <div className="text-gray-400 text-sm animate-pulse">Loading preferences...</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Psychology Tags */}
+                  <div>
+                    <h4 className="text-sm font-medium text-white mb-4">Psychology / Emotion Tags</h4>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {preferences?.psychologyTags.map(tag => (
+                        <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-500/10 text-blue-400 text-sm border border-blue-500/20">
+                          {tag}
+                          <button onClick={() => handleRemovePsychTag(tag)} className="hover:text-blue-300">
+                            <Trash className="w-3.5 h-3.5" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <form onSubmit={handleAddPsychTag} className="flex gap-2">
+                      <input 
+                        type="text" 
+                        value={newPsychTag} 
+                        onChange={e => setNewPsychTag(e.target.value)}
+                        placeholder="Add emotion..."
+                        className="flex-1 rounded-lg border-0 bg-white/5 py-1.5 px-3 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-green-500 sm:text-sm"
+                      />
+                      <button type="submit" className="p-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors">
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Mistake Tags */}
+                  <div>
+                    <h4 className="text-sm font-medium text-white mb-4">Mistake Tags</h4>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {preferences?.mistakeTags.map(tag => (
+                        <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500/10 text-red-400 text-sm border border-red-500/20">
+                          {tag}
+                          <button onClick={() => handleRemoveMistakeTag(tag)} className="hover:text-red-300">
+                            <Trash className="w-3.5 h-3.5" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <form onSubmit={handleAddMistakeTag} className="flex gap-2">
+                      <input 
+                        type="text" 
+                        value={newMistakeTag} 
+                        onChange={e => setNewMistakeTag(e.target.value)}
+                        placeholder="Add mistake..."
+                        className="flex-1 rounded-lg border-0 bg-white/5 py-1.5 px-3 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-green-500 sm:text-sm"
+                      />
+                      <button type="submit" className="p-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors">
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Confluence Tags */}
+                  <div className="md:col-span-2 border-t border-gray-800 pt-8 mt-4">
+                    <h4 className="text-sm font-medium text-white mb-4">Confluence Tags</h4>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {preferences?.confluenceTags?.map(tag => (
+                        <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-500/10 text-purple-400 text-sm border border-purple-500/20">
+                          {tag}
+                          <button onClick={() => handleRemoveConfluenceTag(tag)} className="hover:text-purple-300">
+                            <Trash className="w-3.5 h-3.5" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <form onSubmit={handleAddConfluenceTag} className="flex gap-2 max-w-sm">
+                      <input 
+                        type="text" 
+                        value={newConfluenceTag} 
+                        onChange={e => setNewConfluenceTag(e.target.value)}
+                        placeholder="Add confluence..."
+                        className="flex-1 rounded-lg border-0 bg-white/5 py-1.5 px-3 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-green-500 sm:text-sm"
+                      />
+                      <button type="submit" className="p-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors">
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* APP PREFERENCES TAB */}
+          {activeTab === "app" && (
+            <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 sm:p-8 space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-white">Application Preferences</h3>
+                <p className="text-sm text-gray-400 mt-1">
+                  Customize the look and feel of your app.
+                </p>
+              </div>
+
+              {prefsLoading ? (
+                <div className="text-gray-400 text-sm animate-pulse">Loading...</div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between py-2 border-b border-gray-800">
+                    <div>
+                      <p className="text-sm font-medium text-white flex items-center gap-2">
+                        <EyeOff className="w-4 h-4 text-gray-400" /> Privacy Mode
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">Hide sensitive monetary values on the dashboard</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleTogglePrivacy}
+                      className={cn(
+                        "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-900",
+                        preferences?.privacyMode ? "bg-green-500" : "bg-gray-700"
+                      )}
+                    >
+                      <span className={cn(
+                        "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                        preferences?.privacyMode ? "translate-x-5" : "translate-x-0"
+                      )} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
         </div>
       </div>
