@@ -2,7 +2,8 @@
 
 import { useAccountStore } from "@/store/useAccountStore";
 import { useTradeStore } from "@/store/useTradeStore";
-import { Target, ShieldAlert, TrendingUp, TrendingDown, Activity, Wallet, Percent, AlertTriangle } from "lucide-react";
+import { Target, ShieldAlert, TrendingUp, TrendingDown, Activity, Wallet, Percent, AlertTriangle, Globe } from "lucide-react";
+import { EconomicCalendarWidget } from "@/components/EconomicCalendarWidget";
 import { format } from "date-fns";
 import { motion, Variants } from "framer-motion";
 import clsx from "clsx";
@@ -298,6 +299,29 @@ export default function Dashboard() {
               )}
             </>
           )}
+        </motion.div>
+      </motion.div>
+
+      {/* Economic Calendar Widget */}
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="mt-6"
+      >
+        <motion.div variants={itemVariants} className="relative overflow-hidden rounded-3xl border border-white/5 bg-gray-900/40 backdrop-blur-xl p-6 shadow-2xl h-[400px] hover:bg-gray-900/60 transition-colors">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 rounded-xl bg-white/5">
+              <Globe className="w-6 h-6 text-sky-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white">Upcoming High-Impact Events</h3>
+              <p className="text-sm text-gray-400">Stay ahead of market volatility</p>
+            </div>
+          </div>
+          <div className="h-[calc(100%-4rem)] rounded-xl overflow-hidden bg-gray-950/50">
+            <EconomicCalendarWidget height="100%" importanceFilter="0,1" />
+          </div>
         </motion.div>
       </motion.div>
     </div>

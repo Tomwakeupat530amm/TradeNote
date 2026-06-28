@@ -44,6 +44,10 @@ export function Header() {
     }
   };
 
+  if (!user) {
+    return null;
+  }
+
   return (
     <header className="sticky top-0 z-40 flex h-20 shrink-0 items-center gap-x-4 bg-gray-950/80 backdrop-blur-xl px-4 sm:gap-x-6 sm:px-6 lg:px-8 border-b border-white/5">
       <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
