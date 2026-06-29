@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/routing";
 import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, Users, Activity, Settings, LogOut, ReceiptText, CalendarDays, BookOpen,
@@ -12,14 +14,14 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { motion } from "framer-motion";
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard, color: "text-blue-400" },
-  { name: "Trade Journal", href: "/journal", icon: ReceiptText, color: "text-green-400" },
-  { name: "Reviews", href: "/daily-review", icon: CalendarDays, color: "text-purple-400" },
-  { name: "Accounts", href: "/accounts", icon: Users, color: "text-orange-400" },
-  { name: "Analytics", href: "/analytics", icon: Activity, color: "text-pink-400" },
-  { name: "Calendar", href: "/calendar", icon: CalendarDays, color: "text-yellow-400" },
-  { name: "Playbook", href: "/playbook", icon: BookOpen, color: "text-indigo-400" },
-  { name: "Economic Calendar", href: "/economic-calendar", icon: Globe, color: "text-sky-400" },
+  { id: "dashboard", href: "/", icon: LayoutDashboard, color: "text-blue-400" },
+  { id: "journal", href: "/journal", icon: ReceiptText, color: "text-green-400" },
+  { id: "daily_review", href: "/daily-review", icon: CalendarDays, color: "text-purple-400" },
+  { id: "accounts", href: "/accounts", icon: Users, color: "text-orange-400" },
+  { id: "analytics", href: "/analytics", icon: Activity, color: "text-pink-400" },
+  { id: "calendar", href: "/calendar", icon: CalendarDays, color: "text-yellow-400" },
+  { id: "playbook", href: "/playbook", icon: BookOpen, color: "text-indigo-400" },
+  { id: "economic_calendar", href: "/economic-calendar", icon: Globe, color: "text-sky-400" },
 ];
 
 const tradingQuotes = [
@@ -45,6 +47,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user, signOut } = useAuthStore();
   const [activeQuoteIndex, setActiveQuoteIndex] = useState(0);
+  const t = useTranslations('Navigation');
 
   useEffect(() => {
     if (!user) {
@@ -71,9 +74,9 @@ export function Sidebar() {
             <li>
               <ul role="list" className="-mx-2 space-y-2">
                 {navigation.map((item) => {
-                  const isActive = pathname === item.href;
+                  const isActive = pathname === item.href || pathname === `/vi${item.href}` || pathname === `/en${item.href}`;
                   return (
-                    <li key={item.name} className="relative">
+                    <li key={item.id} className="relative">
                       {isActive && (
                         <motion.div 
                           layoutId="sidebar-active"
@@ -93,7 +96,7 @@ export function Sidebar() {
                           className={clsx("h-5 w-5 shrink-0 transition-colors", isActive ? item.color : "text-gray-500 group-hover:text-gray-300")}
                           aria-hidden="true"
                         />
-                        {item.name}
+                        {t(item.id as any)}
                       </Link>
                     </li>
                   );
@@ -104,12 +107,12 @@ export function Sidebar() {
               <Link
                 href="/settings"
                 className={clsx(
-                  pathname === "/settings" ? "bg-white/10 text-white border border-white/10" : "text-gray-400 hover:bg-white/5 hover:text-white border border-transparent",
+                  pathname === "/settings" || pathname === "/vi/settings" || pathname === "/en/settings" ? "bg-white/10 text-white border border-white/10" : "text-gray-400 hover:bg-white/5 hover:text-white border border-transparent",
                   "group flex gap-x-3 rounded-xl p-3 text-sm font-semibold transition-all -mx-2"
                 )}
               >
-                <Settings className={clsx("h-5 w-5 shrink-0", pathname === "/settings" ? "text-gray-300" : "text-gray-500 group-hover:text-gray-300")} />
-                Settings
+                <Settings className={clsx("h-5 w-5 shrink-0", pathname === "/settings" || pathname === "/vi/settings" || pathname === "/en/settings" ? "text-gray-300" : "text-gray-500 group-hover:text-gray-300")} />
+                {t('settings')}
               </Link>
               <button
                 onClick={() => signOut()}
@@ -185,7 +188,7 @@ export function Sidebar() {
             >
               <Quote className="w-6 h-6 text-green-500/40 mb-2" />
               <p className="text-xs text-gray-300 italic leading-relaxed font-medium min-h-[48px]">
-                "{tradingQuotes[activeQuoteIndex].quote}"
+                &quot;{tradingQuotes[activeQuoteIndex].quote}&quot;
               </p>
               <div className="mt-3 flex items-center justify-between border-t border-white/5 pt-2">
                 <span className="text-[11px] font-semibold text-green-400">

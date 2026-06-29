@@ -120,7 +120,7 @@ export default function PlaybookPage() {
         await deletePlaybook(id);
         toast.success("Playbook deleted");
         if (viewingPlaybook?.id === id) setViewingPlaybook(null);
-      } catch (_error) {
+      } catch {
         toast.error("Failed to delete playbook");
       }
     }

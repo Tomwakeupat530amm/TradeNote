@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -8,8 +9,11 @@ import { useNotificationStore } from "@/store/useNotificationStore";
 import { usePreferenceStore } from "@/store/usePreferenceStore";
 import clsx from "clsx";
 import { formatDistanceToNow } from "date-fns";
+import { LanguageSwitcher } from "./LanguageSwitcher";
+import { useTranslations } from "next-intl";
 
 export function Header() {
+  const t = useTranslations('Header');
   const { user } = useAuthStore();
   const userEmail = user?.email || "trader@example.com";
   const userInitial = userEmail.charAt(0).toUpperCase();
@@ -154,6 +158,11 @@ export function Header() {
             </AnimatePresence>
           </div>
 
+          {/* Language Switcher */}
+          <div className="flex items-center">
+            <LanguageSwitcher />
+          </div>
+
           {/* Separator */}
           <div
             className="hidden lg:block lg:h-6 lg:w-px lg:bg-white/10"
@@ -179,7 +188,7 @@ export function Header() {
             </div>
             <span className="hidden lg:flex lg:flex-col lg:items-start cursor-pointer group">
               <span className="text-sm font-bold leading-5 text-white group-hover:text-blue-400 transition-colors">
-                {preferences?.displayName || "Pro Trader"}
+                {preferences?.displayName || t('profile')}
               </span>
               <span className="text-xs font-medium text-gray-500 truncate w-32">
                 {userEmail}

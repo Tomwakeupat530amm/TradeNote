@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -9,12 +10,14 @@ import { Save, ShieldAlert, Tag, Settings, Trash, Plus, EyeOff, Lock, User, Uplo
 import { toast } from "sonner";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { useTranslations } from "next-intl";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 export default function SettingsPage() {
+  const t = useTranslations("Settings");
   const { user } = useAuthStore();
   const { accounts, activeAccountId, updateAccount } = useAccountStore();
   const { preferences, fetchPreferences, updatePreferences, isLoading: prefsLoading } = usePreferenceStore();
@@ -63,16 +66,20 @@ export default function SettingsPage() {
     fetchPreferences();
   }, [fetchPreferences]);
 
+   
   useEffect(() => {
     if (preferences) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDisplayName(preferences.displayName || "");
       setTimezone(preferences.timezone || "UTC");
       setBaseCurrency(preferences.baseCurrency || "USD");
     }
   }, [preferences]);
 
+   
   useEffect(() => {
     if (user?.email) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEmail(user.email);
     }
   }, [user]);
@@ -106,7 +113,7 @@ export default function SettingsPage() {
     try {
       await updatePreferences({ displayName, timezone, baseCurrency });
       toast.success("Profile settings saved!");
-    } catch (error) {
+    } catch {
       toast.error("Failed to save profile settings.");
     } finally {
       setIsSavingProfile(false);
@@ -157,8 +164,8 @@ export default function SettingsPage() {
       
       await updatePreferences({ avatarUrl: data.publicUrl });
       toast.success("Avatar updated!");
-    } catch (error: any) {
-      toast.error(error.message || "Failed to upload avatar");
+    } catch (error: unknown) {
+      toast.error((error as Error).message || "Failed to upload avatar");
     } finally {
       setIsUploadingAvatar(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -220,10 +227,10 @@ export default function SettingsPage() {
     <div className="space-y-8 max-w-5xl">
       <div>
         <h2 className="text-2xl font-bold leading-7 text-white sm:truncate sm:text-3xl sm:tracking-tight">
-          Settings
+          {t("title")}
         </h2>
         <p className="mt-1 text-sm text-gray-400">
-          Manage your risk rules, trading tags, and app preferences.
+          {t("description")}
         </p>
       </div>
 
@@ -239,7 +246,7 @@ export default function SettingsPage() {
                 : "text-gray-400 border-transparent hover:bg-white/5 hover:text-white"
             )}>
             <User className="w-5 h-5" />
-            Profile
+            {t("profile")}
           </button>
           <button 
             onClick={() => setActiveTab("risk")}
@@ -249,7 +256,7 @@ export default function SettingsPage() {
                 : "text-gray-400 border-transparent hover:bg-white/5 hover:text-white"
             )}>
             <ShieldAlert className="w-5 h-5" />
-            Risk Alerts
+            {t("risk")}
           </button>
           <button 
             onClick={() => setActiveTab("preferences")}
@@ -259,7 +266,7 @@ export default function SettingsPage() {
                 : "text-gray-400 border-transparent hover:bg-white/5 hover:text-white"
             )}>
             <Tag className="w-5 h-5" />
-            Trading Tags
+            {t("tags")}
           </button>
           <button 
             onClick={() => setActiveTab("app")}
@@ -269,7 +276,7 @@ export default function SettingsPage() {
                 : "text-gray-400 border-transparent hover:bg-white/5 hover:text-white"
             )}>
             <Settings className="w-5 h-5" />
-            App Preferences
+            {t("app")}
           </button>
         </div>
 
@@ -283,8 +290,8 @@ export default function SettingsPage() {
               <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 sm:p-8">
                 <div className="mb-6 flex items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-semibold text-white">Profile Information</h3>
-                    <p className="text-sm text-gray-400 mt-1">Update your display name, avatar, and trading preferences.</p>
+                    <h3 className="text-lg font-semibold text-white">{t("profile_info")}</h3>
+                    <p className="text-sm text-gray-400 mt-1">{t("profile_desc")}</p>
                   </div>
                   {/* Avatar Upload */}
                   <div className="flex items-center gap-4">
@@ -305,7 +312,7 @@ export default function SettingsPage() {
                         className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-sm text-white rounded-lg transition-colors border border-gray-700"
                       >
                         <Upload className="w-4 h-4" />
-                        {isUploadingAvatar ? "Uploading..." : "Change"}
+                        {isUploadingAvatar ? t("avatar_uploading") : t("avatar_change")}
                       </button>
                     </div>
                   </div>
@@ -314,7 +321,7 @@ export default function SettingsPage() {
                 <form onSubmit={handleSaveProfile} className="space-y-6">
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     <div>
-                      <label className="block text-sm font-medium text-gray-300">Display Name</label>
+                      <label className="block text-sm font-medium text-gray-300">{t("display_name")}</label>
                       <input
                         type="text"
                         value={displayName}
@@ -324,7 +331,7 @@ export default function SettingsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-300">Base Currency</label>
+                      <label className="block text-sm font-medium text-gray-300">{t("base_currency")}</label>
                       <select
                         value={baseCurrency}
                         onChange={(e) => setBaseCurrency(e.target.value)}
@@ -339,7 +346,7 @@ export default function SettingsPage() {
                       </select>
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="block text-sm font-medium text-gray-300">Timezone</label>
+                      <label className="block text-sm font-medium text-gray-300">{t("timezone")}</label>
                       <select
                         value={timezone}
                         onChange={(e) => setTimezone(e.target.value)}
@@ -356,7 +363,7 @@ export default function SettingsPage() {
                         <option value="Asia/Ho_Chi_Minh">ICT (Ho Chi Minh / Hanoi)</option>
                         <option value="Australia/Sydney">AEST/AEDT (Sydney)</option>
                       </select>
-                      <p className="mt-2 text-xs text-gray-500">This timezone is used to sync your Daily Loss reset and trading history.</p>
+                      <p className="mt-2 text-xs text-gray-500">{t("timezone_desc")}</p>
                     </div>
                   </div>
                   <div className="flex justify-end pt-2">
@@ -366,7 +373,7 @@ export default function SettingsPage() {
                       className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-500 disabled:opacity-50 transition-colors"
                     >
                       <Save className="w-4 h-4" />
-                      {isSavingProfile ? "Saving..." : "Save Profile"}
+                      {isSavingProfile ? t("saving") : t("save_profile")}
                     </button>
                   </div>
                 </form>
@@ -375,13 +382,13 @@ export default function SettingsPage() {
               {/* Security */}
               <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 sm:p-8">
                 <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-white">Security</h3>
-                  <p className="text-sm text-gray-400 mt-1">Update your email address or change your password.</p>
+                  <h3 className="text-lg font-semibold text-white">{t("security")}</h3>
+                  <p className="text-sm text-gray-400 mt-1">{t("security_desc")}</p>
                 </div>
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-4 sm:items-end">
                     <div className="sm:col-span-3">
-                      <label className="block text-sm font-medium text-gray-300">Email Address</label>
+                      <label className="block text-sm font-medium text-gray-300">{t("email")}</label>
                       <div className="relative mt-2">
                         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                           <Mail className="h-5 w-5 text-gray-400" />
@@ -400,14 +407,14 @@ export default function SettingsPage() {
                         disabled={isUpdatingAuth || email === user?.email}
                         className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-700 disabled:opacity-50 transition-colors border border-gray-700"
                       >
-                        Update Email
+                        {t("update_email")}
                       </button>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-4 sm:items-end pt-4 border-t border-gray-800">
                     <div className="sm:col-span-3">
-                      <label className="block text-sm font-medium text-gray-300">New Password</label>
+                      <label className="block text-sm font-medium text-gray-300">{t("new_password")}</label>
                       <div className="relative mt-2">
                         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                           <Key className="h-5 w-5 text-gray-400" />
@@ -416,7 +423,7 @@ export default function SettingsPage() {
                           type="password"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          placeholder="Leave blank to keep current"
+                          placeholder={t("new_password_placeholder")}
                           className="block w-full rounded-xl border-0 bg-white/5 py-2.5 pl-10 pr-4 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-green-500 sm:text-sm"
                         />
                       </div>
@@ -427,7 +434,7 @@ export default function SettingsPage() {
                         disabled={isUpdatingAuth || !password}
                         className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-700 disabled:opacity-50 transition-colors border border-gray-700"
                       >
-                        Change Password
+                        {t("change_password")}
                       </button>
                     </div>
                   </div>
@@ -440,9 +447,9 @@ export default function SettingsPage() {
           {activeTab === "risk" && (
             <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 sm:p-8">
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-white">Risk Alerts & Tilt Guard</h3>
+                <h3 className="text-lg font-semibold text-white">{t("risk_title")}</h3>
                 <p className="text-sm text-gray-400 mt-1">
-                  Configure warning thresholds and enforcement. Applies to active account: <span className="text-green-400 font-medium">{activeAccount?.name || 'None'}</span>
+                  {t("risk_desc")}<span className="text-green-400 font-medium">{activeAccount?.name || 'None'}</span>
                 </p>
               </div>
 
@@ -452,9 +459,9 @@ export default function SettingsPage() {
                     {/* Daily Loss Alert */}
                     <div>
                       <label className="block text-sm font-medium text-gray-300">
-                        Daily Loss Alert Threshold (%)
+                        {t("daily_loss")}
                       </label>
-                      <p className="text-xs text-gray-500 mb-3">Notify me when I reach this percentage of my Daily Loss limit.</p>
+                      <p className="text-xs text-gray-500 mb-3">{t("daily_loss_desc")}</p>
                       <div className="flex items-center gap-4">
                         <input
                           type="range"
@@ -470,9 +477,9 @@ export default function SettingsPage() {
                     {/* Drawdown Alert */}
                     <div>
                       <label className="block text-sm font-medium text-gray-300">
-                        Max Drawdown Alert Threshold (%)
+                        {t("drawdown")}
                       </label>
-                      <p className="text-xs text-gray-500 mb-3">Notify me when I reach this percentage of my Trailing/Max Drawdown limit.</p>
+                      <p className="text-xs text-gray-500 mb-3">{t("drawdown_desc")}</p>
                       <div className="flex items-center gap-4">
                         <input
                           type="range"
@@ -490,10 +497,10 @@ export default function SettingsPage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-medium text-red-400 flex items-center gap-2">
-                            <Lock className="w-4 h-4" /> Tilt Guard (Hard Stop)
+                            <Lock className="w-4 h-4" /> {t("tilt_guard")}
                           </p>
                           <p className="text-xs text-gray-500 mt-1 max-w-md">
-                            When enabled, you will be blocked from logging new trades if you breach your Max Daily Loss limit for the day.
+                            {t("tilt_guard_desc")}
                           </p>
                         </div>
                         <button
@@ -520,13 +527,13 @@ export default function SettingsPage() {
                       className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-500 disabled:opacity-50 transition-colors"
                     >
                       <Save className="w-4 h-4" />
-                      {isSavingRisk ? "Saving..." : "Save Risk Rules"}
+                      {isSavingRisk ? t("saving") : t("save_risk")}
                     </button>
                   </div>
                 </form>
               ) : (
                 <div className="py-8 text-center border-2 border-dashed border-gray-800 rounded-xl">
-                  <p className="text-gray-400 text-sm">Please select an active account from the Accounts page first.</p>
+                  <p className="text-gray-400 text-sm">{t("select_account")}</p>
                 </div>
               )}
             </div>
@@ -536,19 +543,19 @@ export default function SettingsPage() {
           {activeTab === "preferences" && (
             <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 sm:p-8 space-y-8">
               <div>
-                <h3 className="text-lg font-semibold text-white">Trading Tags Manager</h3>
+                <h3 className="text-lg font-semibold text-white">{t("tags_title")}</h3>
                 <p className="text-sm text-gray-400 mt-1">
-                  Customize the tags you use when logging trades for better psychological review.
+                  {t("tags_desc")}
                 </p>
               </div>
 
               {prefsLoading ? (
-                <div className="text-gray-400 text-sm animate-pulse">Loading preferences...</div>
+                <div className="text-gray-400 text-sm animate-pulse">{t("loading")}</div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   {/* Psychology Tags */}
                   <div>
-                    <h4 className="text-sm font-medium text-white mb-4">Psychology / Emotion Tags</h4>
+                    <h4 className="text-sm font-medium text-white mb-4">{t("psych_tags")}</h4>
                     <div className="flex flex-wrap gap-2 mb-4">
                       {preferences?.psychologyTags.map(tag => (
                         <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-500/10 text-blue-400 text-sm border border-blue-500/20">
@@ -564,7 +571,7 @@ export default function SettingsPage() {
                         type="text" 
                         value={newPsychTag} 
                         onChange={e => setNewPsychTag(e.target.value)}
-                        placeholder="Add emotion..."
+                        placeholder={t("add_emotion")}
                         className="flex-1 rounded-lg border-0 bg-white/5 py-1.5 px-3 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-green-500 sm:text-sm"
                       />
                       <button type="submit" className="p-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors">
@@ -575,7 +582,7 @@ export default function SettingsPage() {
 
                   {/* Mistake Tags */}
                   <div>
-                    <h4 className="text-sm font-medium text-white mb-4">Mistake Tags</h4>
+                    <h4 className="text-sm font-medium text-white mb-4">{t("mistake_tags")}</h4>
                     <div className="flex flex-wrap gap-2 mb-4">
                       {preferences?.mistakeTags.map(tag => (
                         <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500/10 text-red-400 text-sm border border-red-500/20">
@@ -591,7 +598,7 @@ export default function SettingsPage() {
                         type="text" 
                         value={newMistakeTag} 
                         onChange={e => setNewMistakeTag(e.target.value)}
-                        placeholder="Add mistake..."
+                        placeholder={t("add_mistake")}
                         className="flex-1 rounded-lg border-0 bg-white/5 py-1.5 px-3 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-green-500 sm:text-sm"
                       />
                       <button type="submit" className="p-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors">
@@ -602,7 +609,7 @@ export default function SettingsPage() {
 
                   {/* Confluence Tags */}
                   <div className="md:col-span-2 border-t border-gray-800 pt-8 mt-4">
-                    <h4 className="text-sm font-medium text-white mb-4">Confluence Tags</h4>
+                    <h4 className="text-sm font-medium text-white mb-4">{t("confluence_tags")}</h4>
                     <div className="flex flex-wrap gap-2 mb-4">
                       {preferences?.confluenceTags?.map(tag => (
                         <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-500/10 text-purple-400 text-sm border border-purple-500/20">
@@ -618,7 +625,7 @@ export default function SettingsPage() {
                         type="text" 
                         value={newConfluenceTag} 
                         onChange={e => setNewConfluenceTag(e.target.value)}
-                        placeholder="Add confluence..."
+                        placeholder={t("add_confluence")}
                         className="flex-1 rounded-lg border-0 bg-white/5 py-1.5 px-3 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-green-500 sm:text-sm"
                       />
                       <button type="submit" className="p-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors">
@@ -635,22 +642,22 @@ export default function SettingsPage() {
           {activeTab === "app" && (
             <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 sm:p-8 space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-white">Application Preferences</h3>
+                <h3 className="text-lg font-semibold text-white">{t("app_title")}</h3>
                 <p className="text-sm text-gray-400 mt-1">
-                  Customize the look and feel of your app.
+                  {t("app_desc")}
                 </p>
               </div>
 
               {prefsLoading ? (
-                <div className="text-gray-400 text-sm animate-pulse">Loading...</div>
+                <div className="text-gray-400 text-sm animate-pulse">{t("loading")}</div>
               ) : (
                 <div className="space-y-6">
                   <div className="flex items-center justify-between py-2 border-b border-gray-800">
                     <div>
                       <p className="text-sm font-medium text-white flex items-center gap-2">
-                        <EyeOff className="w-4 h-4 text-gray-400" /> Privacy Mode
+                        <EyeOff className="w-4 h-4 text-gray-400" /> {t("privacy_mode")}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">Hide sensitive monetary values on the dashboard</p>
+                      <p className="text-xs text-gray-500 mt-1">{t("privacy_mode_desc")}</p>
                     </div>
                     <button
                       type="button"
