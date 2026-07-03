@@ -98,10 +98,10 @@ export default function SettingsPage() {
           enableHardStop
         }
       });
-      toast.success("Risk settings saved successfully!");
+      toast.success(t('risk_saved', { defaultMessage: "Risk settings saved successfully!" }));
     } catch (error) {
       console.error(error);
-      toast.error("Failed to save risk settings.");
+      toast.error(t('risk_failed', { defaultMessage: "Failed to save risk settings." }));
     } finally {
       setIsSavingRisk(false);
     }
@@ -112,9 +112,9 @@ export default function SettingsPage() {
     setIsSavingProfile(true);
     try {
       await updatePreferences({ displayName, timezone, baseCurrency });
-      toast.success("Profile settings saved!");
+      toast.success(t('profile_saved', { defaultMessage: "Profile settings saved!" }));
     } catch {
-      toast.error("Failed to save profile settings.");
+      toast.error(t('profile_failed', { defaultMessage: "Failed to save profile settings." }));
     } finally {
       setIsSavingProfile(false);
     }
@@ -127,7 +127,7 @@ export default function SettingsPage() {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success("Check both emails to confirm the change.");
+      toast.success(t('check_emails', { defaultMessage: "Check both emails to confirm the change." }));
     }
     setIsUpdatingAuth(false);
   };
@@ -139,7 +139,7 @@ export default function SettingsPage() {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success("Password updated successfully!");
+      toast.success(t('password_updated', { defaultMessage: "Password updated successfully!" }));
       setPassword("");
     }
     setIsUpdatingAuth(false);
@@ -163,9 +163,9 @@ export default function SettingsPage() {
       const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
       
       await updatePreferences({ avatarUrl: data.publicUrl });
-      toast.success("Avatar updated!");
+      toast.success(t('avatar_updated', { defaultMessage: "Avatar updated!" }));
     } catch (error: unknown) {
-      toast.error((error as Error).message || "Failed to upload avatar");
+      toast.error((error as Error).message || t('avatar_failed', { defaultMessage: "Failed to upload avatar" }));
     } finally {
       setIsUploadingAvatar(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -178,7 +178,7 @@ export default function SettingsPage() {
     const tags = [...preferences.psychologyTags, newPsychTag.trim()];
     await updatePreferences({ psychologyTags: tags });
     setNewPsychTag("");
-    toast.success("Tag added!");
+    toast.success(t('tag_added', { defaultMessage: "Tag added!" }));
   };
 
   const handleRemovePsychTag = async (tagToRemove: string) => {
@@ -193,7 +193,7 @@ export default function SettingsPage() {
     const tags = [...preferences.mistakeTags, newMistakeTag.trim()];
     await updatePreferences({ mistakeTags: tags });
     setNewMistakeTag("");
-    toast.success("Tag added!");
+    toast.success(t('tag_added', { defaultMessage: "Tag added!" }));
   };
 
   const handleRemoveMistakeTag = async (tagToRemove: string) => {
@@ -208,7 +208,7 @@ export default function SettingsPage() {
     const tags = [...preferences.confluenceTags, newConfluenceTag.trim()];
     await updatePreferences({ confluenceTags: tags });
     setNewConfluenceTag("");
-    toast.success("Tag added!");
+    toast.success(t('tag_added', { defaultMessage: "Tag added!" }));
   };
 
   const handleRemoveConfluenceTag = async (tagToRemove: string) => {
@@ -220,7 +220,7 @@ export default function SettingsPage() {
   const handleTogglePrivacy = async () => {
     if (!preferences) return;
     await updatePreferences({ privacyMode: !preferences.privacyMode });
-    toast.success(`Privacy mode ${!preferences.privacyMode ? "enabled" : "disabled"}`);
+    toast.success(!preferences.privacyMode ? t('privacy_enabled', { defaultMessage: "Privacy mode enabled" }) : t('privacy_disabled', { defaultMessage: "Privacy mode disabled" }));
   };
 
   return (

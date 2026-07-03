@@ -10,6 +10,7 @@ import {
   eachDayOfInterval, isSameMonth, isToday, parseISO, isSameDay,
   startOfWeek, endOfWeek
 } from "date-fns";
+import { useTranslations } from "next-intl";
 
 export default function CalendarPage() {
   const { trades } = useTradeStore();
@@ -18,6 +19,7 @@ export default function CalendarPage() {
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const t = useTranslations("Calendar");
 
   // Filter trades for active account
   const accountTrades = useMemo(() => {
@@ -65,8 +67,8 @@ export default function CalendarPage() {
           className="text-center py-20 bg-gray-900/50 backdrop-blur-md p-10 rounded-3xl border border-gray-800 shadow-2xl"
         >
           <CalendarIcon className="w-12 h-12 text-blue-500 mx-auto mb-4 opacity-50" />
-          <h2 className="text-2xl font-bold text-white mb-2">Calendar Not Available</h2>
-          <p className="text-gray-400 max-w-sm mx-auto">Please create and select an account to view your trading calendar.</p>
+          <h2 className="text-2xl font-bold text-white mb-2">{t('not_available')}</h2>
+          <p className="text-gray-400 max-w-sm mx-auto">{t('please_create_account')}</p>
         </motion.div>
       </div>
     );
@@ -78,10 +80,10 @@ export default function CalendarPage() {
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
           <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-2">
             <CalendarIcon className="w-8 h-8 text-blue-500" />
-            Calendar
+            {t('title')}
           </h2>
           <p className="mt-1 text-sm text-gray-400">
-            Your trading performance month by month.
+            {t('subtitle')}
           </p>
         </motion.div>
       </div>
@@ -114,7 +116,7 @@ export default function CalendarPage() {
           </div>
 
           <div className="grid grid-cols-7 gap-2 mb-2 text-center text-sm font-medium text-gray-500">
-            <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+            <div>{t('mon')}</div><div>{t('tue')}</div><div>{t('wed')}</div><div>{t('thu')}</div><div>{t('fri')}</div><div>{t('sat')}</div><div>{t('sun')}</div>
           </div>
 
           <div className="grid grid-cols-7 gap-2">
@@ -162,7 +164,7 @@ export default function CalendarPage() {
                       <div className={`text-xs font-bold truncate`}>
                         {data.pnl > 0 ? '+' : ''}{data.pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </div>
-                      <div className="text-[10px] text-gray-500 mt-1">{data.count} trades</div>
+                      <div className="text-[10px] text-gray-500 mt-1">{data.count} {t('trades').toLowerCase()}</div>
                     </div>
                   )}
                 </button>
@@ -186,7 +188,7 @@ export default function CalendarPage() {
                       {format(selectedDate, 'EEEE, MMM d')}
                     </h3>
                     <p className="text-gray-400 text-sm">
-                      {selectedDayData ? `${selectedDayData.count} trades completed` : 'No trading activity'}
+                      {selectedDayData ? `${selectedDayData.count} ${t('trades_completed')}` : t('no_trading_activity')}
                     </p>
                   </div>
                   <button 
@@ -200,14 +202,14 @@ export default function CalendarPage() {
                 {selectedDayData ? (
                   <div className="space-y-6">
                     <div className={`p-4 rounded-2xl ${selectedDayData.pnl >= 0 ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'} border`}>
-                      <p className="text-sm font-medium opacity-80 mb-1">Daily Net PnL</p>
+                      <p className="text-sm font-medium opacity-80 mb-1">{t('daily_net_pnl')}</p>
                       <h4 className="text-3xl font-bold">
                         {selectedDayData.pnl >= 0 ? '+' : ''}${selectedDayData.pnl.toLocaleString()}
                       </h4>
                     </div>
                     
                     <div className="space-y-3">
-                      <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Trades</h4>
+                      <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider">{t('trades')}</h4>
                       <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                         {selectedDayData.trades.map(trade => (
                           <div key={trade.id} className="bg-white/5 border border-white/10 p-3 rounded-xl flex items-center justify-between">
@@ -239,8 +241,8 @@ export default function CalendarPage() {
                     <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
                       <CalendarIcon className="w-8 h-8 text-gray-500" />
                     </div>
-                    <p className="text-gray-400 font-medium">No trades recorded</p>
-                    <p className="text-gray-500 text-sm mt-1">Take a break or plan your next move.</p>
+                    <p className="text-gray-400 font-medium">{t('no_trades_recorded')}</p>
+                    <p className="text-gray-500 text-sm mt-1">{t('take_a_break')}</p>
                   </div>
                 )}
               </>
@@ -249,9 +251,9 @@ export default function CalendarPage() {
                 <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center mb-4">
                   <CalendarIcon className="w-10 h-10 text-blue-400" />
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">Select a Day</h3>
+                <h3 className="text-xl font-bold text-white mb-2">{t('select_a_day')}</h3>
                 <p className="text-gray-400 max-w-[200px] text-sm">
-                  Click on any day in the calendar to view your trading activity and detailed performance.
+                  {t('select_a_day_desc')}
                 </p>
               </div>
             )}

@@ -6,8 +6,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, Plus, X, Upload, Trash2, Edit } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 export default function PlaybookPage() {
+  const t = useTranslations("Playbook");
   const { playbooks, addPlaybook, updatePlaybook, deletePlaybook } = usePlaybookStore();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -81,7 +83,7 @@ export default function PlaybookPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title) return toast.error("Title is required");
+    if (!title) return toast.error(t('title_required', { defaultMessage: "Title is required" }));
 
     setIsSubmitting(true);
     try {
@@ -94,7 +96,7 @@ export default function PlaybookPage() {
           rules: cleanRules,
           imageFile: imageFile !== editingPlaybook.imageUrl ? imageFile : undefined
         });
-        toast.success("Playbook updated successfully");
+        toast.success(t('playbook_updated', { defaultMessage: "Playbook updated successfully" }));
       } else {
         await addPlaybook({
           title,
@@ -102,12 +104,12 @@ export default function PlaybookPage() {
           rules: cleanRules,
           imageFile: imageFile || undefined
         });
-        toast.success("Playbook created successfully");
+        toast.success(t('playbook_created', { defaultMessage: "Playbook created successfully" }));
       }
       closeModal();
     } catch (error) {
       console.error(error);
-      toast.error("An error occurred");
+      toast.error(t('an_error_occurred', { defaultMessage: "An error occurred" }));
     } finally {
       setIsSubmitting(false);
     }
@@ -115,13 +117,13 @@ export default function PlaybookPage() {
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm("Are you sure you want to delete this playbook?")) {
+    if (confirm(t('confirm_delete', { defaultMessage: "Are you sure you want to delete this playbook?" }))) {
       try {
         await deletePlaybook(id);
-        toast.success("Playbook deleted");
+        toast.success(t('playbook_deleted', { defaultMessage: "Playbook deleted" }));
         if (viewingPlaybook?.id === id) setViewingPlaybook(null);
       } catch {
-        toast.error("Failed to delete playbook");
+        toast.error(t('failed_to_delete', { defaultMessage: "Failed to delete playbook" }));
       }
     }
   };
@@ -132,10 +134,10 @@ export default function PlaybookPage() {
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
           <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-2">
             <BookOpen className="w-8 h-8 text-indigo-500" />
-            Playbook
+            {t('title')}
           </h2>
           <p className="mt-1 text-sm text-gray-400">
-            Your personal gallery of A+ setups and trading strategies.
+            {t('subtitle')}
           </p>
         </motion.div>
         <motion.button
@@ -145,7 +147,7 @@ export default function PlaybookPage() {
           className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-colors"
         >
           <Plus className="w-5 h-5" />
-          Add Playbook
+          {t('add_playbook')}
         </motion.button>
       </div>
 
@@ -154,13 +156,13 @@ export default function PlaybookPage() {
           <div className="p-4 bg-indigo-500/20 rounded-full mb-4">
             <BookOpen className="w-12 h-12 text-indigo-400" />
           </div>
-          <h3 className="text-xl font-bold text-white mb-2">No playbooks yet</h3>
-          <p className="text-gray-400 max-w-sm mb-6">Create your first playbook to document your best trading setups and rules.</p>
+          <h3 className="text-xl font-bold text-white mb-2">{t('no_playbooks_yet')}</h3>
+          <p className="text-gray-400 max-w-sm mb-6">{t('create_first_playbook')}</p>
           <button
             onClick={openAddModal}
             className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-medium transition-colors border border-white/10"
           >
-            Create Playbook
+            {t('create_playbook')}
           </button>
         </div>
       ) : (
@@ -205,10 +207,10 @@ export default function PlaybookPage() {
                 <div className="p-6">
                   <h3 className="text-xl font-bold text-white mb-2">{playbook.title}</h3>
                   <p className="text-sm text-gray-400 line-clamp-2 mb-4">
-                    {playbook.description || "No description provided."}
+                    {playbook.description || t('no_description')}
                   </p>
                   <div className="flex items-center justify-between text-xs font-medium text-gray-500">
-                    <span>{playbook.rules.length} Rules</span>
+                    <span>{playbook.rules.length} {t('rules')}</span>
                     <span>{format(parseISO(playbook.createdAt), 'MMM d, yyyy')}</span>
                   </div>
                 </div>
@@ -246,13 +248,13 @@ export default function PlaybookPage() {
                 <div className="flex-1 space-y-6">
                   {viewingPlaybook.description && (
                     <div>
-                      <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-2">Description</h4>
+                      <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-2">{t('description')}</h4>
                       <p className="text-gray-200 text-lg leading-relaxed whitespace-pre-wrap">{viewingPlaybook.description}</p>
                     </div>
                   )}
                   {viewingPlaybook.rules.length > 0 && (
                     <div>
-                      <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4">Setup Rules</h4>
+                      <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4">{t('setup_rules')}</h4>
                       <ul className="space-y-3">
                         {viewingPlaybook.rules.map((rule, idx) => (
                           <li key={idx} className="flex items-start gap-3 bg-white/5 p-4 rounded-xl border border-white/5">
@@ -268,7 +270,7 @@ export default function PlaybookPage() {
                 </div>
                 {viewingPlaybook.imageUrl && (
                   <div className="lg:w-1/2 shrink-0">
-                    <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-2">Example Chart</h4>
+                    <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-2">{t('example_chart')}</h4>
                     <div className="rounded-2xl overflow-hidden border border-white/10 bg-black">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={viewingPlaybook.imageUrl} alt="Chart" className="w-full h-auto" />
@@ -298,7 +300,7 @@ export default function PlaybookPage() {
             >
               <div className="flex items-center justify-between p-6 border-b border-white/10 shrink-0">
                 <h3 className="text-xl font-bold text-white">
-                  {editingPlaybook ? "Edit Playbook" : "New Playbook"}
+                  {editingPlaybook ? t('edit_playbook') : t('new_playbook')}
                 </h3>
                 <button
                   onClick={closeModal}
@@ -310,28 +312,28 @@ export default function PlaybookPage() {
               <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Setup Name</label>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">{t('setup_name')}</label>
                     <input
                       type="text"
                       value={title}
                       onChange={e => setTitle(e.target.value)}
-                      placeholder="e.g. Break and Retest"
+                      placeholder={t('setup_name_placeholder')}
                       className="w-full bg-gray-950 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Description (Optional)</label>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">{t('description_optional')}</label>
                     <textarea
                       value={description}
                       onChange={e => setDescription(e.target.value)}
-                      placeholder="Describe the overall strategy..."
+                      placeholder={t('description_placeholder')}
                       className="w-full bg-gray-950 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all min-h-[100px]"
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">Rules / Confluences</label>
+                    <label className="block text-sm font-medium text-gray-400 mb-2">{t('rules_confluences')}</label>
                     <div className="space-y-3">
                       {rules.map((rule, idx) => (
                         <div key={idx} className="flex gap-2">
@@ -339,7 +341,7 @@ export default function PlaybookPage() {
                             type="text"
                             value={rule}
                             onChange={e => handleRuleChange(idx, e.target.value)}
-                            placeholder={`Rule ${idx + 1}...`}
+                            placeholder={t('rule_placeholder', { defaultMessage: `Rule ${idx + 1}...`, count: idx + 1 })}
                             className="flex-1 bg-gray-950 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                           />
                           <button
@@ -356,13 +358,13 @@ export default function PlaybookPage() {
                         onClick={handleAddRule}
                         className="flex items-center gap-2 text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
                       >
-                        <Plus className="w-4 h-4" /> Add Rule
+                        <Plus className="w-4 h-4" /> {t('add_rule')}
                       </button>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">Example Chart (Paste Image)</label>
+                    <label className="block text-sm font-medium text-gray-400 mb-2">{t('paste_image')}</label>
                     {imageFile ? (
                       <div className="relative group rounded-xl overflow-hidden border border-white/10">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -373,14 +375,14 @@ export default function PlaybookPage() {
                             onClick={() => setImageFile(null)}
                             className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
                           >
-                            <Trash2 className="w-4 h-4" /> Remove Image
+                            <Trash2 className="w-4 h-4" /> {t('remove_image')}
                           </button>
                         </div>
                       </div>
                     ) : (
                       <div className="w-full h-40 border-2 border-dashed border-white/20 rounded-xl flex flex-col items-center justify-center text-gray-500 bg-gray-950/50">
                         <Upload className="w-8 h-8 mb-2 opacity-50" />
-                        <p className="text-sm font-medium">Click here and press Ctrl+V to paste an image</p>
+                        <p className="text-sm font-medium">{t('click_paste')}</p>
                       </div>
                     )}
                   </div>
@@ -392,14 +394,14 @@ export default function PlaybookPage() {
                   onClick={closeModal}
                   className="px-6 py-2.5 bg-transparent hover:bg-white/5 text-white rounded-xl font-medium transition-colors border border-transparent hover:border-white/10"
                 >
-                  Cancel
+                  {t('cancel')}
                 </button>
                 <button
                   onClick={handleSubmit}
                   disabled={isSubmitting}
                   className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl font-medium transition-colors shadow-lg shadow-indigo-500/20"
                 >
-                  {isSubmitting ? "Saving..." : "Save Playbook"}
+                  {isSubmitting ? t('saving') : t('save_playbook')}
                 </button>
               </div>
             </motion.div>

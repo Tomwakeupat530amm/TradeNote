@@ -7,6 +7,7 @@ import { EconomicCalendarWidget } from "@/components/EconomicCalendarWidget";
 import { format } from "date-fns";
 import { motion, Variants } from "framer-motion";
 import clsx from "clsx";
+import { useTranslations } from "next-intl";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -24,6 +25,7 @@ const itemVariants: Variants = {
 export default function Dashboard() {
   const { accounts, activeAccountId } = useAccountStore();
   const { trades } = useTradeStore();
+  const t = useTranslations("Dashboard");
 
   const activeAccount = accounts.find((a) => a.id === activeAccountId);
   
@@ -36,8 +38,8 @@ export default function Dashboard() {
           className="text-center py-20 bg-gray-900/50 backdrop-blur-md p-10 rounded-3xl border border-gray-800 shadow-2xl"
         >
           <Activity className="w-12 h-12 text-green-500 mx-auto mb-4 opacity-50" />
-          <h2 className="text-2xl font-bold text-white mb-2">Welcome to TradeNote</h2>
-          <p className="text-gray-400 max-w-sm mx-auto">Create or select an active account from the sidebar to start journaling your trades.</p>
+          <h2 className="text-2xl font-bold text-white mb-2">{t('welcome')}</h2>
+          <p className="text-gray-400 max-w-sm mx-auto">{t('no_account_desc')}</p>
         </motion.div>
       </div>
     );
@@ -50,7 +52,7 @@ export default function Dashboard() {
   const currentBalance = activeAccount.initialBalance + totalPnL;
 
   // Win Rate
-  const winTrades = accountTrades.filter(t => t.pnl > 0).length;
+  const winTrades = accountTrades.filter(trade => trade.pnl > 0).length;
   const winRate = accountTrades.length > 0 ? Math.round((winTrades / accountTrades.length) * 100) : 0;
 
   // Calculate Consistency Rule (Max 1 day profit / Total Profit)
@@ -84,8 +86,8 @@ export default function Dashboard() {
   let currentDrawdown = 0;
 
   const chronologicalTrades = [...accountTrades].reverse(); 
-  chronologicalTrades.forEach(t => {
-    currentSimulatedBalance += t.pnl;
+  chronologicalTrades.forEach(trade => {
+    currentSimulatedBalance += trade.pnl;
     if (currentSimulatedBalance > peak) {
       peak = currentSimulatedBalance;
     }
@@ -102,10 +104,10 @@ export default function Dashboard() {
       <div className="flex items-center justify-between">
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
           <h2 className="text-3xl font-bold tracking-tight text-white">
-            Dashboard
+            {t('welcome')}
           </h2>
           <p className="mt-1 text-sm text-gray-400">
-            Overview for your active prop firm account.
+            {t('here_is_overview')}
           </p>
         </motion.div>
         
@@ -132,14 +134,14 @@ export default function Dashboard() {
           <div className="relative z-10">
             <dt className="truncate text-sm font-medium text-gray-400 flex items-center gap-2">
               <div className="p-1.5 bg-blue-500/20 rounded-lg"><Wallet className="w-4 h-4 text-blue-400" /></div>
-              Current Balance
+              {t('balance')}
             </dt>
             <dd className="mt-4">
               <div className="text-4xl font-bold tracking-tight text-white">${currentBalance.toLocaleString()}</div>
               {totalPnL !== 0 && (
                 <div className={clsx("mt-2 flex items-center text-sm font-semibold", totalPnL > 0 ? 'text-green-400' : 'text-red-400')}>
                   {totalPnL > 0 ? <TrendingUp className="w-4 h-4 mr-1" /> : <TrendingDown className="w-4 h-4 mr-1" />}
-                  {totalPnL > 0 ? '+' : ''}${totalPnL.toLocaleString()} Total Return
+                  {totalPnL > 0 ? '+' : ''}${totalPnL.toLocaleString()} {t('total_pnl')}
                 </div>
               )}
             </dd>
@@ -154,7 +156,7 @@ export default function Dashboard() {
           <div className="relative z-10">
             <dt className="truncate text-sm font-medium text-gray-400 flex items-center gap-2">
               <div className="p-1.5 bg-purple-500/20 rounded-lg"><Percent className="w-4 h-4 text-purple-400" /></div>
-              Win Rate
+              {t('win_rate')}
             </dt>
             <dd className="mt-4 flex items-baseline gap-2">
               <span className="text-4xl font-bold tracking-tight text-white">{winRate}%</span>
@@ -172,10 +174,10 @@ export default function Dashboard() {
             <div className="flex justify-between items-start">
               <dt className="truncate text-sm font-medium text-gray-400 flex items-center gap-2">
                 <div className="p-1.5 bg-green-500/20 rounded-lg"><Target className="w-4 h-4 text-green-400" /></div>
-                Profit Target Progress
+                {t('profit_target_progress')}
               </dt>
               <span className="text-xs font-semibold px-2 py-1 bg-white/5 rounded-md text-gray-400 border border-white/10">
-                Target: {activeAccount.rules.profitTarget ? `$${activeAccount.rules.profitTarget.toLocaleString()}` : "N/A"}
+                {t('target')}: {activeAccount.rules.profitTarget ? `$${activeAccount.rules.profitTarget.toLocaleString()}` : "N/A"}
               </span>
             </div>
             
@@ -183,7 +185,7 @@ export default function Dashboard() {
               <span className="text-4xl font-bold tracking-tight text-white">
                 ${Math.max(0, totalPnL).toLocaleString()}
               </span>
-              <span className="text-sm text-gray-400">earned</span>
+              <span className="text-sm text-gray-400">{t('earned')}</span>
             </div>
 
             {activeAccount.rules.profitTarget && (
@@ -200,7 +202,7 @@ export default function Dashboard() {
                 </div>
                 <div className="mt-2 flex justify-between text-xs text-gray-500 font-medium">
                   <span>$0</span>
-                  <span>{((Math.max(0, totalPnL) / activeAccount.rules.profitTarget) * 100).toFixed(1)}% Completed</span>
+                  <span>{((Math.max(0, totalPnL) / activeAccount.rules.profitTarget) * 100).toFixed(1)}% {t('completed')}</span>
                 </div>
               </div>
             )}
@@ -221,8 +223,8 @@ export default function Dashboard() {
               <ShieldAlert className={clsx("w-6 h-6", drawdownPercentage > 80 ? 'text-red-500' : 'text-gray-400')} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">Drawdown Guard</h3>
-              <p className="text-sm text-gray-400">Limit: ${maxDrawdownLimit.toLocaleString()}</p>
+              <h3 className="text-lg font-bold text-white">{t('drawdown_guard')}</h3>
+              <p className="text-sm text-gray-400">{t('limit')}: ${maxDrawdownLimit.toLocaleString()}</p>
             </div>
           </div>
 
@@ -231,7 +233,7 @@ export default function Dashboard() {
               ${currentDrawdown.toLocaleString()}
             </span>
             <span className={clsx("font-bold text-lg", drawdownPercentage > 80 ? 'text-red-400' : 'text-green-400')}>
-              {drawdownPercentage.toFixed(1)}% <span className="text-sm font-normal opacity-70">of limit</span>
+              {drawdownPercentage.toFixed(1)}% <span className="text-sm font-normal opacity-70">{t('of_limit')}</span>
             </span>
           </div>
 
@@ -247,7 +249,7 @@ export default function Dashboard() {
           {drawdownPercentage > 80 && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex gap-3">
               <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
-              <p className="text-sm text-red-400 font-medium leading-relaxed">WARNING: You are dangerously close to hitting your Max Drawdown limit! Consider sizing down.</p>
+              <p className="text-sm text-red-400 font-medium leading-relaxed">{t('warning_drawdown')}</p>
             </motion.div>
           )}
         </motion.div>
@@ -259,14 +261,14 @@ export default function Dashboard() {
               <Target className={clsx("w-6 h-6", isConsistencyViolated ? 'text-yellow-500' : 'text-gray-400')} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">Consistency Rule</h3>
-              <p className="text-sm text-gray-400">Limit: {consistencyLimit}% max single day</p>
+              <h3 className="text-lg font-bold text-white">{t('consistency_rule')}</h3>
+              <p className="text-sm text-gray-400">{t('limit')}: {consistencyLimit}% {t('max_single_day')}</p>
             </div>
           </div>
           
           {totalPnL <= 0 ? (
             <div className="flex items-center justify-center h-24 border border-dashed border-white/10 rounded-xl bg-white/[0.02]">
-              <p className="text-sm text-gray-500">Consistency rule applies when you are in profit.</p>
+              <p className="text-sm text-gray-500">{t('consistency_rule_applies')}</p>
             </div>
           ) : (
             <>
@@ -275,7 +277,7 @@ export default function Dashboard() {
                   {currentConsistency.toFixed(1)}%
                 </span>
                 <div className="text-right">
-                  <p className="text-sm text-gray-400 font-medium">Max Day: <span className="text-white">${maxDailyProfit.toLocaleString()}</span></p>
+                  <p className="text-sm text-gray-400 font-medium">{t('max_day')}: <span className="text-white">${maxDailyProfit.toLocaleString()}</span></p>
                   <p className="text-xs text-gray-500">{maxDailyProfitDate}</p>
                 </div>
               </div>
@@ -293,7 +295,7 @@ export default function Dashboard() {
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl flex gap-3">
                   <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0" />
                   <p className="text-sm text-yellow-500 font-medium leading-relaxed">
-                    CAUTION: One of your days exceeds the {consistencyLimit}% rule. You need more consistent, smaller winning days to dilute this percentage.
+                    {t('caution_consistency', { limit: consistencyLimit })}
                   </p>
                 </motion.div>
               )}
@@ -315,8 +317,8 @@ export default function Dashboard() {
               <Globe className="w-6 h-6 text-sky-400" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">Upcoming High-Impact Events</h3>
-              <p className="text-sm text-gray-400">Stay ahead of market volatility</p>
+              <h3 className="text-lg font-bold text-white">{t('upcoming_events')}</h3>
+              <p className="text-sm text-gray-400">{t('stay_ahead')}</p>
             </div>
           </div>
           <div className="h-[calc(100%-4rem)] rounded-xl overflow-hidden bg-gray-950/50">

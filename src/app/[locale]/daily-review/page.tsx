@@ -9,6 +9,7 @@ import { Save, Calendar, Sun, Moon, Star, TrendingUp, Target, BarChart2 } from "
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import clsx from "clsx";
+import { useTranslations } from "next-intl";
 
 export default function ReviewsPage() {
   const { 
@@ -25,6 +26,7 @@ export default function ReviewsPage() {
   const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [saving, setSaving] = useState(false);
+  const t = useTranslations("DailyReview");
 
   useEffect(() => {
     fetchPeriodicReviews();
@@ -67,8 +69,8 @@ export default function ReviewsPage() {
     <div className="max-w-5xl mx-auto space-y-8 pb-10">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Trading Reviews</h1>
-          <p className="mt-1 text-sm text-gray-400">Track your performance, mindset, and consistency.</p>
+          <h1 className="text-3xl font-bold text-white tracking-tight">{t('trading_reviews')}</h1>
+          <p className="mt-1 text-sm text-gray-400">{t('track_performance')}</p>
         </motion.div>
         
         <motion.div 
@@ -87,9 +89,9 @@ export default function ReviewsPage() {
 
       <div className="flex bg-gray-900/40 p-1 rounded-2xl border border-white/5 w-fit">
         {[
-          { id: 'daily', label: 'Daily Prep', icon: Sun },
-          { id: 'weekly', label: 'Weekly Review', icon: TrendingUp },
-          { id: 'monthly', label: 'Monthly Review', icon: Target },
+          { id: 'daily', label: t('daily_prep'), icon: Sun },
+          { id: 'weekly', label: t('weekly_review'), icon: TrendingUp },
+          { id: 'monthly', label: t('monthly_review'), icon: Target },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -139,6 +141,8 @@ export default function ReviewsPage() {
 // --- Subcomponents ---
 
 function DailyForm({ currentReview, selectedDate, isLoading, saveReview, saving, setSaving }: any) {
+  const t = useTranslations("DailyReview");
+  const c = useTranslations("Common");
   const [formData, setFormData] = useState({
     preMarketBias: "",
     economicNews: "",
@@ -180,9 +184,9 @@ function DailyForm({ currentReview, selectedDate, isLoading, saveReview, saving,
         date: selectedDate,
         ...formData
       });
-      toast.success("Daily review saved successfully!");
+      toast.success(t('daily_review_saved'));
     } catch {
-      toast.error("Failed to save daily review.");
+      toast.error(t('failed_to_save_daily'));
     } finally {
       setSaving(false);
     }
@@ -210,28 +214,28 @@ function DailyForm({ currentReview, selectedDate, isLoading, saveReview, saving,
               <div className="p-2.5 bg-blue-500/20 rounded-xl">
                 <Sun className="w-6 h-6 text-blue-400" />
               </div>
-              <h2 className="text-xl font-bold text-white">Pre-Market Prep</h2>
+              <h2 className="text-xl font-bold text-white">{t('pre_market_prep')}</h2>
             </div>
             
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-300">Market Bias / Gameplan</label>
+              <label className="block text-sm font-medium text-gray-300">{t('market_bias_gameplan')}</label>
               <textarea
                 value={formData.preMarketBias}
                 onChange={(e) => setFormData({ ...formData, preMarketBias: e.target.value })}
                 rows={5}
                 className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white placeholder:text-gray-600 focus:bg-white/10 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all resize-none"
-                placeholder="What is your bias today? Where are key levels?"
+                placeholder={t('bias_placeholder')}
               />
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-300">Economic News</label>
+              <label className="block text-sm font-medium text-gray-300">{t('economic_news')}</label>
               <textarea
                 value={formData.economicNews}
                 onChange={(e) => setFormData({ ...formData, economicNews: e.target.value })}
                 rows={3}
                 className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white placeholder:text-gray-600 focus:bg-white/10 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all resize-none"
-                placeholder="Any red folder news? CPI, FOMC?"
+                placeholder={t('news_placeholder')}
               />
             </div>
           </div>
@@ -244,34 +248,34 @@ function DailyForm({ currentReview, selectedDate, isLoading, saveReview, saving,
               <div className="p-2.5 bg-green-500/20 rounded-xl">
                 <Moon className="w-6 h-6 text-green-400" />
               </div>
-              <h2 className="text-xl font-bold text-white">End of Day Review</h2>
+              <h2 className="text-xl font-bold text-white">{t('end_of_day_review')}</h2>
             </div>
             
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-300">Performance Review</label>
+              <label className="block text-sm font-medium text-gray-300">{t('performance_review')}</label>
               <textarea
                 value={formData.endOfDayReview}
                 onChange={(e) => setFormData({ ...formData, endOfDayReview: e.target.value })}
                 rows={4}
                 className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white placeholder:text-gray-600 focus:bg-white/10 focus:border-green-500/50 focus:ring-1 focus:ring-green-500/50 transition-all resize-none"
-                placeholder="Did you follow your plan?"
+                placeholder={t('performance_placeholder')}
               />
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-300">Lessons Learned</label>
+              <label className="block text-sm font-medium text-gray-300">{t('lessons_learned')}</label>
               <textarea
                 value={formData.lessonsLearned}
                 onChange={(e) => setFormData({ ...formData, lessonsLearned: e.target.value })}
                 rows={3}
                 className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white placeholder:text-gray-600 focus:bg-white/10 focus:border-green-500/50 focus:ring-1 focus:ring-green-500/50 transition-all resize-none"
-                placeholder="What could be improved tomorrow?"
+                placeholder={t('lessons_placeholder')}
               />
             </div>
 
             <div className="space-y-3 pt-2">
               <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-300">Discipline Rating</label>
+                <label className="block text-sm font-medium text-gray-300">{t('discipline_rating')}</label>
                 <span className="text-sm font-bold text-green-400">{formData.rating}/5</span>
               </div>
               <div className="flex gap-3 justify-between bg-white/5 p-2 rounded-2xl border border-white/5">
@@ -308,7 +312,7 @@ function DailyForm({ currentReview, selectedDate, isLoading, saveReview, saving,
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl font-bold transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(37,99,235,0.4)]"
         >
           <Save className="w-5 h-5" />
-          {saving ? "Saving..." : "Save Daily Log"}
+          {saving ? c('saving') : t('save_daily_log')}
         </motion.button>
       </div>
     </motion.form>
@@ -316,6 +320,8 @@ function DailyForm({ currentReview, selectedDate, isLoading, saveReview, saving,
 }
 
 function PeriodicForm({ type, selectedDate, reviews, isLoading, saveReview, saving, setSaving }: any) {
+  const t = useTranslations("DailyReview");
+  const c = useTranslations("Common");
   const currentReview = useMemo(() => {
     return reviews.find((r: PeriodicReview) => r.periodType === type && r.startDate === selectedDate);
   }, [reviews, type, selectedDate]);
@@ -367,9 +373,9 @@ function PeriodicForm({ type, selectedDate, reviews, isLoading, saveReview, savi
       };
       
       await saveReview(payload);
-      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} review saved successfully!`);
+      toast.success(t('periodic_review_saved', { type: type === 'weekly' ? t('weekly') : t('monthly') }));
     } catch {
-      toast.error(`Failed to save ${type} review.`);
+      toast.error(t('failed_to_save_periodic', { type: type === 'weekly' ? t('weekly') : t('monthly') }));
     } finally {
       setSaving(false);
     }
@@ -383,7 +389,7 @@ function PeriodicForm({ type, selectedDate, reviews, isLoading, saveReview, savi
     );
   }
 
-  const title = type === 'weekly' ? "Weekly Overview" : "Monthly Assessment";
+  const title = type === 'weekly' ? t('weekly_overview') : t('monthly_assessment');
   const icon = type === 'weekly' ? <TrendingUp className="w-6 h-6 text-purple-400" /> : <Target className="w-6 h-6 text-pink-400" />;
   
   const gradients = type === 'weekly' ? 'from-purple-500/5' : 'from-pink-500/5';
@@ -411,61 +417,61 @@ function PeriodicForm({ type, selectedDate, reviews, isLoading, saveReview, savi
             <h2 className="text-xl font-bold text-white">{title}</h2>
             <div className="ml-auto text-sm text-gray-400 font-medium">
               {type === 'weekly' 
-                ? `Week of ${format(parseISO(selectedDate), "MMM do, yyyy")}`
-                : `Month of ${format(parseISO(selectedDate), "MMMM yyyy")}`
+                ? t('week_of', { date: format(parseISO(selectedDate), "MMM do, yyyy") })
+                : t('month_of', { date: format(parseISO(selectedDate), "MMMM yyyy") })
               }
             </div>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-300">Performance Review</label>
+              <label className="block text-sm font-medium text-gray-300">{t('performance_review')}</label>
               <textarea
                 value={formData.performanceReview}
                 onChange={(e) => setFormData({ ...formData, performanceReview: e.target.value })}
                 rows={6}
                 className={`w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white placeholder:text-gray-600 focus:bg-white/10 ${focusBorder} focus:ring-1 transition-all resize-none`}
-                placeholder={`Summarize your trading performance this ${type}...`}
+                placeholder={t('periodic_performance_placeholder', { type: type === 'weekly' ? t('weekly') : t('monthly') })}
               />
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-300">Emotional State & Psychology</label>
+              <label className="block text-sm font-medium text-gray-300">{t('emotional_state')}</label>
               <textarea
                 value={formData.emotionalState}
                 onChange={(e) => setFormData({ ...formData, emotionalState: e.target.value })}
                 rows={6}
                 className={`w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white placeholder:text-gray-600 focus:bg-white/10 ${focusBorder} focus:ring-1 transition-all resize-none`}
-                placeholder={`How was your mindset this ${type}? Were you disciplined?`}
+                placeholder={t('periodic_emotional_placeholder', { type: type === 'weekly' ? t('weekly') : t('monthly') })}
               />
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-green-400">What went well?</label>
+              <label className="block text-sm font-medium text-green-400">{t('what_went_well')}</label>
               <textarea
                 value={formData.wentWell}
                 onChange={(e) => setFormData({ ...formData, wentWell: e.target.value })}
                 rows={4}
                 className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white placeholder:text-gray-600 focus:bg-white/10 focus:border-green-500/50 focus:ring-1 focus:ring-green-500/50 transition-all resize-none"
-                placeholder="Highlight your wins and good decisions..."
+                placeholder={t('went_well_placeholder')}
               />
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-red-400">Needs Improvement</label>
+              <label className="block text-sm font-medium text-red-400">{t('needs_improvement')}</label>
               <textarea
                 value={formData.needsImprovement}
                 onChange={(e) => setFormData({ ...formData, needsImprovement: e.target.value })}
                 rows={4}
                 className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white placeholder:text-gray-600 focus:bg-white/10 focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all resize-none"
-                placeholder="Where did you slip up? What to fix next time?"
+                placeholder={t('improvement_placeholder')}
               />
             </div>
           </div>
 
           <div className="space-y-3 pt-6 border-t border-white/5 max-w-sm">
             <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-gray-300">Overall Rating</label>
+              <label className="block text-sm font-medium text-gray-300">{t('overall_rating')}</label>
               <span className={`text-sm font-bold ${textColor}`}>{formData.rating}/5</span>
             </div>
             <div className="flex gap-3 justify-between bg-white/5 p-2 rounded-2xl border border-white/5">
@@ -501,7 +507,7 @@ function PeriodicForm({ type, selectedDate, reviews, isLoading, saveReview, savi
           className={`flex items-center gap-2 text-white px-8 py-3 rounded-xl font-bold transition-all disabled:opacity-50 ${submitBtnBg}`}
         >
           <Save className="w-5 h-5" />
-          {saving ? "Saving..." : `Save ${type.charAt(0).toUpperCase() + type.slice(1)} Review`}
+          {saving ? c('saving') : t('save_periodic_review', { type: type === 'weekly' ? t('weekly') : t('monthly') })}
         </motion.button>
       </div>
     </motion.form>
