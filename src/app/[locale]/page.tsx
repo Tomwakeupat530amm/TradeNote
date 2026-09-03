@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { motion, Variants } from "framer-motion";
 import clsx from "clsx";
 import { useTranslations } from "next-intl";
+import { EquityCurveChart } from "@/components/EquityCurveChart";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -127,9 +128,10 @@ export default function Dashboard() {
         className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4"
       >
         {/* Balance Card */}
-        <motion.div variants={itemVariants} className="relative overflow-hidden rounded-3xl border border-white/5 bg-gray-900/40 backdrop-blur-xl p-6 shadow-2xl group hover:bg-gray-900/60 transition-colors">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Wallet className="w-16 h-16 text-white" />
+        <motion.div variants={itemVariants} className="relative overflow-hidden rounded-3xl border border-white/5 bg-gray-900/40 backdrop-blur-xl p-6 shadow-2xl group hover:bg-gray-900/60 transition-all hover:border-white/10 hover:shadow-[0_0_40px_rgba(59,130,246,0.1)]">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 via-transparent to-transparent group-hover:from-blue-500/5 transition-colors duration-500 pointer-events-none" />
+          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 group-hover:scale-110 transition-all duration-500">
+            <Wallet className="w-16 h-16 text-blue-400" />
           </div>
           <div className="relative z-10">
             <dt className="truncate text-sm font-medium text-gray-400 flex items-center gap-2">
@@ -149,9 +151,10 @@ export default function Dashboard() {
         </motion.div>
 
         {/* Win Rate Card */}
-        <motion.div variants={itemVariants} className="relative overflow-hidden rounded-3xl border border-white/5 bg-gray-900/40 backdrop-blur-xl p-6 shadow-2xl group hover:bg-gray-900/60 transition-colors">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Percent className="w-16 h-16 text-white" />
+        <motion.div variants={itemVariants} className="relative overflow-hidden rounded-3xl border border-white/5 bg-gray-900/40 backdrop-blur-xl p-6 shadow-2xl group hover:bg-gray-900/60 transition-all hover:border-white/10 hover:shadow-[0_0_40px_rgba(168,85,247,0.1)]">
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 via-transparent to-transparent group-hover:from-purple-500/5 transition-colors duration-500 pointer-events-none" />
+          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 group-hover:scale-110 transition-all duration-500">
+            <Percent className="w-16 h-16 text-purple-400" />
           </div>
           <div className="relative z-10">
             <dt className="truncate text-sm font-medium text-gray-400 flex items-center gap-2">
@@ -166,9 +169,10 @@ export default function Dashboard() {
         </motion.div>
 
         {/* Profit Target Card */}
-        <motion.div variants={itemVariants} className="relative overflow-hidden rounded-3xl border border-white/5 bg-gray-900/40 backdrop-blur-xl p-6 shadow-2xl group hover:bg-gray-900/60 transition-colors sm:col-span-2 lg:col-span-2">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Target className="w-24 h-24 text-white" />
+        <motion.div variants={itemVariants} className="relative overflow-hidden rounded-3xl border border-white/5 bg-gray-900/40 backdrop-blur-xl p-6 shadow-2xl group hover:bg-gray-900/60 transition-all sm:col-span-2 lg:col-span-2 hover:border-white/10 hover:shadow-[0_0_40px_rgba(34,197,94,0.1)]">
+          <div className="absolute inset-0 bg-gradient-to-br from-green-500/0 via-transparent to-transparent group-hover:from-green-500/5 transition-colors duration-500 pointer-events-none" />
+          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 group-hover:scale-110 transition-all duration-500">
+            <Target className="w-24 h-24 text-green-400" />
           </div>
           <div className="relative z-10">
             <div className="flex justify-between items-start">
@@ -190,14 +194,17 @@ export default function Dashboard() {
 
             {activeAccount.rules.profitTarget && (
               <div className="mt-5 relative">
-                <div className="w-full bg-gray-800/80 rounded-full h-3 overflow-hidden border border-white/5 shadow-inner">
+                <div className="w-full bg-gray-950/50 rounded-full h-3 overflow-hidden border border-white/10 shadow-inner relative">
+                  {/* Background Track */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-gray-800 to-gray-700 opacity-30" />
                   <motion.div 
                     initial={{ width: 0 }}
                     animate={{ width: `${Math.min((Math.max(0, totalPnL) / activeAccount.rules.profitTarget) * 100, 100)}%` }}
-                    transition={{ duration: 1, ease: "easeOut" }}
-                    className="bg-gradient-to-r from-green-600 to-green-400 h-full rounded-full relative"
+                    transition={{ duration: 1.5, ease: "easeOut", delay: 0.2 }}
+                    className="bg-gradient-to-r from-green-500 to-emerald-400 h-full rounded-full relative shadow-[0_0_10px_rgba(52,211,153,0.5)]"
                   >
-                    <div className="absolute inset-0 bg-white/20 w-full h-full animate-pulse"></div>
+                    <div className="absolute inset-0 bg-white/20 w-full h-full animate-pulse rounded-full"></div>
+                    <div className="absolute right-0 top-0 bottom-0 w-4 bg-white/30 rounded-full animate-ping opacity-50"></div>
                   </motion.div>
                 </div>
                 <div className="mt-2 flex justify-between text-xs text-gray-500 font-medium">
@@ -209,12 +216,33 @@ export default function Dashboard() {
           </div>
         </motion.div>
       </motion.div>
+      <motion.div 
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="mt-6"
+      >
+        <motion.div variants={itemVariants} className="relative overflow-hidden rounded-3xl border border-white/5 bg-gray-900/40 backdrop-blur-xl p-6 shadow-2xl hover:bg-gray-900/60 transition-colors">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-xl bg-blue-500/20">
+              <TrendingUp className="w-6 h-6 text-blue-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white">Equity Curve</h3>
+              <p className="text-sm text-gray-400">Account growth over time</p>
+            </div>
+          </div>
+          <div className="h-[300px] w-full">
+            <EquityCurveChart trades={accountTrades} initialBalance={activeAccount.initialBalance} />
+          </div>
+        </motion.div>
+      </motion.div>
 
       <motion.div 
         variants={containerVariants}
         initial="hidden"
         animate="show"
-        className="grid grid-cols-1 gap-6 lg:grid-cols-2"
+        className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2"
       >
         {/* Drawdown Monitor */}
         <motion.div variants={itemVariants} className={clsx("relative overflow-hidden rounded-3xl border backdrop-blur-xl p-6 shadow-2xl transition-colors", drawdownPercentage > 80 ? 'border-red-500/30 bg-red-950/20' : 'border-white/5 bg-gray-900/40 hover:bg-gray-900/60')}>
@@ -237,13 +265,16 @@ export default function Dashboard() {
             </span>
           </div>
 
-          <div className="w-full bg-gray-800/80 rounded-full h-3 overflow-hidden border border-white/5 shadow-inner mt-4">
+          <div className="w-full bg-gray-950/50 rounded-full h-3 overflow-hidden border border-white/10 shadow-inner mt-4 relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-800 to-gray-700 opacity-30" />
             <motion.div 
               initial={{ width: 0 }}
               animate={{ width: `${Math.min(drawdownPercentage, 100)}%` }}
-              transition={{ duration: 1, ease: "easeOut" }}
-              className={clsx("h-full rounded-full relative", drawdownPercentage > 80 ? 'bg-gradient-to-r from-red-600 to-red-400' : drawdownPercentage > 50 ? 'bg-gradient-to-r from-yellow-600 to-yellow-400' : 'bg-gradient-to-r from-green-600 to-green-400')}
-            />
+              transition={{ duration: 1.5, ease: "easeOut", delay: 0.3 }}
+              className={clsx("h-full rounded-full relative shadow-[0_0_10px_currentColor]", drawdownPercentage > 80 ? 'bg-gradient-to-r from-red-500 to-rose-400 text-red-500' : drawdownPercentage > 50 ? 'bg-gradient-to-r from-yellow-500 to-amber-400 text-yellow-500' : 'bg-gradient-to-r from-green-500 to-emerald-400 text-green-500')}
+            >
+              <div className="absolute inset-0 bg-white/20 w-full h-full animate-pulse rounded-full"></div>
+            </motion.div>
           </div>
 
           {drawdownPercentage > 80 && (
@@ -282,13 +313,16 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="w-full bg-gray-800/80 rounded-full h-3 overflow-hidden border border-white/5 shadow-inner mt-4">
+              <div className="w-full bg-gray-950/50 rounded-full h-3 overflow-hidden border border-white/10 shadow-inner mt-4 relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-gray-800 to-gray-700 opacity-30" />
                 <motion.div 
                   initial={{ width: 0 }}
                   animate={{ width: `${Math.min(currentConsistency, 100)}%` }}
-                  transition={{ duration: 1, ease: "easeOut" }}
-                  className={clsx("h-full rounded-full relative", isConsistencyViolated ? 'bg-gradient-to-r from-yellow-600 to-yellow-400' : 'bg-gradient-to-r from-blue-600 to-blue-400')}
-                />
+                  transition={{ duration: 1.5, ease: "easeOut", delay: 0.4 }}
+                  className={clsx("h-full rounded-full relative shadow-[0_0_10px_currentColor]", isConsistencyViolated ? 'bg-gradient-to-r from-yellow-500 to-amber-400 text-yellow-500' : 'bg-gradient-to-r from-blue-500 to-cyan-400 text-blue-500')}
+                >
+                  <div className="absolute inset-0 bg-white/20 w-full h-full animate-pulse rounded-full"></div>
+                </motion.div>
               </div>
 
               {isConsistencyViolated && (

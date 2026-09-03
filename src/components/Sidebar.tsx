@@ -7,7 +7,7 @@ import { Link } from "@/i18n/routing";
 import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, Users, Activity, Settings, LogOut, ReceiptText, CalendarDays, BookOpen,
-  TrendingUp, Quote, Target, Award, Globe
+  TrendingUp, Quote, Target, Award, Globe, Cpu
 } from "lucide-react";
 import clsx from "clsx";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -22,6 +22,7 @@ const navigation = [
   { id: "calendar", href: "/calendar", icon: CalendarDays, color: "text-yellow-400" },
   { id: "playbook", href: "/playbook", icon: BookOpen, color: "text-indigo-400" },
   { id: "economic_calendar", href: "/economic-calendar", icon: Globe, color: "text-sky-400" },
+  { id: "simulator", href: "/simulator", icon: Cpu, color: "text-yellow-300" },
 ];
 
 const tradingQuotes = [

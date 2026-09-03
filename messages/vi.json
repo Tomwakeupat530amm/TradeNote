@@ -8,7 +8,8 @@
     "economic_calendar": "Lịch kinh tế",
     "daily_review": "Đánh giá ngày",
     "settings": "Cài đặt",
-    "accounts": "Tài khoản"
+    "accounts": "Tài khoản",
+    "simulator": "Simulator"
   },
   "LanguageSwitcher": {
     "label": "Ngôn ngữ",
@@ -405,5 +406,227 @@
     "delete": "Xóa",
     "cancel": "Hủy",
     "saving": "Đang lưu..."
+  },
+  "Simulator": {
+    "title": "Elite Quant Optimizer",
+    "btnGuide": "📖 Hướng dẫn sử dụng",
+    "sections": {
+      "fundRules": "Luật Quỹ (Fund Rules)",
+      "strategyEngine": "Chiến lược (Strategy Engine)",
+      "sweepVariable": "Biến thiên (Sweep Variable)",
+      "business": "Kinh doanh (Business)"
+    },
+    "fund": {
+      "preset": "Cấu hình (Preset)",
+      "balance": "Vốn (Balance)",
+      "evalTarget": "Mục tiêu Eval",
+      "payoutTarget": "Mục tiêu Payout",
+      "evalConsistency": "Quy tắc Nhất quán",
+      "maxDrawdown": "Sụt giảm Tối đa (DD)",
+      "ddType": "Loại DD",
+      "payoutRule": "Luật Payout",
+      "groupTopstep": "--- TOPSTEP ---",
+      "groupBulenox": "--- BULENOX ---",
+      "custom": "Tùy chỉnh",
+      "ddTrailing": "Trailing (di động)",
+      "ddStatic": "Static (cố định)",
+      "ruleStandard": "Standard (5 ngày $150+)",
+      "ruleConsistency": "Consistency (Quy tắc 40%, 3 ngày)"
+    },
+    "strategy": {
+      "winrate": "Tỷ lệ thắng (Winrate)",
+      "rewardRisk": "Tỷ lệ R:R",
+      "maxTrades": "Số lệnh tối đa",
+      "dailyStop": "Lỗ tối đa/ngày",
+      "dailyTarget": "Mục tiêu/ngày"
+    },
+    "sweep": {
+      "variable": "Biến số",
+      "min": "Nhỏ nhất",
+      "max": "Lớn nhất",
+      "step": "Bước nhảy",
+      "labelRisk": "Risk ($)",
+      "labelWr": "Winrate (%)",
+      "labelRR": "Tỷ lệ R:R"
+    },
+    "business": {
+      "tradingVelocity": "Tốc độ GD",
+      "targetFunded": "Mục tiêu Funded",
+      "passPending": "Pass Pending Buffer",
+      "evalFee": "Phí Eval",
+      "activationFee": "Phí kích hoạt",
+      "payoutSize": "Kích thước Payout",
+      "minTradingDays": "Số ngày GD tối thiểu"
+    },
+    "btnRun": "Chạy Tối ưu hóa",
+    "kpi": {
+      "evalPass": "Tỷ lệ Pass Eval",
+      "payoutPass": "Tỷ lệ Payout",
+      "bustRate": "Tỷ lệ Cháy",
+      "evalTrades": "Số lệnh Eval (TB | Min)",
+      "payoutTrades": "Số lệnh Payout (TB | Min)"
+    },
+    "charts": {
+      "optCurve": "Đường cong tối ưu",
+      "optCurveSub": "Click hàng → Phân lớp (Stratified) | Double-click → Kinh doanh (Biz)",
+      "exportCsv": "📥 Xuất CSV",
+      "legendEvalPass": "Pass Eval (%)",
+      "legendPayoutPass": "Pass Payout (%)",
+      "legendBustRate": "Tỷ lệ Cháy (%)"
+    },
+    "results": {
+      "title": "Kết quả Tối ưu hóa",
+      "subtitle": "Click hàng → Funded Stratified | Double-click Stratified → Tính toán Biz",
+      "colSweep": "Rủi ro ($)",
+      "colEvalPass": "Qua Eval",
+      "colPayoutPass": "Qua Payout",
+      "colBustRate": "Tỷ lệ Cháy",
+      "colEvalTrades": "Lệnh Eval",
+      "colPayoutTrades": "Lệnh Payout",
+      "colEv": "Kỳ vọng"
+    },
+    "stratified": {
+      "title": "📊 Funded Stratified — P1 (hàng đã click) → P2 (toàn bộ sweep) tại 50% mục tiêu | Eval→Payout% = Pass Eval × Survival",
+      "subtitle": "Double-click hàng để nạp vào Business Calculator",
+      "colCombo": "Combo",
+      "colSurvival": "Tỷ lệ Sống sót",
+      "colRate": "Eval→Payout%",
+      "colTrades": "Số lệnh",
+      "colNote": "Ghi chú",
+      "verySafe": "🛡️ Rất an toàn",
+      "balanced": "⚖️ Cân bằng",
+      "fast": "🚀 Nhanh",
+      "computing": "⏳ Đang tính toán..."
+    },
+    "biz": {
+      "title": "Business Calculator",
+      "subtitle": "Setup N tài khoản funded — bổ sung hàng tháng khi cháy",
+      "setupEvals": "TK Setup (SF+SP)",
+      "refillEvals": "TK Refill/Tháng",
+      "fundedSurvival": "Tỷ lệ Funded",
+      "payoutsMonth": "Payout/Tháng",
+      "timePayout": "Thời gian đến Payout (Ngày)",
+      "timeRefill": "Thời gian đến Refill (Ngày)",
+      "expense": "Chi phí/Tháng",
+      "revenue": "Doanh thu/Tháng",
+      "netProfit": "Lợi nhuận/Tháng",
+      "roi": "ROI",
+      "breakeven": "Điểm hoà vốn",
+      "costFunded": "Chi phí/Funded",
+      "revMult": "Hệ số Doanh thu",
+      "annual": "Thu nhập năm",
+      "breakEvenUnit": "Payouts"
+    },
+    "analysis": {
+      "title": "📈 Phân tích Tối ưu",
+      "subtitle": "So sánh các phương án từ kết quả mô phỏng — click hàng để chọn & xem workflow",
+      "colRisk": "Rủi ro ($)",
+      "colType": "Loại",
+      "colSetupEvals": "TK Setup",
+      "colSetupCost": "Chi phí Setup",
+      "colFundSurv": "Tỷ lệ Sống sót",
+      "colProfit": "Lợi nhuận/Tháng",
+      "colAnnual": "Năm",
+      "colSelect": "Chọn",
+      "best": "👑 TỐT NHẤT",
+      "pick": "Chọn →",
+      "typeSafe": "🛡️ An toàn",
+      "typeBalance": "⚖️ Cân bằng",
+      "typeRisky": "🔥 Rủi ro",
+      "typeHighRisk": "⚠️ Rủi ro cao",
+      "typeViolent": "💥 Bạo lực"
+    },
+    "workflow": {
+      "titlePrefix": "🔄 Mô phỏng Workflow thực tế — Risk",
+      "simDays": "Ngày mô phỏng",
+      "evalPassRefill": "Eval Pass (refill)",
+      "tkBust": "TK BUST",
+      "payoutReceived": "Payout nhận",
+      "fundedEnd": "TK Funded cuối",
+      "processTitle": "📋 Quy trình thao tác",
+      "morning": "🌅 Buổi sáng",
+      "evalGoal": "🎯 Mục tiêu pass Eval",
+      "stopRules": "⏹ 3 tình huống dừng/ngày",
+      "accountMgmt": "🔄 Quản lý từng tk",
+      "subtitleTpl": "{conc} tk chạy song song, {tpa} lệnh/tk/ngày",
+      "morningItem1": "Bật {conc} tài khoản, kiểm tra balance ${target}+",
+      "morningItem2": "Đánh {tpa} lệnh/tk ({tpd} ÷ {conc} slots)",
+      "morningItem3": "Mỗi lệnh: SL=-${risk} · TP=+${win}",
+      "evalItem1": "Đạt lợi nhuận ${target}",
+      "evalItem2": "Best day ≤ 50% tổng lợi nhuận (Consistency)",
+      "evalItem3": "Không chạm trailing DD ${dd}",
+      "stopItem1": "Đủ {tpa} lệnh/ngày → nghỉ",
+      "stopItem2": "Hit +${dt} (daily target) → nghỉ",
+      "stopItem3": "Hit -${ds} (daily stop) → nghỉ",
+      "mgmtItem1": "⭐ Pass eval → vào FUNDED, reset balance",
+      "mgmtItem2": "💥 Bust (chạm DD) → mua eval refill slot",
+      "mgmtItem3": "💰 FUNDED đạt target → nhận PAYOUT ${ps}",
+      "colDay": "Ngày",
+      "colResult": "Kết quả (từng tk)",
+      "dayLabel": "📅 Ngày {d}"
+    },
+    "guide": {
+      "title": "📖 Hướng Dẫn Sử Dụng Chi Tiết - Elite Quant Optimizer",
+      "newWindow": "↗ Cửa sổ mới",
+      "subtitle": "Công cụ tính toán & tối ưu hóa xác suất thi quỹ, quản trị rủi ro & mô phỏng kinh doanh Prop Trading chuyên sâu.",
+      "section1": {
+        "title": "1. Tổng Quan Hệ Thống (System Overview)",
+        "p1": "Elite Quant Optimizer không chỉ là một bảng tính xác suất cơ bản. Đây là một trình giả lập Monte Carlo nâng cao, giúp bạn định lượng chính xác khả năng sống sót và lợi nhuận khi tham gia các quỹ Prop Firm (Topstep, Bulenox, APEX...). Bằng cách giả lập hàng ngàn kịch bản thị trường dựa trên thông số hệ thống của bạn, công cụ giúp bạn ngừng phỏng đoán và bắt đầu đưa ra các quyết định có tính toán dựa trên toán học (Expected Value)."
+      },
+      "section2": {
+        "title": "2. Thiết Lập Quy Tắc Quỹ (Fund Rules Setup)",
+        "items": [
+          "__b__Preset (Cấu hình sẵn):__/b__ Tải nhanh bộ quy tắc của các quỹ phổ biến. Ví dụ: Topstep 50k sẽ tự động thiết lập số dư 50k, mục tiêu 3k và Drawdown 2k.",
+          "__b__Balance & Targets ($):__/b__ Số vốn ban đầu, mục tiêu lợi nhuận để qua vòng đánh giá (Eval Target) và mục tiêu an toàn để nhận Payout đầu tiên.",
+          "__b__Eval Consistency (%):__/b__ Quy tắc nhất quán lợi nhuận. Nếu quỹ yêu cầu một ngày không được chiếm quá 50% tổng lợi nhuận, bộ mô phỏng sẽ tự động tính toán số ngày giao dịch thêm cần thiết để pha loãng phần trăm này nếu bạn thắng quá lớn trong một ngày.",
+          "__b__Max Drawdown & DD Type:__/b__ Tính toán sức chịu đựng của tài khoản. Trailing Drawdown sẽ trượt theo mức lợi nhuận cao nhất của bạn (rất khắt khe), trong khi Static Drawdown sẽ cố định từ số dư ban đầu.",
+          "__b__Payout Rule:__/b__ Cách bạn đạt đủ điều kiện rút tiền. 'Standard' (ví dụ 5 ngày thắng trên $150) hoặc 'Consistency' (không ngày nào vượt 40% số tiền rút)."
+        ]
+      },
+      "section3": {
+        "title": "3. Động Cơ Chiến Lược (Strategy Engine)",
+        "items": [
+          "__b__Winrate (%):__/b__ Tỷ lệ thắng thực tế của hệ thống giao dịch của bạn. Hãy nhập con số thực tế dựa trên dữ liệu quá khứ.",
+          "__b__Reward/Risk (X):__/b__ Tỷ lệ Thưởng/Rủi ro. Ví dụ: R:R = 1.5 nghĩa là bạn ăn $150 cho mỗi $100 chịu rủi ro.",
+          "__b__Daily Stop ($) & Daily Target ($):__/b__ Công tắc an toàn cực kỳ quan trọng. Trình giả lập sẽ tự động ngừng giao dịch trong ngày nếu chạm một trong hai ngưỡng này, mô phỏng kỷ luật chốt lời/cắt lỗ bảo vệ tài khoản khỏi 'tilt'."
+        ]
+      },
+      "section4": {
+        "title": "4. Quét Biến Số (Sweep Variable) & Phân Tích",
+        "p1": "Thay vì thử nghiệm mù quáng, tính năng này chạy hàng loạt mô phỏng qua nhiều mức giá trị khác nhau (Risk, Winrate, R:R) để vẽ ra đường cong tối ưu hóa:",
+        "items": [
+          "__b__Min / Max / Step:__/b__ Giới hạn vùng không gian mà bạn muốn quét. Ví dụ: Quét rủi ro mỗi lệnh từ $100 đến $500 với bước nhảy $50.",
+          "__b__Eval Pass%:__/b__ Xác suất vượt qua vòng thử thách.",
+          "__b__Payout Pass%:__/b__ Xác suất sống sót qua cả vòng thử thách VÀ chạm tới lần rút tiền đầu tiên.",
+          "__b__Expected Value (EV):__/b__ Kỳ vọng lợi nhuận toán học trên mỗi giao dịch."
+        ],
+        "tip": "💡 __b__Mẹo tương tác:__/b__ Bấm vào bất kỳ một hàng nào trong bảng kết quả Quét Biến Số để tải mức rủi ro đó vào Mô Hình Kinh Doanh và Bảng Phân Lớp (Stratified) phía dưới."
+      },
+      "section5": {
+        "title": "5. Mô Hình Kinh Doanh (Business Model Calculator)",
+        "items": [
+          "__b__Trading Velocity (T/Day):__/b__ Tốc độ giao dịch. Tổng số lệnh bạn vào mỗi ngày trên toàn bộ các tài khoản.",
+          "__b__Target Funded Slots:__/b__ Số lượng tài khoản Funded bạn muốn duy trì đồng thời (thường dùng chung với trade copier).",
+          "__b__Pass Pending Buffer:__/b__ Hàng đợi dự phòng. Số tài khoản Eval đã thi đậu, chờ sẵn để kích hoạt ngay lập tức khi một tài khoản Funded đang chạy bị cháy.",
+          "__b__Business Metrics:__/b__ Hệ thống sẽ tính toán chi phí hàng tháng (tiền thi quỹ), doanh thu ước tính, ROI, và lợi nhuận ròng hàng tháng của mô hình này."
+        ]
+      },
+      "section6": {
+        "title": "6. Stratified & Workflow (Đa Cấp Độ & Dòng Chảy)",
+        "items": [
+          "__b__Phân Lớp Rủi Ro (Stratified):__/b__ So sánh hiệu quả của việc thay đổi Rủi Ro giữa giai đoạn Eval (đánh rủi ro cao để qua nhanh) và giai đoạn Funded (hạ rủi ro để sống sót lâu dài). Click đúp vào một hàng để tính toán lại Business Model.",
+          "__b__Mô Phỏng Nhật Ký (Workflow):__/b__ Trình bày quy trình làm việc theo từng ngày dưới dạng văn bản (Day 1, Day 2...), giúp bạn hình dung rõ hành trình của tài khoản từ lúc bắt đầu đến khi cháy hoặc nhận Payout."
+        ],
+        "warning": "⚠️ __b__Lưu ý Quản trị:__/b__ Không có mô phỏng nào thay thế được tính kỷ luật thực tế. Hãy luôn gắn chặt với giới hạn Daily Stop Loss để biến số liệu mô phỏng thành hiện thực."
+      }
+    },
+    "alerts": {
+      "noResults": "Chưa có kết quả"
+    },
+    "units": {
+      "tradesPerDay": "Lệnh/Ngày",
+      "slots": "Slot"
+    },
+    "btnRunning": "Đang chạy... {p}%"
   }
 }

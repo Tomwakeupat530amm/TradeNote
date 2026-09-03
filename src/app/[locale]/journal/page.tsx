@@ -5,7 +5,8 @@ import { useTradeStore, TradeResult, SetupTag, EmotionTag, MistakeTag, Trade } f
 import { useAccountStore } from "@/store/useAccountStore";
 import { usePreferenceStore } from "@/store/usePreferenceStore";
 import TradeDetailsModal from "@/components/TradeDetailsModal";
-import { PlusCircle, Image as ImageIcon, Save, X, Trash2 } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
+import { PlusCircle, Image as ImageIcon, Save, X, Trash2, AlignJustify } from "lucide-react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -22,6 +23,9 @@ export default function JournalPage() {
   const { trades, addTrade, deleteTrade } = useTradeStore();
   const { preferences, fetchPreferences } = usePreferenceStore();
   const [isAdding, setIsAdding] = useState(false);
+  const [isCompactView, setIsCompactView] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterSetup, setFilterSetup] = useState("All");
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const t = useTranslations("Journal");
   const c = useTranslations("Common");
@@ -41,6 +45,11 @@ export default function JournalPage() {
 
   const activeAccount = accounts.find(a => a.id === activeAccountId);
   const accountTrades = trades.filter(t => t.accountId === activeAccountId);
+  const filteredTrades = accountTrades.filter(t => {
+    const matchesSearch = t.asset.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSetup = filterSetup === "All" || t.setup === filterSetup;
+    return matchesSearch && matchesSetup;
+  });
 
   useEffect(() => {
     fetchPreferences();
@@ -141,23 +150,33 @@ export default function JournalPage() {
             {t('active_account')}: <span className="font-semibold text-green-400">{activeAccount.name}</span>
           </p>
         </motion.div>
-        
-        <AnimatePresence>
-          {!isAdding && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setIsAdding(true)}
-              className="inline-flex items-center rounded-xl bg-green-600/20 border border-green-500/50 px-4 py-2 text-sm font-semibold text-green-400 shadow-[0_0_15px_rgba(22,163,74,0.2)] hover:bg-green-600 hover:text-white transition-all"
-            >
-              <PlusCircle className="-ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
-              {t('log_new_trade')}
-            </motion.button>
-          )}
-        </AnimatePresence>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsCompactView(!isCompactView)}
+            className="hidden md:flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-white/5"
+          >
+            <AlignJustify className="w-4 h-4" />
+            {isCompactView ? 'Normal View' : 'Compact View'}
+          </button>
+          
+          <AnimatePresence>
+            {!isAdding && (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setIsAdding(true)}
+                className="inline-flex items-center rounded-xl bg-green-600/20 border border-green-500/50 px-4 py-2 text-sm font-semibold text-green-400 shadow-[0_0_15px_rgba(22,163,74,0.2)] hover:bg-green-600 hover:text-white transition-all"
+              >
+                <PlusCircle className="-ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
+                <span className="hidden sm:inline">{t('log_new_trade')}</span>
+                <span className="sm:hidden">Log Trade</span>
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       <AnimatePresence>
@@ -278,11 +297,12 @@ export default function JournalPage() {
                       </button>
                     </div>
                   ) : (
-                    <div className="flex justify-center items-center rounded-xl border border-dashed border-white/20 h-[104px] bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
-                      <div className="text-center">
-                        <ImageIcon className="mx-auto h-6 w-6 text-gray-500 mb-1" aria-hidden="true" />
+                    <div className="flex justify-center items-center rounded-xl border-2 border-dashed border-white/20 h-[104px] bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/40 transition-all cursor-pointer relative overflow-hidden group">
+                      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="text-center relative z-10">
+                        <ImageIcon className="mx-auto h-6 w-6 text-gray-400 group-hover:text-blue-400 transition-colors mb-2" aria-hidden="true" />
                         <div className="text-xs text-gray-400">
-                          {t('press')} <span className="font-semibold text-white">Ctrl+V</span>
+                          {t('press')} <span className="font-semibold text-white px-1.5 py-0.5 bg-white/10 rounded shadow-sm">Ctrl+V</span>
                         </div>
                       </div>
                     </div>
@@ -311,76 +331,148 @@ export default function JournalPage() {
         )}
       </AnimatePresence>
 
-      {/* Trade History */}
-      <div className="bg-gray-900/40 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-white/5">
-            <thead className="bg-white/5">
-              <tr>
-                <th scope="col" className="py-4 pl-6 pr-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('date')}</th>
-                <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('asset')}</th>
-                <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('lots')}</th>
-                <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('tags')}</th>
-                <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('pnl')}</th>
-                <th scope="col" className="relative py-4 pl-3 pr-6 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('actions')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5 bg-transparent">
-              <AnimatePresence>
-                {accountTrades.map((trade) => (
-                  <motion.tr 
-                    key={trade.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    onClick={() => setSelectedTrade(trade)}
-                    className="hover:bg-white/[0.02] transition-colors group cursor-pointer"
-                  >
-                    <td className="whitespace-nowrap py-4 pl-6 pr-3 text-sm text-gray-300">
-                      {format(new Date(trade.date), "MMM d, HH:mm")}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm font-semibold text-white">{trade.asset}</td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-400">{trade.lotSize}</td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-300">
-                      <div className="flex flex-wrap gap-2">
-                        <span className="inline-flex items-center rounded-md bg-blue-500/10 border border-blue-500/20 px-2 py-1 text-xs font-medium text-blue-400">
-                          {trade.setup}
-                        </span>
-                        {trade.confluences?.map(c => (
-                          <span key={c} className="inline-flex items-center rounded-md bg-indigo-500/10 border border-indigo-500/20 px-2 py-1 text-xs font-medium text-indigo-400">
-                            {c}
-                          </span>
-                        ))}
-                        <span className="inline-flex items-center rounded-md bg-purple-500/10 border border-purple-500/20 px-2 py-1 text-xs font-medium text-purple-400">
-                          {trade.emotion}
-                        </span>
-                        {trade.mistake !== "None" && (
-                          <span className="inline-flex items-center rounded-md bg-orange-500/10 border border-orange-500/20 px-2 py-1 text-xs font-medium text-orange-400">
-                            {trade.mistake}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className={clsx("whitespace-nowrap px-3 py-4 text-sm font-bold", trade.pnl > 0 ? 'text-green-400' : trade.pnl < 0 ? 'text-red-400' : 'text-gray-400')}>
+      {accountTrades.length === 0 ? (
+        <EmptyState 
+          title={t('no_trades_recorded')}
+          description={t('start_journaling_description') || "Start recording your trades to analyze your performance and improve your strategy over time."}
+          actionLabel={t('add_new_trade')}
+          onAction={() => setIsAdding(true)}
+        />
+      ) : (
+        <div className="space-y-4">
+          {/* Toolbar */}
+          <div className="flex flex-col sm:flex-row gap-4 bg-gray-900/40 backdrop-blur-md p-4 rounded-2xl border border-white/5">
+            <div className="flex-1 relative">
+              <input 
+                type="text" 
+                placeholder="Search symbol..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
+              />
+            </div>
+            <div className="flex gap-2">
+              <select 
+                value={filterSetup}
+                onChange={(e) => setFilterSetup(e.target.value)}
+                className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none min-w-[120px]"
+              >
+                <option value="All">All Setups</option>
+                {SETUPS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {filteredTrades.length === 0 ? (
+             <div className="text-center py-10 bg-white/5 rounded-2xl border border-white/5">
+               <p className="text-sm text-gray-500">No trades match your filters.</p>
+             </div>
+          ) : (
+          <>
+            {/* Trade History - Desktop Table */}
+            <div className="hidden md:block bg-gray-900/40 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden shadow-2xl">
+              <div className="overflow-x-auto max-h-[600px] overflow-y-auto custom-scrollbar">
+                <table className="min-w-full divide-y divide-white/5 relative">
+                  <thead className="bg-gray-950/90 backdrop-blur-xl sticky top-0 z-20 shadow-md">
+                    <tr>
+                      <th scope="col" className="py-4 pl-6 pr-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('date')}</th>
+                      <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('asset')}</th>
+                      <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('lots')}</th>
+                      <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('tags')}</th>
+                      <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('pnl')}</th>
+                      <th scope="col" className="relative py-4 pl-3 pr-6 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('actions')}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 bg-transparent">
+                    <AnimatePresence>
+                      {filteredTrades.map((trade) => (
+                      <motion.tr 
+                        key={trade.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        onClick={() => setSelectedTrade(trade)}
+                        className="hover:bg-white/[0.04] transition-colors group cursor-pointer"
+                      >
+                        <td className={clsx("whitespace-nowrap pl-6 pr-3 text-sm text-gray-300", isCompactView ? "py-2" : "py-4")}>
+                          {format(new Date(trade.date), "MMM d, HH:mm")}
+                        </td>
+                        <td className={clsx("whitespace-nowrap px-3 text-sm font-bold text-white", isCompactView ? "py-2" : "py-4")}>{trade.asset}</td>
+                        <td className={clsx("whitespace-nowrap px-3 text-sm text-gray-400", isCompactView ? "py-2" : "py-4")}>{trade.lotSize}</td>
+                        <td className={clsx("whitespace-nowrap px-3 text-sm text-gray-300", isCompactView ? "py-2" : "py-4")}>
+                          <div className="flex flex-wrap gap-1.5">
+                            <span className="inline-flex items-center rounded-md bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 text-xs font-medium text-blue-400">
+                              {trade.setup}
+                            </span>
+                            {!isCompactView && trade.confluences?.map(c => (
+                              <span key={c} className="inline-flex items-center rounded-md bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-xs font-medium text-indigo-400">
+                                {c}
+                              </span>
+                            ))}
+                            <span className="inline-flex items-center rounded-md bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 text-xs font-medium text-purple-400">
+                              {trade.emotion}
+                            </span>
+                            {trade.mistake !== "None" && !isCompactView && (
+                              <span className="inline-flex items-center rounded-md bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 text-xs font-medium text-orange-400">
+                                {trade.mistake}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className={clsx("whitespace-nowrap px-3 text-sm font-bold", isCompactView ? "py-2" : "py-4", trade.pnl > 0 ? 'text-green-400' : trade.pnl < 0 ? 'text-red-400' : 'text-gray-400')}>
+                          ${trade.pnl > 0 ? `+${trade.pnl}` : trade.pnl}
+                        </td>
+                        <td className={clsx("relative whitespace-nowrap pl-3 pr-6 text-right text-sm font-medium", isCompactView ? "py-2" : "py-4")}>
+                          <button onClick={(e) => { e.stopPropagation(); handleDelete(trade.id); }} className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-red-500/10 rounded-lg">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Trade History - Mobile Card List */}
+          <div className="md:hidden space-y-4">
+            <AnimatePresence>
+              {filteredTrades.map((trade) => (
+                <motion.div
+                  key={trade.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  onClick={() => setSelectedTrade(trade)}
+                  className="bg-gray-900/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col gap-3 shadow-lg active:scale-[0.98] transition-transform"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="text-lg font-bold text-white tracking-tight">{trade.asset}</h4>
+                      <p className="text-xs text-gray-400">{format(new Date(trade.date), "MMM d, HH:mm")}</p>
+                    </div>
+                    <div className={clsx("text-lg font-black tracking-tight", trade.pnl > 0 ? 'text-green-400' : trade.pnl < 0 ? 'text-red-400' : 'text-gray-400')}>
                       ${trade.pnl > 0 ? `+${trade.pnl}` : trade.pnl}
-                    </td>
-                    <td className="relative whitespace-nowrap py-4 pl-3 pr-6 text-right text-sm font-medium">
-                      <button onClick={(e) => { e.stopPropagation(); handleDelete(trade.id); }} className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-red-500/10 rounded-lg">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </motion.tr>
-                ))}
-              </AnimatePresence>
-            </tbody>
-          </table>
-          {accountTrades.length === 0 && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16">
-              <p className="text-sm text-gray-500">{t('no_trades_recorded')}</p>
-            </motion.div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    <span className="inline-flex items-center rounded-md bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 text-xs font-medium text-blue-400">
+                      {trade.setup}
+                    </span>
+                    <span className="inline-flex items-center rounded-md bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 text-xs font-medium text-purple-400">
+                      {trade.emotion}
+                    </span>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+            </div>
+          </>
           )}
         </div>
-      </div>
+      )}
 
       <TradeDetailsModal
         isOpen={selectedTrade !== null}

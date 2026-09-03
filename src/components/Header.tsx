@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Bell, Search, Sparkles, Check, Trash2, Info, AlertTriangle, AlertCircle } from "lucide-react";
+import { Bell, Search, Sparkles, Check, Trash2, Info, AlertTriangle, AlertCircle, Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useNotificationStore } from "@/store/useNotificationStore";
@@ -11,6 +11,7 @@ import clsx from "clsx";
 import { formatDistanceToNow } from "date-fns";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useTranslations } from "next-intl";
+import { Sidebar } from "./Sidebar";
 
 export function Header() {
   const t = useTranslations('Header');
@@ -21,6 +22,7 @@ export function Header() {
   const { notifications, unreadCount, fetchNotifications, markAsRead, markAllAsRead, clearAll } = useNotificationStore();
   const { preferences, fetchPreferences } = usePreferenceStore();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -53,9 +55,20 @@ export function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-40 flex h-20 shrink-0 items-center gap-x-4 bg-gray-950/80 backdrop-blur-xl px-4 sm:gap-x-6 sm:px-6 lg:px-8 border-b border-white/5">
-      <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-        <form className="relative flex flex-1 items-center" action="#" method="GET">
+    <>
+      <header className="sticky top-0 z-40 flex h-20 shrink-0 items-center gap-x-4 bg-gray-950/80 backdrop-blur-xl px-4 sm:gap-x-6 sm:px-6 lg:px-8 border-b border-white/5">
+        <div className="flex md:hidden items-center">
+          <button
+            type="button"
+            className="-m-2.5 p-2.5 text-gray-400 hover:text-white"
+            onClick={() => setIsMobileMenuOpen(true)}
+          >
+            <span className="sr-only">Open sidebar</span>
+            <Menu className="h-6 w-6" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
+          <form className="relative flex flex-1 items-center" action="#" method="GET">
           <label htmlFor="search-field" className="sr-only">
             Search
           </label>
@@ -198,5 +211,40 @@ export function Header() {
         </div>
       </div>
     </header>
+
+    {/* Mobile Navigation Drawer */}
+    <AnimatePresence>
+      {isMobileMenuOpen && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-gray-950/80 backdrop-blur-sm z-50 md:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+          <motion.div
+            initial={{ x: "-100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "-100%" }}
+            transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+            className="fixed inset-y-0 left-0 z-50 w-72 bg-gray-900 shadow-2xl md:hidden flex flex-col"
+          >
+            <div className="absolute right-0 top-0 -mr-12 pt-4">
+              <button
+                type="button"
+                className="ml-1 flex h-10 w-10 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <span className="sr-only">Close sidebar</span>
+                <X className="h-6 w-6 text-white" aria-hidden="true" />
+              </button>
+            </div>
+            <Sidebar />
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+    </>
   );
 }

@@ -24,3 +24,25 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-gray-900/40 backdrop-blur-xl border border-white/5 shadow-2xl;
+  }
+  .glass-panel-hover {
+    @apply hover:bg-gray-900/60 transition-colors cursor-pointer;
+  }
+  .glass-pill {
+    @apply px-4 py-1.5 rounded-full text-sm font-semibold transition-all border bg-white/5 border-transparent text-gray-400 hover:bg-white/10;
+  }
+  .glass-pill-active {
+    @apply shadow-[0_0_10px_rgba(255,255,255,0.1)];
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+

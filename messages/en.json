@@ -8,7 +8,8 @@
     "economic_calendar": "Economic Calendar",
     "daily_review": "Daily Review",
     "settings": "Settings",
-    "accounts": "Accounts"
+    "accounts": "Accounts",
+    "simulator": "Simulator"
   },
   "LanguageSwitcher": {
     "label": "Language",
@@ -405,5 +406,227 @@
     "delete": "Delete",
     "cancel": "Cancel",
     "saving": "Saving..."
+  },
+  "Simulator": {
+    "title": "Elite Quant Optimizer",
+    "btnGuide": "📖 User Guide",
+    "sections": {
+      "fundRules": "Fund Rules",
+      "strategyEngine": "Strategy Engine",
+      "sweepVariable": "Sweep Variable",
+      "business": "Business"
+    },
+    "fund": {
+      "preset": "Preset",
+      "balance": "Balance",
+      "evalTarget": "Eval Target",
+      "payoutTarget": "Payout Target",
+      "evalConsistency": "Eval Consistency",
+      "maxDrawdown": "Max Drawdown",
+      "ddType": "DD Type",
+      "payoutRule": "Payout Rule",
+      "groupTopstep": "--- TOPSTEP ---",
+      "groupBulenox": "--- BULENOX ---",
+      "custom": "Custom",
+      "ddTrailing": "Trailing",
+      "ddStatic": "Static",
+      "ruleStandard": "Standard (5 days $150+)",
+      "ruleConsistency": "Consistency (40% rule, 3 days)"
+    },
+    "strategy": {
+      "winrate": "Winrate",
+      "rewardRisk": "Reward/Risk",
+      "maxTrades": "Max Trades",
+      "dailyStop": "Daily Stop",
+      "dailyTarget": "Daily Target"
+    },
+    "sweep": {
+      "variable": "Variable",
+      "min": "Min",
+      "max": "Max",
+      "step": "Step",
+      "labelRisk": "Risk ($)",
+      "labelWr": "Winrate (%)",
+      "labelRR": "R:R Ratio"
+    },
+    "business": {
+      "tradingVelocity": "Trading Velocity",
+      "targetFunded": "Target Funded",
+      "passPending": "Pass Pending Buffer",
+      "evalFee": "Eval Fee",
+      "activationFee": "Activation Fee",
+      "payoutSize": "Payout Size",
+      "minTradingDays": "Min Trading Days"
+    },
+    "btnRun": "Run Optimizer",
+    "kpi": {
+      "evalPass": "Eval Pass Rate",
+      "payoutPass": "Payout Rate",
+      "bustRate": "Bust Rate",
+      "evalTrades": "Eval Trades (Avg | Min)",
+      "payoutTrades": "Payout Trades (Avg | Min)"
+    },
+    "charts": {
+      "optCurve": "Optimization Curve",
+      "optCurveSub": "Click row → Stratified | Double-click Stratified → Biz",
+      "exportCsv": "📥 Export CSV",
+      "legendEvalPass": "Eval Pass (%)",
+      "legendPayoutPass": "Payout Pass (%)",
+      "legendBustRate": "Bust Rate (%)"
+    },
+    "results": {
+      "title": "Optimization Results",
+      "subtitle": "Click row → Funded Stratified | Double-click Stratified → Biz Calc",
+      "colSweep": "Risk ($)",
+      "colEvalPass": "Eval Pass",
+      "colPayoutPass": "Payout Pass",
+      "colBustRate": "Bust Rate",
+      "colEvalTrades": "Eval Trades",
+      "colPayoutTrades": "Payout Trades",
+      "colEv": "Expected Val"
+    },
+    "stratified": {
+      "title": "📊 Funded Stratified — P1 (clicked row) → P2 (all sweep) at 50% target | Eval→Payout% = Eval Pass × Fund Survival",
+      "subtitle": "Double-click row to load into Business Calculator",
+      "colCombo": "Combo",
+      "colSurvival": "Fund Survival",
+      "colRate": "Eval→Payout%",
+      "colTrades": "Trades",
+      "colNote": "Note",
+      "verySafe": "🛡️ Very safe",
+      "balanced": "⚖️ Balanced",
+      "fast": "🚀 Fast",
+      "computing": "⏳ Computing..."
+    },
+    "biz": {
+      "title": "Business Calculator",
+      "subtitle": "Setup N funded accounts — refill monthly on bust",
+      "setupEvals": "Setup Evals (5F+5P)",
+      "refillEvals": "Refill Evals/mo",
+      "fundedSurvival": "Funded Survival",
+      "payoutsMonth": "Payouts/Month",
+      "timePayout": "Time to Payout (Days)",
+      "timeRefill": "Time to Refill (Days)",
+      "expense": "Expense/Mo",
+      "revenue": "Revenue/Mo",
+      "netProfit": "Net Profit/Mo",
+      "roi": "ROI",
+      "breakeven": "Break-even",
+      "costFunded": "Cost/Funded",
+      "revMult": "Revenue Mult.",
+      "annual": "Annual Income",
+      "breakEvenUnit": "Payouts"
+    },
+    "analysis": {
+      "title": "📈 Optimization Analysis",
+      "subtitle": "Compare strategies from simulation results — click row to select & view workflow",
+      "colRisk": "Risk",
+      "colType": "Type",
+      "colSetupEvals": "Setup Evals",
+      "colSetupCost": "Setup Cost",
+      "colFundSurv": "Fund Surv",
+      "colProfit": "Profit/Mo",
+      "colAnnual": "Annual",
+      "colSelect": "Select",
+      "best": "👑 BEST",
+      "pick": "Pick →",
+      "typeSafe": "🛡️ Safe",
+      "typeBalance": "⚖️ Balanced",
+      "typeRisky": "🔥 Risky",
+      "typeHighRisk": "⚠️ High Risk",
+      "typeViolent": "💥 Violent"
+    },
+    "workflow": {
+      "titlePrefix": "🔄 Simulated Workflow — Risk",
+      "simDays": "Sim Days",
+      "evalPassRefill": "Eval Pass (refill)",
+      "tkBust": "Account BUST",
+      "payoutReceived": "Payout Received",
+      "fundedEnd": "Funded Accounts (End)",
+      "processTitle": "📋 Operating Procedure",
+      "morning": "🌅 Morning",
+      "evalGoal": "🎯 Eval Target",
+      "stopRules": "⏹ 3 Daily Stop Rules",
+      "accountMgmt": "🔄 Account Management",
+      "subtitleTpl": "{conc} accounts running parallel, {tpa} trades/account/day",
+      "morningItem1": "Turn on {conc} accounts, check balance ${target}+",
+      "morningItem2": "Take {tpa} trades/account ({tpd} ÷ {conc} slots)",
+      "morningItem3": "Each trade: SL=-${risk} · TP=+${win}",
+      "evalItem1": "Reach profit ${target}",
+      "evalItem2": "Best day ≤ 50% of total profit (Consistency)",
+      "evalItem3": "Do not hit trailing DD ${dd}",
+      "stopItem1": "Complete {tpa} trades/day → stop",
+      "stopItem2": "Hit +${dt} (daily target) → stop",
+      "stopItem3": "Hit -${ds} (daily stop) → stop",
+      "mgmtItem1": "⭐ Pass eval → FUNDED, reset balance",
+      "mgmtItem2": "💥 Bust (hit DD) → buy eval refill slot",
+      "mgmtItem3": "💰 FUNDED hits target → receive PAYOUT ${ps}",
+      "colDay": "Day",
+      "colResult": "Results (per account)",
+      "dayLabel": "📅 Day {d}"
+    },
+    "guide": {
+      "title": "📖 Detailed User Guide - Elite Quant Optimizer",
+      "newWindow": "↗ New Window",
+      "subtitle": "An advanced probability calculator, risk management optimizer, and Prop Trading business simulator.",
+      "section1": {
+        "title": "1. System Overview",
+        "p1": "Elite Quant Optimizer is not just a basic spreadsheet. It is an advanced Monte Carlo simulator designed to help you accurately quantify your survival rate and profitability when trading for Prop Firms (Topstep, Bulenox, APEX...). By simulating thousands of market scenarios based on your system's metrics, it helps you stop guessing and start making mathematically sound decisions."
+      },
+      "section2": {
+        "title": "2. Fund Rules Setup",
+        "items": [
+          "__b__Preset:__/b__ Quickly load rulesets from popular prop firms. For example, Topstep 50k automatically sets a 50k balance, 3k target, and 2k drawdown.",
+          "__b__Balance & Targets ($):__/b__ Initial account balance, Eval Target to pass the challenge, and the safe Payout Target to secure your first withdrawal.",
+          "__b__Eval Consistency (%):__/b__ Daily profit consistency rule. If a firm restricts a single day from making up more than 50% of your total profit, the simulator will dynamically force extra trading days to dilute huge winning days.",
+          "__b__Max Drawdown & DD Type:__/b__ Calculates your account's pain tolerance. Trailing Drawdown trails your highest peak (highly restrictive), whereas Static Drawdown is fixed from your starting balance.",
+          "__b__Payout Rule:__/b__ How you qualify for a withdrawal. 'Standard' (e.g., 5 days of $150+ wins) or 'Consistency' (no single day exceeds 40% of the withdrawal amount)."
+        ]
+      },
+      "section3": {
+        "title": "3. Strategy Engine",
+        "items": [
+          "__b__Winrate (%):__/b__ The true historical win rate of your trading system. Enter a realistic number based on backtesting or journaling.",
+          "__b__Reward/Risk (X):__/b__ The R:R ratio. For instance, a 1.5 R:R means you gain $150 for every $100 you risk.",
+          "__b__Daily Stop ($) & Daily Target ($):__/b__ Crucial safety switches. The simulator will automatically halt trading for the day if either threshold is hit, accurately modeling the discipline needed to prevent 'tilt'."
+        ]
+      },
+      "section4": {
+        "title": "4. Sweep Variable & Analytics",
+        "p1": "Instead of testing blindly, this feature runs bulk simulations across a range of values (Risk, Winrate, R:R) to map out your optimal performance curve:",
+        "items": [
+          "__b__Min / Max / Step:__/b__ Set the boundaries for the sweep. E.g., Sweep risk per trade from $100 to $500 in $50 increments.",
+          "__b__Eval Pass%:__/b__ The mathematical probability of passing the challenge.",
+          "__b__Payout Pass%:__/b__ The true probability of surviving the evaluation AND lasting long enough to secure the first payout.",
+          "__b__Expected Value (EV):__/b__ The mathematical expectancy per trade."
+        ],
+        "tip": "💡 __b__Interactive Tip:__/b__ Click on any row in the Sweep Variable results table to load that specific risk level into the Business Model and Stratified Analysis panels below."
+      },
+      "section5": {
+        "title": "5. Business Model Calculator",
+        "items": [
+          "__b__Trading Velocity (T/Day):__/b__ The total number of trades you execute daily across all accounts.",
+          "__b__Target Funded Slots:__/b__ The number of Funded accounts you intend to manage concurrently (often via a trade copier).",
+          "__b__Pass Pending Buffer:__/b__ Your backup queue. The number of passed Eval accounts kept in reserve to immediately replace any active Funded account that blows up.",
+          "__b__Business Metrics:__/b__ The system aggregates evaluation fees, estimated revenue, ROI, and net monthly profit to evaluate your operation as a business."
+        ]
+      },
+      "section6": {
+        "title": "6. Stratified Risk & Workflow Simulation",
+        "items": [
+          "__b__Stratified Risk:__/b__ Compares the impact of shifting risk profiles (e.g., high risk during Eval for speed, low risk during Funded for survival). Double-click a row to recalculate the Business Model.",
+          "__b__Workflow Journal:__/b__ Presents the simulated workflow day-by-day in text format (Day 1, Day 2...), helping you visualize the realistic journey of an account from day one to bust or payout."
+        ],
+        "warning": "⚠️ __b__Management Warning:__/b__ No simulation can replace real discipline. Strictly adhere to your Daily Stop Loss to ensure real-world results align with these projections."
+      }
+    },
+    "alerts": {
+      "noResults": "No results yet"
+    },
+    "units": {
+      "tradesPerDay": "T/Day",
+      "slots": "Slots"
+    },
+    "btnRunning": "Running... {p}%"
   }
 }

@@ -1,0 +1,430 @@
+/* ─── CSS Variables (scoped to :global to match original look) ─── */
+:global(:root) {
+  --bg-base: #0B0C10;
+  --surface: #161B22;
+  --text-primary: #F0F6FC;
+  --text-secondary: #8B949E;
+  --accent-gold: #D4AF37;
+  --accent-gold-glow: rgba(212, 175, 55, 0.2);
+  --success: #3FB950;
+  --danger: #F85149;
+  --border: #30363D;
+}
+
+/* ─── Layout ─── */
+.layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  flex: 1;
+  height: calc(100vh - 57px);
+}
+
+.sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 20px 18px;
+  overflow-y: auto;
+}
+
+.section-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-secondary);
+  margin: 18px 0 10px 0;
+}
+
+/* ─── Inputs ─── */
+.input-group {
+  margin-bottom: 10px;
+}
+
+.input-group label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.input-group input,
+.input-group select {
+  width: 100%;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  color: var(--accent-gold);
+  padding: 8px 10px;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.input-group select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23D4AF37' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+
+.input-group input:focus,
+.input-group select:focus {
+  border-color: var(--accent-gold);
+}
+
+.range-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.range-row div {
+  text-align: center;
+}
+
+.range-row label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin: 0;
+  justify-content: center;
+  display: flex;
+}
+
+.range-row input {
+  width: 100%;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  color: var(--accent-gold);
+  padding: 8px 10px;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.range-row input:focus {
+  border-color: var(--accent-gold);
+}
+
+/* ─── Buttons ─── */
+.btn-guide {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(212, 175, 55, 0.05));
+  color: var(--accent-gold);
+  border: 1px solid var(--accent-gold);
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.1);
+}
+
+.btn-guide:hover {
+  background: var(--accent-gold);
+  color: var(--bg-base);
+  box-shadow: 0 0 15px var(--accent-gold-glow);
+  transform: translateY(-1px);
+}
+
+.btn-run {
+  width: 100%;
+  background: linear-gradient(135deg, #D4AF37 0%, #AA8022 100%);
+  color: #000;
+  border: none;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 20px;
+  box-shadow: 0 4px 15px var(--accent-gold-glow);
+}
+
+.btn-run:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─── Dashboard ─── */
+.dashboard {
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ─── KPI ─── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 82px;
+  justify-content: center;
+}
+
+.kpi-card .label,
+.label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.kpi-card .value,
+.value {
+  font-size: 26px;
+  font-weight: 300;
+  text-align: center;
+  margin-top: 6px;
+}
+
+/* ─── Value colours ─── */
+.val-gold { color: var(--accent-gold); }
+.val-good { color: var(--success); }
+.val-bad  { color: var(--danger); }
+.val-secondary { color: var(--text-secondary); }
+
+/* ─── Chart ─── */
+.chart-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  min-height: 300px;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chart-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.chart-subtitle {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* ─── Table ─── */
+.table-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.table-scroll {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+/* Global table styles (needed for dynamic table content) */
+:global(#optTable),
+:global(#stratTable),
+:global(#optAnalysisTable),
+:global(#wfTable) {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+:global(#optTable th),
+:global(#stratTable th),
+:global(#optAnalysisTable th),
+:global(#wfTable th) {
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+
+:global(#optTable td),
+:global(#stratTable td),
+:global(#optAnalysisTable td),
+:global(#wfTable td) {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+:global(#optTable tbody tr),
+:global(#stratTable tbody tr),
+:global(#optAnalysisTable tbody tr) {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+:global(#optTable tbody tr:hover),
+:global(#stratTable tbody tr:hover),
+:global(#optAnalysisTable tbody tr:hover) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* ─── Row states ─── */
+.best-row {
+  background: rgba(212, 175, 55, 0.05) !important;
+}
+
+.best-row td {
+  color: var(--accent-gold);
+  font-weight: bold;
+}
+
+.selected-row {
+  background: rgba(88, 166, 255, 0.12) !important;
+  border-left: 3px solid #58A6FF;
+}
+
+/* ─── Business ─── */
+.biz-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 20px;
+}
+
+.biz-funnel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 16px 0 24px;
+  flex-wrap: wrap;
+}
+
+.biz-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+
+.biz-card {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 72px;
+  align-items: center;
+}
+
+.biz-card .label {
+  font-size: 9px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-align: center;
+}
+
+.biz-card .value {
+  font-size: 18px;
+  font-weight: 400;
+  text-align: center;
+  margin-top: 4px;
+}
+
+.highlight {
+  border-color: var(--accent-gold) !important;
+  box-shadow: 0 0 10px var(--accent-gold-glow);
+}
+
+/* ─── Funnel ─── */
+.funnel-step {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px 24px;
+  text-align: center;
+  min-width: 160px;
+  flex: 1;
+  max-width: 220px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 80px;
+}
+
+.f-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.f-value {
+  font-size: 22px;
+  font-weight: 400;
+  text-align: center;
+}
+
+.funnel-arrow {
+  font-size: 18px;
+  color: var(--accent-gold);
+}
+
+/* ─── Workflow ─── */
+.wf-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 0 24px;
+}
+
+.wf-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.wf-row .funnel-step {
+  min-width: 140px;
+  max-width: 220px;
+  flex: 1;
+}
