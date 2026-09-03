@@ -51,6 +51,7 @@ export default function SimulatorPage() {
   const [sweepMin, setSweepMin] = useState(100);
   const [sweepMax, setSweepMax] = useState(1000);
   const [sweepStep, setSweepStep] = useState(100);
+  const [chartType, setChartType] = useState<'area' | 'bar'>('area');
 
   // ── Business ──
   const [tpd, setTpd] = useState(20);
@@ -117,17 +118,18 @@ export default function SimulatorPage() {
   }, []);
 
   // ── Chart ──
-  const drawChart = useCallback((res: SimResult[]) => {
+  const drawChart = useCallback((res: SimResult[], type: 'area' | 'bar' = 'area') => {
     if (!chartRef.current) return;
     if (chartInstance.current) chartInstance.current.destroy();
+    const isArea = type === 'area';
     chartInstance.current = new Chart(chartRef.current, {
-      type: 'line',
+      type: isArea ? 'line' : 'bar',
       data: {
         labels: res.map(r => r.val),
         datasets: [
-          { label: t('charts.legendEvalPass'), data: res.map(r => r.eval_rate), backgroundColor: 'rgba(212,175,55,0.7)', borderColor: 'rgba(212,175,55,1)', borderWidth: 2, tension: 0.3, fill: true },
-          { label: t('charts.legendPayoutPass'), data: res.map(r => r.payout_rate), backgroundColor: 'rgba(63,185,80,0.7)', borderColor: 'rgba(63,185,80,1)', borderWidth: 2, tension: 0.3, fill: true },
-          { label: t('charts.legendBustRate'), data: res.map(r => r.bust_rate), backgroundColor: 'rgba(248,81,73,0.7)', borderColor: 'rgba(248,81,73,1)', borderWidth: 2, tension: 0.3, fill: true },
+          { label: t('charts.legendEvalPass'), data: res.map(r => r.eval_rate), backgroundColor: isArea ? 'rgba(212,175,55,0.7)' : 'rgba(212,175,55,1)', borderColor: 'rgba(212,175,55,1)', borderWidth: 2, tension: isArea ? 0.3 : 0, fill: isArea },
+          { label: t('charts.legendPayoutPass'), data: res.map(r => r.payout_rate), backgroundColor: isArea ? 'rgba(63,185,80,0.7)' : 'rgba(63,185,80,1)', borderColor: 'rgba(63,185,80,1)', borderWidth: 2, tension: isArea ? 0.3 : 0, fill: isArea },
+          { label: t('charts.legendBustRate'), data: res.map(r => r.bust_rate), backgroundColor: isArea ? 'rgba(248,81,73,0.7)' : 'rgba(248,81,73,1)', borderColor: 'rgba(248,81,73,1)', borderWidth: 2, tension: isArea ? 0.3 : 0, fill: isArea },
         ]
       },
       options: {
@@ -139,7 +141,7 @@ export default function SimulatorPage() {
         }
       }
     });
-  }, []);
+  }, [t]);
 
   // ── Cleanup Chart.js on unmount to prevent memory leak ──
   useEffect(() => {
@@ -165,7 +167,7 @@ export default function SimulatorPage() {
       tpd, conc: concurrent, sv: sweepVar, smn: sweepMin, smx: sweepMax, sst: sweepStep
     };
     const { resArr, bi } = await runOptimizer(params);
-    drawChart(resArr);
+    drawChart(resArr, chartType);
 
     if (bi !== -1 && resArr[bi]) {
       const best = resArr[bi];
@@ -423,9 +425,25 @@ export default function SimulatorPage() {
                   <span className={styles['chart-title']}>{t('charts.optCurve')}</span>
                   <span className={styles['chart-subtitle']} style={{ marginLeft: 12 }}>{t('charts.optCurveSub')}</span>
                 </div>
-                <button onClick={exportCSV} style={{ fontSize: 10, padding: '5px 10px', background: 'var(--bg-base)', color: 'var(--accent-gold)', border: '1px solid var(--accent-gold)', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                  {t('charts.exportCsv')}
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    onClick={() => {
+                      setChartType(prev => {
+                        const next = prev === 'area' ? 'bar' : 'area';
+                        if (results && results.length > 0) {
+                          drawChart(results, next);
+                        }
+                        return next;
+                      });
+                    }} 
+                    style={{ fontSize: 10, padding: '5px 10px', background: 'var(--bg-base)', color: 'var(--accent-gold)', border: '1px solid var(--accent-gold)', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  >
+                    {t('charts.toggleChart')}
+                  </button>
+                  <button onClick={exportCSV} style={{ fontSize: 10, padding: '5px 10px', background: 'var(--bg-base)', color: 'var(--accent-gold)', border: '1px solid var(--accent-gold)', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    {t('charts.exportCsv')}
+                  </button>
+                </div>
               </div>
               <div style={{ position: 'relative', height: '350px', width: '100%' }}>
                 <canvas ref={chartRef} id="mcChart" />

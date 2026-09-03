@@ -472,7 +472,8 @@
       "exportCsv": "📥 Export CSV",
       "legendEvalPass": "Eval Pass (%)",
       "legendPayoutPass": "Payout Pass (%)",
-      "legendBustRate": "Bust Rate (%)"
+      "legendBustRate": "Bust Rate (%)",
+      "toggleChart": "Toggle Chart Type"
     },
     "results": {
       "title": "Optimization Results",

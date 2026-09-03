@@ -472,7 +472,8 @@
       "exportCsv": "📥 Xuất CSV",
       "legendEvalPass": "Pass Eval (%)",
       "legendPayoutPass": "Pass Payout (%)",
-      "legendBustRate": "Tỷ lệ Cháy (%)"
+      "legendBustRate": "Tỉ lệ cháy (%)",
+      "toggleChart": "Chuyển dạng biểu đồ"
     },
     "results": {
       "title": "Kết quả Tối ưu hóa",
