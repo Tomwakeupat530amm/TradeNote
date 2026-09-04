@@ -564,7 +564,17 @@
       "mgmtItem3": "💰 FUNDED hits target → receive PAYOUT ${ps}",
       "colDay": "Day",
       "colResult": "Results (per account)",
-      "dayLabel": "📅 Day {d}"
+      "dayLabel": "📅 Day {d}",
+      "tradeLog": "TK{id} {phase} · Trade {tradeNum}: {result} → BTN ${balance}",
+      "winText": "✅ WIN +${amount}",
+      "lossText": "❌ LOSS -${amount}",
+      "bustPending": "activate 1 pass pending ({left} left)",
+      "bustNoPending": "no pending, wait for new eval",
+      "bustLog": "💥 TK{id} BUST → {src}",
+      "evalPassLog": "🔄 Passed new eval → pass 1 ({left} pending left)",
+      "fundedTarget": "💰 TK{id} FUNDED hit target → receive PAYOUT ${amount}, keep account",
+      "dailyStop": "⏹ TK{id} hit DAILY STOP -${amount} → stop for today",
+      "dailyTarget": "⏹ TK{id} hit DAILY TARGET +${amount} → stop for today"
     },
     "guide": {
       "title": "📖 Detailed User Guide - Elite Quant Optimizer",

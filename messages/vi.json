@@ -564,7 +564,17 @@
       "mgmtItem3": "💰 FUNDED đạt target → nhận PAYOUT ${ps}",
       "colDay": "Ngày",
       "colResult": "Kết quả (từng tk)",
-      "dayLabel": "📅 Ngày {d}"
+      "dayLabel": "📅 Ngày {d}",
+      "tradeLog": "TK{id} {phase} · Lệnh {tradeNum}: {result} → BTN ${balance}",
+      "winText": "✅ WIN +${amount}",
+      "lossText": "❌ LOSS -${amount}",
+      "bustPending": "activate 1 pass pending (còn {left})",
+      "bustNoPending": "hết pending, chờ eval mới",
+      "bustLog": "💥 TK{id} BUST → {src}",
+      "evalPassLog": "🔄 Thi eval mới → pass 1 (còn {left} pending)",
+      "fundedTarget": "💰 TK{id} FUNDED đạt target → nhận PAYOUT ${amount}, giữ tk đánh tiếp",
+      "dailyStop": "⏹ TK{id} hit DAILY STOP -${amount} → nghỉ hôm nay",
+      "dailyTarget": "⏹ TK{id} hit DAILY TARGET +${amount} → nghỉ hôm nay"
     },
     "guide": {
       "title": "📖 Hướng Dẫn Sử Dụng Chi Tiết - Elite Quant Optimizer",

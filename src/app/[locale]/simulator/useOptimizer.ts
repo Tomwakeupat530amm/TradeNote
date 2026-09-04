@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 
 export interface SimResult {
   val: number;
@@ -114,99 +115,49 @@ export interface BizParams {
 }
 
 export function useOptimizer() {
+  const tLog = useTranslations('Simulator.workflow');
   const [isCalculating, setIsCalculating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<SimResult[]>([]);
   const [bestIndex, setBestIndex] = useState(-1);
   const cachedResults = useRef<SimResult[]>([]);
+  const workerRef = useRef<Worker | null>(null);
 
-  const runOptimizer = useCallback(async (params: OptimizerParams) => {
-    setIsCalculating(true);
-    setProgress(0);
+  useEffect(() => {
+    workerRef.current = new Worker(new URL('./optimizer.worker.ts', import.meta.url));
+    return () => {
+      workerRef.current?.terminate();
+    };
+  }, []);
 
-    const { bal, tgtE, tgtP, dd, ec, wr, rrv, dRisk, maxT, ds, dt, tpd, conc, sv, smn, smx, sst } = params;
-    const tpa = Math.max(1, Math.ceil(tpd / conc));
-    const steps: number[] = [];
-    for (let v = smn; v <= smx; v = Math.round((v + sst) * 1e6) / 1e6) steps.push(v);
-
-    const resArr: SimResult[] = [];
-    const nSim = 5000;
-
-    const batch = (stepVal: number): Promise<SimResult | null> =>
-      new Promise(resolve => setTimeout(() => {
-        try {
-          const risk = sv === 'risk' ? stepVal : dRisk;
-          const wr2 = sv === 'wr' ? stepVal / 100 : wr;
-          const rr2 = sv === 'rr' ? stepVal : rrv;
-          const ev = (wr2 * (risk * rr2)) - ((1 - wr2) * risk);
-          let ep = 0, pp = 0, bc = 0, te = 0, me = 999999, tp = 0, mp = 999999;
-
-          for (let i = 0; i < nSim; i++) {
-            let b = bal, pk = bal, md = 0, dp = 0, ep2 = 0, bu = false;
-            for (let t = 1; t <= maxT; t++) {
-              const pn = Math.random() < wr2 ? risk * rr2 : -risk;
-              b += pn; dp += pn; if (b > pk) pk = b;
-              if (b <= pk - dd) { bu = true; break; }
-              if (b >= bal + tgtE) {
-                const cm = Math.max(md, dp);
-                if (ec === 0 || cm <= (b - bal) * ec) { ep2 = t; break; }
-              }
-              if (t % tpa === 0) { if (dp > md) md = dp; dp = 0; }
-              else {
-                if (ds > 0 && dp <= -ds) { if (dp > md) md = dp; dp = 0; }
-                else if (dt > 0 && dp >= dt) { if (dp > md) md = dp; dp = 0; }
-              }
-            }
-            if (bu) bc++;
-            else if (ep2 > 0) {
-              ep++; te += ep2; if (ep2 < me) me = ep2;
-              b = bal; pk = bal; md = 0; dp = 0; let pp2 = false;
-              for (let t = 1; t <= maxT - ep2; t++) {
-                const pn = Math.random() < wr2 ? risk * rr2 : -risk;
-                b += pn; dp += pn; if (b > pk) pk = b;
-                if (b <= pk - dd) { bu = true; break; }
-                if (b >= bal + tgtP) { pp2 = true; tp += t; if (t < mp) mp = t; break; }
-                if (t % tpa === 0) { if (dp > md) md = dp; dp = 0; }
-                else {
-                  if (ds > 0 && dp <= -ds) { if (dp > md) md = dp; dp = 0; }
-                  else if (dt > 0 && dp >= dt) { if (dp > md) md = dp; dp = 0; }
-                }
-              }
-              if (pp2) pp++; else if (bu) bc++;
-            } else { bc++; }
-          }
-
-          resolve({
-            val: stepVal,
-            eval_rate: ep / nSim * 100,
-            payout_rate: pp / nSim * 100,
-            bust_rate: bc / nSim * 100,
-            eval_avg: ep > 0 ? Math.round(te / ep) : 0,
-            eval_min: ep > 0 ? me : '--',
-            payout_avg: pp > 0 ? Math.round(tp / pp) : 0,
-            payout_min: pp > 0 ? mp : '--',
-            ev
-          });
-        } catch (e) { console.error(e); resolve(null); }
-      }, 0));
-
-    for (let i = 0; i < steps.length; i++) {
-      setProgress(Math.round(i / steps.length * 100));
-      const r = await batch(steps[i]);
-      if (r) resArr.push(r);
-    }
-
-    setIsCalculating(false);
-    setResults(resArr);
-    cachedResults.current = resArr;
-
-    let bi = -1, bs = -999999;
-    resArr.forEach((r, i) => {
-      const s = r.ev * r.payout_rate;
-      if (s > bs && r.bust_rate < 50) { bs = s; bi = i; }
+  const runOptimizer = useCallback((params: OptimizerParams) => {
+    return new Promise<{ resArr: SimResult[], bi: number }>((resolve) => {
+      setIsCalculating(true);
+      setProgress(0);
+      
+      const msgId = Date.now().toString();
+      
+      const handleMessage = (e: MessageEvent) => {
+        if (e.data.msgId !== msgId) return;
+        
+        if (e.data.type === 'PROGRESS') {
+          setProgress(e.data.progress);
+        } else if (e.data.type === 'DONE') {
+          workerRef.current?.removeEventListener('message', handleMessage);
+          const { results: resArr, bestIndex: bi } = e.data;
+          
+          setIsCalculating(false);
+          setResults(resArr);
+          cachedResults.current = resArr;
+          setBestIndex(bi);
+          
+          resolve({ resArr, bi });
+        }
+      };
+      
+      workerRef.current?.addEventListener('message', handleMessage);
+      workerRef.current?.postMessage({ type: 'RUN_OPTIMIZER', payload: params, msgId });
     });
-    setBestIndex(bi);
-    return { resArr, bi };
   }, []);
 
   const calculateBiz = useCallback((er: number, pr: number, ae: number, ap: number, bizParams: BizParams): BizResult => {
@@ -241,55 +192,18 @@ export function useOptimizer() {
     r: SimResult,
     params: OptimizerParams
   ): Promise<StratRow[]> => {
-    return new Promise(resolve => setTimeout(() => {
-      const { bal, tgtP, dd, wr, rrv, ds, dt, tpd, conc, smn, smx, sst } = params;
-      const tpa = Math.max(1, Math.ceil(tpd / conc));
-      const p1 = r.val;
-      const p2s: number[] = [];
-      for (let v = smn; v <= smx; v = Math.round((v + sst) * 1e6) / 1e6) {
-        if (v !== p1) p2s.push(v);
-      }
-      const ht = tgtP * 0.5, nSim = 1500;
-      const srs: StratRow[] = [];
-      for (const p2 of p2s) {
-        let pc = 0, nf = 0, tt = 0;
-        for (let i = 0; i < nSim; i++) {
-          let b = bal, pk = bal, md = 0, dp = 0, bu = false, pa = false, tr = 0;
-          for (let t = 1; t <= 500; t++) {
-            tr++;
-            const pn = Math.random() < wr ? p1 * rrv : -p1;
-            b += pn; dp += pn; if (b > pk) pk = b;
-            if (b <= pk - dd) { bu = true; break; }
-            if (b >= bal + ht) { pa = true; break; }
-            if (t % tpa === 0) { if (dp > md) md = dp; dp = 0; }
-            else {
-              if (ds > 0 && dp <= -ds) { if (dp > md) md = dp; dp = 0; }
-              else if (dt > 0 && dp >= dt) { if (dp > md) md = dp; dp = 0; }
-            }
-          }
-          if (bu || !pa) continue;
-          nf++; md = 0; dp = 0;
-          for (let t = 1; t <= 500; t++) {
-            tr++;
-            const pn = Math.random() < wr ? p2 * rrv : -p2;
-            b += pn; dp += pn; if (b > pk) pk = b;
-            if (b <= pk - dd) break;
-            if (b >= bal + tgtP) { pc++; tt += tr; break; }
-            if (t % tpa === 0) { if (dp > md) md = dp; dp = 0; }
-            else {
-              if (ds > 0 && dp <= -ds) { if (dp > md) md = dp; dp = 0; }
-              else if (dt > 0 && dp >= dt) { if (dp > md) md = dp; dp = 0; }
-            }
-          }
+    return new Promise(resolve => {
+      const msgId = Date.now().toString() + "_strat";
+      const handleMessage = (e: MessageEvent) => {
+        if (e.data.msgId !== msgId) return;
+        if (e.data.type === 'STRATIFIED_DONE') {
+          workerRef.current?.removeEventListener('message', handleMessage);
+          resolve(e.data.results);
         }
-        const sv = nf > 0 ? pc / nf * 100 : 0;
-        const pr = pc / nSim * 100;
-        const at = pc > 0 ? Math.round(tt / pc) : 0;
-        srs.push({ p2, sv, pr, at });
-      }
-      srs.sort((a, b) => b.pr - a.pr);
-      resolve(srs);
-    }, 20));
+      };
+      workerRef.current?.addEventListener('message', handleMessage);
+      workerRef.current?.postMessage({ type: 'GET_STRATIFIED', payload: { r, params }, msgId });
+    });
   }, []);
 
   const renderWorkflow = useCallback((
@@ -327,30 +241,32 @@ export function useOptimizer() {
           const isWin = Math.random() < wr;
           const pnl = isWin ? win : -risk;
           s.bal += pnl; s.pnl += pnl; s.peak = Math.max(s.peak, s.bal);
-          lines.push(`   TK${i + 1} ${s.phase} · Lệnh ${t + 1}: ${isWin ? '✅ WIN +$' + win : '❌ LOSS -$' + risk} → BTN $${Math.round(s.bal).toLocaleString()}`);
+          const resultStr = isWin ? tLog('winText', { amount: win }) : tLog('lossText', { amount: risk });
+          lines.push(tLog('tradeLog', { id: i + 1, phase: s.phase, tradeNum: t + 1, result: resultStr, balance: Math.round(s.bal).toLocaleString() }));
           if (s.bal <= s.peak - dd) {
             s.busts++;
             let src = '';
-            if (pendingPool > 0) { pendingPool--; src = `activate 1 pass pending (còn ${pendingPool})`; }
-            else { src = 'hết pending, chờ eval mới'; }
+            let hasPending = false;
+            if (pendingPool > 0) { pendingPool--; src = tLog('bustPending', { left: pendingPool }); hasPending = true; }
+            else { src = tLog('bustNoPending'); }
             if (evalPassRate > 0) {
               for (let k = 0; k < 6; k++) {
                 if (Math.random() < evalPassRate) { pendingPool++; evalPassCount++; break; }
               }
             }
-            lines.push(`   💥 TK${i + 1} BUST → ${src}`);
-            if (src.includes('pending')) lines.push(`   🔄 Thi eval mới → pass 1 (còn ${pendingPool} pending)`);
+            lines.push(tLog('bustLog', { id: i + 1, src }));
+            if (hasPending) lines.push(tLog('evalPassLog', { left: pendingPool }));
             s.bal = bal0; s.peak = bal0; s.pnl = 0;
             break;
           }
           if (s.bal >= bal0 + tgt) {
             s.payouts++;
-            lines.push(`   💰 TK${i + 1} FUNDED đạt target → nhận PAYOUT $${psize.toLocaleString()}, giữ tk đánh tiếp`);
+            lines.push(tLog('fundedTarget', { id: i + 1, amount: psize.toLocaleString() }));
             s.bal = bal0; s.peak = bal0; s.pnl = 0;
             break;
           }
-          if (s.pnl <= -ds) { lines.push(`   ⏹ TK${i + 1} hit DAILY STOP -$${ds} → nghỉ hôm nay`); break; }
-          if (dt > 0 && s.pnl >= dt) { lines.push(`   ⏹ TK${i + 1} hit DAILY TARGET +$${dt} → nghỉ hôm nay`); break; }
+          if (s.pnl <= -ds) { lines.push(tLog('dailyStop', { id: i + 1, amount: ds })); break; }
+          if (dt > 0 && s.pnl >= dt) { lines.push(tLog('dailyTarget', { id: i + 1, amount: dt })); break; }
         }
         dayBlocks.push(lines.join('\n'));
       });
@@ -363,7 +279,7 @@ export function useOptimizer() {
     const fundedEnd = slots.filter(s => s.phase === 'FUNDED').length;
 
     return { days: logRows.length, evalPassCount, totBust, totPayout, fundedEnd, conc, psize, logRows };
-  }, []);
+  }, [tLog]);
 
   return {
     isCalculating, progress, results, bestIndex,

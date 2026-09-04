@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { user, isLoading, checkSession } = useAuthStore();
+  const activeAccountId = useAccountStore(state => state.activeAccountId);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -30,10 +31,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (user) {
       useAccountStore.getState().fetchAccounts();
-      useTradeStore.getState().fetchTrades();
       usePlaybookStore.getState().fetchPlaybooks();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (activeAccountId) {
+      useTradeStore.getState().fetchTrades(activeAccountId);
+      useTradeStore.getState().fetchAccountStats(activeAccountId);
+    }
+  }, [activeAccountId]);
 
   if (isLoading) {
     return (

@@ -25,10 +25,21 @@ export interface Trade {
   date: string;
 }
 
+export interface AccountStats {
+  total_trades: number;
+  total_pnl: number;
+  win_rate: number;
+  wins: number;
+  losses: number;
+  profit_factor: number;
+}
+
 interface TradeState {
   trades: Trade[];
+  accountStats: AccountStats | null;
   isLoading: boolean;
-  fetchTrades: (accountId?: string) => Promise<void>;
+  fetchTrades: (accountId: string) => Promise<void>;
+  fetchAccountStats: (accountId: string) => Promise<void>;
   addTrade: (trade: Omit<Trade, 'id' | 'date'> & { screenshotFile?: File | Blob | string }) => Promise<void>;
   updateTrade: (id: string, updates: Partial<Omit<Trade, 'id' | 'date'>> & { screenshotFile?: File | Blob | string | null }) => Promise<void>;
   deleteTrade: (id: string) => Promise<void>;
@@ -36,16 +47,27 @@ interface TradeState {
 
 export const useTradeStore = create<TradeState>((set, get) => ({
   trades: [],
+  accountStats: null,
   isLoading: false,
 
-  fetchTrades: async () => {
+  fetchAccountStats: async (accountId: string) => {
+    const { data, error } = await supabase.rpc('get_account_stats', { p_account_id: accountId });
+    if (error) {
+      console.error('Error fetching account stats:', error);
+    } else if (data) {
+      set({ accountStats: data as AccountStats });
+    }
+  },
+
+  fetchTrades: async (accountId: string) => {
     const user = useAuthStore.getState().user;
-    if (!user) return;
+    if (!user || !accountId) return;
 
     set({ isLoading: true });
     const { data, error } = await supabase
       .from('trades')
       .select('*')
+      .eq('account_id', accountId)
       .order('date', { ascending: false });
 
     if (error) {

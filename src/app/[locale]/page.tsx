@@ -25,7 +25,7 @@ const itemVariants: Variants = {
 
 export default function Dashboard() {
   const { accounts, activeAccountId } = useAccountStore();
-  const { trades } = useTradeStore();
+  const { trades, accountStats } = useTradeStore();
   const t = useTranslations("Dashboard");
 
   const activeAccount = accounts.find((a) => a.id === activeAccountId);
@@ -48,13 +48,14 @@ export default function Dashboard() {
 
   const accountTrades = trades.filter((t) => t.accountId === activeAccountId);
   
-  // Calculate PnL
-  const totalPnL = accountTrades.reduce((acc, trade) => acc + trade.pnl, 0);
+  // Use RPC stats if available, fallback to local calculation
+  const totalPnL = accountStats ? accountStats.total_pnl : accountTrades.reduce((acc, trade) => acc + trade.pnl, 0);
   const currentBalance = activeAccount.initialBalance + totalPnL;
 
   // Win Rate
-  const winTrades = accountTrades.filter(trade => trade.pnl > 0).length;
-  const winRate = accountTrades.length > 0 ? Math.round((winTrades / accountTrades.length) * 100) : 0;
+  const winRate = accountStats ? accountStats.win_rate : (accountTrades.length > 0 ? Math.round((accountTrades.filter(t => t.pnl > 0).length / accountTrades.length) * 100) : 0);
+  const totalTradesCount = accountStats ? accountStats.total_trades : accountTrades.length;
+  const winTradesCount = accountStats ? accountStats.wins : accountTrades.filter(t => t.pnl > 0).length;
 
   // Calculate Consistency Rule (Max 1 day profit / Total Profit)
   let maxDailyProfit = 0;
@@ -163,7 +164,7 @@ export default function Dashboard() {
             </dt>
             <dd className="mt-4 flex items-baseline gap-2">
               <span className="text-4xl font-bold tracking-tight text-white">{winRate}%</span>
-              <span className="text-sm text-gray-500 font-medium">({winTrades}/{accountTrades.length} trades)</span>
+              <span className="text-sm text-gray-500 font-medium">({winTradesCount}/{totalTradesCount} trades)</span>
             </dd>
           </div>
         </motion.div>
