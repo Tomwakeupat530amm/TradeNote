@@ -144,6 +144,8 @@
     "select_active_account_first": "Select an active account first",
     "trade_logged_success": "Trade logged successfully!",
     "failed_to_save": "Failed to save trade",
+    "invalid_pnl": "Please enter a valid PnL value",
+    "invalid_lot_size": "Please enter a valid lot size",
     "trade_deleted": "Trade deleted!",
     "failed_to_delete": "Failed to delete trade",
     "no_active_account": "No Active Account",
@@ -172,7 +174,9 @@
     "tags": "Tags",
     "pnl": "PnL",
     "actions": "Actions",
-    "no_trades_recorded": "No trades recorded."
+    "no_trades_recorded": "No trades recorded.",
+    "start_journaling_description": "Start recording your trades to analyze your performance and improve your strategy over time.",
+    "add_new_trade": "Add New Trade"
   },
   "DailyReview": {
     "title": "Trading Reviews",
@@ -639,5 +643,32 @@
       "slots": "Slots"
     },
     "btnRunning": "Running... {p}%"
+  },
+  "Tags": {
+    "Win": "Win",
+    "Loss": "Loss",
+    "Break_Even": "Break Even",
+    "Breakout": "Breakout",
+    "Pullback": "Pullback",
+    "Reversal": "Reversal",
+    "Continuation": "Continuation",
+    "Other": "Other",
+    "Trendline": "Trendline",
+    "Support_Resistance": "Support/Resistance",
+    "Fibonacci": "Fibonacci",
+    "Moving_Average": "Moving Average",
+    "RSI_Divergence": "RSI Divergence",
+    "Order_Block": "Order Block",
+    "Calm": "Calm",
+    "FOMO": "FOMO",
+    "Revenge": "Revenge",
+    "Greedy": "Greedy",
+    "Fearful": "Fearful",
+    "None": "None",
+    "Moved_SL": "Moved SL",
+    "Early_Entry": "Early Entry",
+    "Late_Entry": "Late Entry",
+    "Overleveraged": "Overleveraged",
+    "Forced_Trade": "Forced Trade"
   }
 }

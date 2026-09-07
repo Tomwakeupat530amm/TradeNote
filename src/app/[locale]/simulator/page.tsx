@@ -257,10 +257,6 @@ export default function SimulatorPage() {
   // ── Sweep header label ──
   const sweepLabel = sweepVar === 'risk' ? t('sweep.labelRisk') : sweepVar === 'wr' ? t('sweep.labelWr') : t('sweep.labelRR');
 
-  // ── KPI color helpers ──
-  const evalClass = kpiResult ? (kpiResult.eval_rate > 50 ? 'val-good' : kpiResult.eval_rate > 30 ? 'val-gold' : 'val-bad') : 'val-gold';
-  const payoutClass = kpiResult ? (kpiResult.payout_rate > 40 ? 'val-good' : kpiResult.payout_rate > 20 ? 'val-gold' : 'val-bad') : 'val-good';
-  const bustClass = kpiResult ? (kpiResult.bust_rate > 40 ? 'val-bad' : 'val-secondary') : '';
 
   return (
     <>

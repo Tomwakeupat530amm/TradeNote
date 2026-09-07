@@ -3,6 +3,7 @@
 import { Trade } from "@/store/useTradeStore";
 import { Edit2, Trash2, ZoomIn, Image as ImageIcon } from "lucide-react";
 import clsx from "clsx";
+import { useTagTranslation } from "@/hooks/useTagTranslation";
 
 interface TradeViewDetailsProps {
   trade: Trade;
@@ -13,6 +14,8 @@ interface TradeViewDetailsProps {
 }
 
 export function TradeViewDetails({ trade, onEdit, onDelete, onClose, setZoomImageSrc }: TradeViewDetailsProps) {
+  const tTag = useTagTranslation();
+
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -32,7 +35,7 @@ export function TradeViewDetails({ trade, onEdit, onDelete, onClose, setZoomImag
                     : "bg-gray-500/10 text-gray-300 ring-gray-500/20"
                 )}
               >
-                {trade.result}
+                {tTag(trade.result)}
               </span>
             </div>
 
@@ -55,19 +58,19 @@ export function TradeViewDetails({ trade, onEdit, onDelete, onClose, setZoomImag
 
             <div className="border-t border-gray-800/80 pt-3 flex flex-wrap gap-2">
               <span className="inline-flex items-center rounded-md bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 text-xs font-semibold text-blue-400">
-                {trade.setup}
+                {tTag(trade.setup)}
               </span>
               {trade.confluences?.map(c => (
                 <span key={c} className="inline-flex items-center rounded-md bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 text-xs font-semibold text-indigo-400">
-                  {c}
+                  {tTag(c)}
                 </span>
               ))}
               <span className="inline-flex items-center rounded-md bg-purple-500/10 border border-purple-500/20 px-2.5 py-1 text-xs font-semibold text-purple-400">
-                {trade.emotion}
+                {tTag(trade.emotion)}
               </span>
               {trade.mistake !== "None" && (
                 <span className="inline-flex items-center rounded-md bg-orange-500/10 border border-orange-500/20 px-2.5 py-1 text-xs font-semibold text-orange-400">
-                  {trade.mistake}
+                  {tTag(trade.mistake)}
                 </span>
               )}
             </div>

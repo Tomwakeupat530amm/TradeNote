@@ -6,6 +6,7 @@ import { usePreferenceStore } from "@/store/usePreferenceStore";
 import { X, Save, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import clsx from "clsx";
+import { useTagTranslation } from "@/hooks/useTagTranslation";
 
 const RESULTS: TradeResult[] = ["Win", "Loss", "Break Even"];
 const SETUPS = ["Breakout", "Pullback", "Reversal", "Continuation", "Other"];
@@ -23,6 +24,7 @@ interface TradeEditFormProps {
 export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpen }: TradeEditFormProps) {
   const { updateTrade } = useTradeStore();
   const { preferences } = usePreferenceStore();
+  const tTag = useTagTranslation();
 
   const [saving, setSaving] = useState(false);
   const [asset, setAsset] = useState(trade.asset);
@@ -158,7 +160,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
                   : "bg-white/5 border-transparent text-gray-400 hover:bg-white/10"
               )}
             >
-              {r}
+              {tTag(r)}
             </button>
           ))}
         </div>
@@ -179,7 +181,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
                   : "bg-white/5 border-transparent text-gray-400 hover:bg-white/10"
               )}
             >
-              {s}
+              {tTag(s)}
             </button>
           ))}
         </div>
@@ -200,7 +202,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
                   : "bg-white/5 border-transparent text-gray-400 hover:bg-white/10"
               )}
             >
-              {c}
+              {tTag(c)}
             </button>
           ))}
         </div>
@@ -221,7 +223,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
                   : "bg-white/5 border-transparent text-gray-400 hover:bg-white/10"
               )}
             >
-              {e}
+              {tTag(e)}
             </button>
           ))}
         </div>
@@ -244,7 +246,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
                   : "bg-white/5 border-transparent text-gray-400 hover:bg-white/10"
               )}
             >
-              {m}
+              {tTag(m)}
             </button>
           ))}
         </div>

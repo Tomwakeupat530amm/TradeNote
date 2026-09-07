@@ -99,7 +99,9 @@ export default function Dashboard() {
     }
   });
 
-  const drawdownPercentage = (currentDrawdown / maxDrawdownLimit) * 100;
+  const drawdownPercentage = maxDrawdownLimit && maxDrawdownLimit > 0
+    ? (currentDrawdown / maxDrawdownLimit) * 100
+    : 0;
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-10">

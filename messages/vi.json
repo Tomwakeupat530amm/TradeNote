@@ -144,6 +144,8 @@
     "select_active_account_first": "Vui lòng chọn tài khoản đang hoạt động trước",
     "trade_logged_success": "Ghi lại giao dịch thành công!",
     "failed_to_save": "Lưu giao dịch thất bại",
+    "invalid_pnl": "Vui lòng nhập PnL hợp lệ",
+    "invalid_lot_size": "Vui lòng nhập số Lot hợp lệ",
     "trade_deleted": "Đã xóa giao dịch!",
     "failed_to_delete": "Xóa giao dịch thất bại",
     "no_active_account": "Không có tài khoản hoạt động",
@@ -172,7 +174,9 @@
     "tags": "Thẻ",
     "pnl": "PnL",
     "actions": "Thao tác",
-    "no_trades_recorded": "Chưa có giao dịch nào được ghi lại."
+    "no_trades_recorded": "Chưa có giao dịch nào được ghi lại.",
+    "start_journaling_description": "Bắt đầu ghi lại các giao dịch của bạn để phân tích hiệu suất và cải thiện chiến lược theo thời gian.",
+    "add_new_trade": "Thêm Giao Dịch Mới"
   },
   "DailyReview": {
     "title": "Đánh giá Giao dịch",
@@ -639,5 +643,32 @@
       "slots": "Slot"
     },
     "btnRunning": "Đang chạy... {p}%"
+  },
+  "Tags": {
+    "Win": "Thắng",
+    "Loss": "Thua",
+    "Break_Even": "Hòa vốn",
+    "Breakout": "Phá vỡ",
+    "Pullback": "Kéo ngược",
+    "Reversal": "Đảo chiều",
+    "Continuation": "Tiếp diễn",
+    "Other": "Khác",
+    "Trendline": "Đường xu hướng",
+    "Support_Resistance": "Hỗ trợ/Kháng cự",
+    "Fibonacci": "Fibonacci",
+    "Moving_Average": "Trung bình động (MA)",
+    "RSI_Divergence": "Phân kỳ RSI",
+    "Order_Block": "Khối lệnh (OB)",
+    "Calm": "Bình tĩnh",
+    "FOMO": "Sợ lỡ cơ hội (FOMO)",
+    "Revenge": "Trả thù",
+    "Greedy": "Tham lam",
+    "Fearful": "Sợ hãi",
+    "None": "Không",
+    "Moved_SL": "Dời SL",
+    "Early_Entry": "Vào lệnh sớm",
+    "Late_Entry": "Vào lệnh trễ",
+    "Overleveraged": "Đòn bẩy cao",
+    "Forced_Trade": "Gượng ép giao dịch"
   }
 }

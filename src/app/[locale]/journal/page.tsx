@@ -6,12 +6,13 @@ import { useAccountStore } from "@/store/useAccountStore";
 import { usePreferenceStore } from "@/store/usePreferenceStore";
 import TradeDetailsModal from "@/components/TradeDetailsModal";
 import { EmptyState } from "@/components/EmptyState";
-import { PlusCircle, Image as ImageIcon, Save, X, Trash2, AlignJustify } from "lucide-react";
+import { PlusCircle, Image as ImageIcon, Save, X, Trash2, AlignJustify, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { useTranslations } from "next-intl";
+import { useTagTranslation } from "@/hooks/useTagTranslation";
 
 const RESULTS: TradeResult[] = ["Win", "Loss", "Break Even"];
 const SETUPS: SetupTag[] = ["Breakout", "Pullback", "Reversal", "Continuation", "Other"];
@@ -29,6 +30,7 @@ export default function JournalPage() {
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const t = useTranslations("Journal");
   const c = useTranslations("Common");
+  const tTag = useTagTranslation();
 
   // Form State
   const [asset, setAsset] = useState("XAUUSD");
@@ -79,19 +81,24 @@ export default function JournalPage() {
 
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, [isAdding]);
+  }, [isAdding, t]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeAccountId) return toast.error(t('select_active_account_first'));
     
+    const parsedPnl = parseFloat(pnl);
+    const parsedLotSize = parseFloat(lotSize);
+    if (isNaN(parsedPnl)) return toast.error(t('invalid_pnl'));
+    if (isNaN(parsedLotSize)) return toast.error(t('invalid_lot_size'));
+
     setSaving(true);
     try {
       await addTrade({
         accountId: activeAccountId,
         asset,
-        lotSize: Number(lotSize),
-        pnl: Number(pnl),
+        lotSize: parsedLotSize,
+        pnl: parsedPnl,
         result,
         setup,
         confluences,
@@ -213,8 +220,8 @@ export default function JournalPage() {
                 <div className="sm:col-span-2 space-y-1">
                   <label className="block text-sm font-medium text-gray-300">{t('pnl_usd')}</label>
                   <input type="number" required value={pnl} onChange={e => setPnl(e.target.value)} className={clsx("block w-full rounded-xl border-0 py-2 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm px-4 transition-all font-bold", 
-                    Number(pnl) > 0 ? "bg-green-500/10 text-green-400 ring-green-500/30 focus:ring-green-500" : 
-                    Number(pnl) < 0 ? "bg-red-500/10 text-red-400 ring-red-500/30 focus:ring-red-500" : 
+                    !isNaN(parseFloat(pnl)) && parseFloat(pnl) > 0 ? "bg-green-500/10 text-green-400 ring-green-500/30 focus:ring-green-500" : 
+                    !isNaN(parseFloat(pnl)) && parseFloat(pnl) < 0 ? "bg-red-500/10 text-red-400 ring-red-500/30 focus:ring-red-500" : 
                     "bg-white/5 text-white ring-white/10 focus:ring-gray-500"
                   )} />
                 </div>
@@ -225,7 +232,7 @@ export default function JournalPage() {
                   <div className="flex flex-wrap gap-2">
                     {RESULTS.map(r => (
                       <button key={r} type="button" onClick={() => setResult(r)} className={clsx("px-4 py-1.5 rounded-full text-sm font-semibold transition-all border", result === r ? (r === 'Win' ? 'bg-green-500/20 border-green-500/50 text-green-400 shadow-[0_0_10px_rgba(22,163,74,0.3)]' : r === 'Loss' ? 'bg-red-500/20 border-red-500/50 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'bg-gray-700 border-gray-600 text-white') : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10')}>
-                        {r}
+                        {tTag(r)}
                       </button>
                     ))}
                   </div>
@@ -236,7 +243,7 @@ export default function JournalPage() {
                   <div className="flex flex-wrap gap-2">
                     {SETUPS.map(s => (
                       <button key={s} type="button" onClick={() => setSetup(s)} className={clsx("px-4 py-1.5 rounded-full text-sm font-semibold transition-all border", setup === s ? 'bg-blue-500/20 border-blue-500/50 text-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.3)]' : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10')}>
-                        {s}
+                        {tTag(s)}
                       </button>
                     ))}
                   </div>
@@ -252,7 +259,7 @@ export default function JournalPage() {
                         onClick={() => setConfluences(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])} 
                         className={clsx("px-4 py-1.5 rounded-full text-sm font-semibold transition-all border", confluences.includes(c) ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-400 shadow-[0_0_10px_rgba(99,102,241,0.3)]' : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10')}
                       >
-                        {c}
+                        {tTag(c)}
                       </button>
                     ))}
                   </div>
@@ -263,7 +270,7 @@ export default function JournalPage() {
                   <div className="flex flex-wrap gap-2">
                     {(preferences?.psychologyTags || EMOTIONS).map(e => (
                       <button key={e} type="button" onClick={() => setEmotion(e)} className={clsx("px-4 py-1.5 rounded-full text-sm font-semibold transition-all border", emotion === e ? 'bg-purple-500/20 border-purple-500/50 text-purple-400 shadow-[0_0_10px_rgba(139,92,246,0.3)]' : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10')}>
-                        {e}
+                        {tTag(e)}
                       </button>
                     ))}
                   </div>
@@ -274,7 +281,7 @@ export default function JournalPage() {
                   <div className="flex flex-wrap gap-2">
                     {(preferences?.mistakeTags || MISTAKES).map(m => (
                       <button key={m} type="button" onClick={() => setMistake(m)} className={clsx("px-4 py-1.5 rounded-full text-sm font-semibold transition-all border", mistake === m ? (m === 'None' ? 'bg-green-500/20 border-green-500/50 text-green-400' : 'bg-orange-500/20 border-orange-500/50 text-orange-400 shadow-[0_0_10px_rgba(249,115,22,0.3)]') : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10')}>
-                        {m}
+                        {tTag(m)}
                       </button>
                     ))}
                   </div>
@@ -351,15 +358,18 @@ export default function JournalPage() {
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 relative">
               <select 
                 value={filterSetup}
                 onChange={(e) => setFilterSetup(e.target.value)}
-                className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none min-w-[120px]"
+                className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 pr-10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none min-w-[140px] cursor-pointer"
               >
-                <option value="All">All Setups</option>
-                {SETUPS.map(s => <option key={s} value={s}>{s}</option>)}
+                <option value="All" className="bg-gray-900 text-white">{t('all_setups')}</option>
+                {SETUPS.map(s => <option key={s} value={s} className="bg-gray-900 text-white">{tTag(s)}</option>)}
               </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                <ChevronDown className="w-4 h-4" />
+              </div>
             </div>
           </div>
 
@@ -402,19 +412,19 @@ export default function JournalPage() {
                         <td className={clsx("whitespace-nowrap px-3 text-sm text-gray-300", isCompactView ? "py-2" : "py-4")}>
                           <div className="flex flex-wrap gap-1.5">
                             <span className="inline-flex items-center rounded-md bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 text-xs font-medium text-blue-400">
-                              {trade.setup}
+                              {tTag(trade.setup)}
                             </span>
                             {!isCompactView && trade.confluences?.map(c => (
                               <span key={c} className="inline-flex items-center rounded-md bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-xs font-medium text-indigo-400">
-                                {c}
+                                {tTag(c)}
                               </span>
                             ))}
                             <span className="inline-flex items-center rounded-md bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 text-xs font-medium text-purple-400">
-                              {trade.emotion}
+                              {tTag(trade.emotion)}
                             </span>
                             {trade.mistake !== "None" && !isCompactView && (
                               <span className="inline-flex items-center rounded-md bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 text-xs font-medium text-orange-400">
-                                {trade.mistake}
+                                {tTag(trade.mistake)}
                               </span>
                             )}
                           </div>
@@ -459,10 +469,10 @@ export default function JournalPage() {
                   
                   <div className="flex flex-wrap gap-1.5 mt-1">
                     <span className="inline-flex items-center rounded-md bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 text-xs font-medium text-blue-400">
-                      {trade.setup}
+                      {tTag(trade.setup)}
                     </span>
                     <span className="inline-flex items-center rounded-md bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 text-xs font-medium text-purple-400">
-                      {trade.emotion}
+                      {tTag(trade.emotion)}
                     </span>
                   </div>
                 </motion.div>

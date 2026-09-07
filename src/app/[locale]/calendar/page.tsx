@@ -11,6 +11,7 @@ import {
   startOfWeek, endOfWeek
 } from "date-fns";
 import { useTranslations } from "next-intl";
+import { useTagTranslation } from "@/hooks/useTagTranslation";
 
 export default function CalendarPage() {
   const { trades } = useTradeStore();
@@ -20,6 +21,7 @@ export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const t = useTranslations("Calendar");
+  const tTag = useTagTranslation();
 
   // Filter trades for active account
   const accountTrades = useMemo(() => {
@@ -221,11 +223,11 @@ export default function CalendarPage() {
                                   trade.result === "Loss" ? "bg-red-500/20 text-red-400" :
                                   "bg-gray-500/20 text-gray-400"
                                 }`}>
-                                  {trade.result}
+                                  {tTag(trade.result)}
                                 </span>
                               </div>
                               <div className="text-xs text-gray-400 mt-1">
-                                {format(parseISO(trade.date), 'HH:mm')} • {trade.setup}
+                                {format(parseISO(trade.date), 'HH:mm')} • {tTag(trade.setup)}
                               </div>
                             </div>
                             <div className={`font-bold ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>

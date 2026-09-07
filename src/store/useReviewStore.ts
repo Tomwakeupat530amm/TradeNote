@@ -58,6 +58,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       .from('daily_reviews')
       .select('*')
       .eq('date', dateStr)
+      .eq('user_id', user.id)
       .maybeSingle();
 
     if (error && error.code !== 'PGRST116') {
