@@ -135,14 +135,29 @@ export default function SettingsPage() {
   const handleUpdatePassword = async () => {
     if (!password) return;
     setIsUpdatingAuth(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success(t('password_updated', { defaultMessage: "Password updated successfully!" }));
-      setPassword("");
+
+    try {
+      // Force refresh the session first to ensure the token is active
+      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (refreshError || !session) {
+        toast.error(t('session_missing', { defaultMessage: "Your session has expired. Please log in again." }));
+        setIsUpdatingAuth(false);
+        return;
+      }
+
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success(t('password_updated', { defaultMessage: "Password updated successfully!" }));
+        setPassword("");
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsUpdatingAuth(false);
     }
-    setIsUpdatingAuth(false);
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
