@@ -254,6 +254,15 @@ export function UserGuideModal({ onOpenQuickLog, onOpenCalculator }: UserGuideMo
                         <div className="text-gray-400 mt-1">1R = % trên Tổng số dư tài khoản</div>
                       </div>
                     </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-white/5 border border-white/5 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400">Chế Độ Riêng Tư:</span>
+                        <span className="font-mono font-bold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">•••••• (Privacy Mode)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-blue-300 font-medium">
+                        <span>🌐 Đồng bộ Múi giờ Reset Quỹ (17:00 EST)</span>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -269,6 +278,16 @@ export function UserGuideModal({ onOpenQuickLog, onOpenCalculator }: UserGuideMo
                       <p className="text-xs text-gray-300">Tự động nén ảnh 4K (5MB) thành WebP (~200KB) trong 0.05 giây</p>
                       <div className="inline-block text-[11px] font-mono text-emerald-400 font-semibold bg-emerald-950/80 px-2.5 py-0.5 rounded-md border border-emerald-500/40">
                         📷 WebP -92% (Tiết kiệm bộ nhớ & không lỗi Quota)
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/5">
+                        <span className="text-gray-300">Chia sẻ thẻ lệnh:</span>
+                        <span className="text-emerald-300 font-mono font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">🎨 Share Trade Card</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/5">
+                        <span className="text-gray-300">Bố cục nhật ký:</span>
+                        <span className="text-indigo-300 font-mono font-semibold bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">⊞ Lưới Thẻ / ☰ Bảng</span>
                       </div>
                     </div>
                   </div>
@@ -295,6 +314,10 @@ export function UserGuideModal({ onOpenQuickLog, onOpenCalculator }: UserGuideMo
                           🔴 &lt; 8 Đạn
                         </span>
                       </div>
+                    </div>
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/5 text-xs">
+                      <span className="text-gray-400">Vùng Đệm Sụt Giảm (Buffer Remaining):</span>
+                      <span className="text-emerald-400 font-mono font-bold">+$1,450.00 cách ngưỡng vi phạm</span>
                     </div>
                     <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400" />
@@ -326,6 +349,16 @@ export function UserGuideModal({ onOpenQuickLog, onOpenCalculator }: UserGuideMo
                         <div className="text-emerald-400 font-mono">$50.00 / điểm</div>
                       </div>
                     </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-white/5 border border-white/5 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400">Forex Majors:</span>
+                        <span className="text-indigo-300 font-mono font-semibold">Chuẩn hóa $10.00 / pip</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400">Làm tròn an toàn:</span>
+                        <span className="text-emerald-400 font-mono font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">1.87 HĐ → 1 HĐ (≤ 1R)</span>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -354,6 +387,16 @@ export function UserGuideModal({ onOpenQuickLog, onOpenCalculator }: UserGuideMo
                         72% WR (+$1,850)
                       </div>
                     </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div className="p-2.5 rounded-xl bg-pink-500/10 border border-pink-500/20">
+                        <div className="font-bold text-pink-300">🤖 AI Trading Coach</div>
+                        <div className="text-gray-400 mt-1">Phát hiện rò rỉ vốn từ sai lầm & đưa chỉ thị phiên</div>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                        <div className="font-bold text-rose-300">🔴 Lịch Kinh Tế (Calendar)</div>
+                        <div className="text-gray-400 mt-1">Cảnh báo bão tin đỏ (CPI, FOMC) tránh trượt giá</div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -368,6 +411,16 @@ export function UserGuideModal({ onOpenQuickLog, onOpenCalculator }: UserGuideMo
                         <div className="text-xs text-gray-400">Kiên nhẫn chờ cơ hội A+ = Nhận 100 điểm tuyệt đối!</div>
                       </div>
                       <div className="text-2xl font-black font-mono text-purple-300">100 / 100</div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between">
+                        <span className="text-gray-400">Khung Đo R:R:</span>
+                        <span className="text-emerald-300 font-mono font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">1 : 3.20 (Đạt Tiêu Chuẩn)</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between">
+                        <span className="text-gray-400">Khiên Hạ Nhiệt:</span>
+                        <span className="text-amber-300 font-mono font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">⏳ 20:00 (Nghỉ 2 lệnh thua)</span>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -403,11 +456,21 @@ export function UserGuideModal({ onOpenQuickLog, onOpenCalculator }: UserGuideMo
                         <kbd className="font-mono text-purple-300 bg-gray-900 px-1.5 py-0.5 rounded border border-white/10 font-bold">Ctrl+K &gt; pb</kbd>
                       </div>
                     </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
+                        <div className="font-bold text-cyan-300">🎲 Monte Carlo Prop Simulator</div>
+                        <div className="text-gray-400 mt-1">1,000 chu kỳ thử nghiệm: 84.5% Pass | 3.2% Bust</div>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+                        <div className="font-bold text-indigo-300">📊 Prop Business Calculator</div>
+                        <div className="text-gray-400 mt-1">Tính toán chi phí thi lại & thời gian rút tiền</div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* 3 Core Invariants / Points */}
+              {/* 4 Core Invariants / Points */}
               <div className="space-y-2.5">
                 <div className="flex items-start gap-2.5 text-xs sm:text-sm text-gray-200">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
@@ -420,6 +483,10 @@ export function UserGuideModal({ onOpenQuickLog, onOpenCalculator }: UserGuideMo
                 <div className="flex items-start gap-2.5 text-xs sm:text-sm text-gray-200">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
                   <span>{t(`${activeChapter}_point3`)}</span>
+                </div>
+                <div className="flex items-start gap-2.5 text-xs sm:text-sm text-gray-200">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <span>{t(`${activeChapter}_point4`)}</span>
                 </div>
               </div>
 

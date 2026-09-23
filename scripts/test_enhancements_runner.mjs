@@ -2989,7 +2989,7 @@ it("Validates Location Badges and Visual Mockups mapping for all 7 chapters", ()
   const vi = JSON.parse(fs.readFileSync(viPath, 'utf8'));
 
   for (const ch of guideChapters) {
-    const fields = ["loc", "title", "summary", "point1", "point2", "point3", "tip", "action"];
+    const fields = ["loc", "title", "summary", "point1", "point2", "point3", "point4", "tip", "action"];
     for (const f of fields) {
       const key = `${ch}_${f}`;
       assert.ok(en.UserGuide[key], `en.UserGuide.${key} is missing`);
