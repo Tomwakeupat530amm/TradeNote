@@ -1,12 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useTradeStore, TradeResult, SetupTag, EmotionTag, MistakeTag, Trade } from "@/store/useTradeStore";
+import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { Link } from "@/i18n/routing";
+import { useTradeStore, SetupTag, Trade } from "@/store/useTradeStore";
 import { useAccountStore } from "@/store/useAccountStore";
 import { usePreferenceStore } from "@/store/usePreferenceStore";
+import { usePlaybookStore } from "@/store/usePlaybookStore";
+import { detectSession, getSessionBadgeColor, TradingSession } from "@/lib/sessionUtils";
 import TradeDetailsModal from "@/components/TradeDetailsModal";
 import { EmptyState } from "@/components/EmptyState";
-import { PlusCircle, Image as ImageIcon, Save, X, Trash2, AlignJustify, ChevronDown } from "lucide-react";
+import { JournalCalendarView } from "@/components/JournalCalendarView";
+import { TradeSlideOverDrawer } from "@/components/TradeSlideOverDrawer";
+import { TradeCardsView } from "@/components/TradeCardsView";
+import { ShareTradeModal } from "@/components/ShareTradeModal";
+import { PlusCircle, Trash2, AlignJustify, ChevronDown, ChevronLeft, ChevronRight, Calendar as CalendarIcon, BookOpen, RotateCcw, AlertTriangle, Lock, LayoutList, LayoutGrid } from "lucide-react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -14,113 +22,223 @@ import clsx from "clsx";
 import { useTranslations } from "next-intl";
 import { useTagTranslation } from "@/hooks/useTagTranslation";
 
-const RESULTS: TradeResult[] = ["Win", "Loss", "Break Even"];
 const SETUPS: SetupTag[] = ["Breakout", "Pullback", "Reversal", "Continuation", "Other"];
-const EMOTIONS: EmotionTag[] = ["Calm", "FOMO", "Revenge", "Greedy", "Fearful"];
-const MISTAKES: MistakeTag[] = ["None", "Moved SL", "Early Entry", "Late Entry", "Overleveraged", "Forced Trade"];
+const SESSIONS: TradingSession[] = ["Asian", "London", "London-NY Overlap", "New York"];
 
-export default function JournalPage() {
+function JournalContent() {
   const { accounts, activeAccountId } = useAccountStore();
-  const { trades, addTrade, deleteTrade } = useTradeStore();
-  const { preferences, fetchPreferences } = usePreferenceStore();
+  const { trades, deleteTrade } = useTradeStore();
+  const { fetchPreferences } = usePreferenceStore();
+  const { playbooks, fetchPlaybooks } = usePlaybookStore();
   const [isAdding, setIsAdding] = useState(false);
-  const [isCompactView, setIsCompactView] = useState(false);
+  const [viewMode, setViewMode] = useState<"table" | "calendar">("table");
+  const [layoutMode, setLayoutMode] = useState<"table" | "cards">("table");
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [filterSetup, setFilterSetup] = useState("All");
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
+  const [tradeToEdit, setTradeToEdit] = useState<Trade | null>(null);
+  const [tradeToShare, setTradeToShare] = useState<Trade | null>(null);
+  const [initialTradeData, setInitialTradeData] = useState<Partial<Trade> | undefined>(undefined);
+
   const t = useTranslations("Journal");
-  const c = useTranslations("Common");
+  const tCards = useTranslations("JournalCards");
   const tTag = useTagTranslation();
 
-  // Form State
-  const [asset, setAsset] = useState("XAUUSD");
-  const [lotSize, setLotSize] = useState("1");
-  const [pnl, setPnl] = useState("0");
-  const [result, setResult] = useState<TradeResult>("Win");
-  const [setup, setSetup] = useState<SetupTag>("Breakout");
-  const [confluences, setConfluences] = useState<string[]>([]);
-  const [emotion, setEmotion] = useState<EmotionTag>("Calm");
-  const [mistake, setMistake] = useState<MistakeTag>("None");
-  const [notes, setNotes] = useState("");
-  const [screenshot, setScreenshot] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  // Load layout preference from localStorage
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("tradenote_journal_view_layout");
+        if (saved === "cards" || saved === "table") {
+          setLayoutMode(saved);
+        } else if (window.innerWidth < 768) {
+          setLayoutMode("cards");
+        }
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleLayoutChange = (mode: "table" | "cards") => {
+    setLayoutMode(mode);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("tradenote_journal_view_layout", mode);
+    }
+  };
+
+  const searchParams = useSearchParams();
+
+  // Dynamic setups: merge user Playbooks with defaults
+  const dynamicSetups = Array.from(new Set([...playbooks.map(p => p.title), ...SETUPS]));
+
+  // Multi-dimensional filters
+  const [filterResult, setFilterResult] = useState<string>("All");
+  const [filterSession, setFilterSession] = useState<string>("All");
+  const [filterTimeframe, setFilterTimeframe] = useState<string>("all");
+  const [filterMistake, setFilterMistake] = useState<string>("All");
 
   const activeAccount = accounts.find(a => a.id === activeAccountId);
   const accountTrades = trades.filter(t => t.accountId === activeAccountId);
-  const filteredTrades = accountTrades.filter(t => {
-    const matchesSearch = t.asset.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesSetup = filterSetup === "All" || t.setup === filterSetup;
-    return matchesSearch && matchesSetup;
-  });
+
+  // Today's Realized Loss Calculation for Daily Loss Warning / Hard Stop
+  const todayPnL = useMemo(() => {
+    const todayStr = new Date().toDateString();
+    return accountTrades
+      .filter(t => new Date(t.date).toDateString() === todayStr)
+      .reduce((sum, t) => sum + t.pnl, 0);
+  }, [accountTrades]);
+
+  const dailyLossRule = useMemo(() => {
+    if (!activeAccount || !activeAccount.rules) return null;
+    const rules = activeAccount.rules;
+    const rawMaxLoss = rules.maxDailyLoss;
+    if (!rawMaxLoss || rawMaxLoss <= 0) return null;
+
+    const maxLossLimit: number = rules.maxDailyLossType === "%"
+      ? activeAccount.initialBalance * (rawMaxLoss / 100)
+      : rawMaxLoss;
+    
+    const currentLoss = Math.max(0, -todayPnL);
+    const lossPercent = maxLossLimit > 0 ? (currentLoss / maxLossLimit) * 100 : 0;
+    const alertThreshold = rules.dailyLossAlertThreshold ?? 80;
+    const isBreached = currentLoss >= maxLossLimit;
+    const isWarning = lossPercent >= alertThreshold && !isBreached;
+
+    return {
+      maxLossLimit,
+      currentLoss,
+      lossPercent: Math.min(100, Math.round(lossPercent)),
+      isWarning,
+      isBreached,
+      enableHardStop: rules.enableHardStop ?? false
+    };
+  }, [activeAccount, todayPnL]);
+
+  const filteredTrades = useMemo(() => {
+    return accountTrades.filter(t => {
+      const matchesSearch = t.asset.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSetup = filterSetup === "All" || t.setup === filterSetup;
+      const matchesResult = filterResult === "All" || t.result === filterResult;
+      const matchesSession = filterSession === "All" || (t.session || detectSession(t.date)) === filterSession;
+      const matchesMistake = filterMistake === "All" || t.mistake === filterMistake;
+
+      let matchesTimeframe = true;
+      if (filterTimeframe !== "all") {
+        const tDate = new Date(t.date);
+        const now = new Date();
+        if (filterTimeframe === "today") {
+          matchesTimeframe = tDate.toDateString() === now.toDateString();
+        } else if (filterTimeframe === "week") {
+          const weekStart = new Date(now);
+          weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+          weekStart.setHours(0, 0, 0, 0);
+          matchesTimeframe = tDate >= weekStart;
+        } else if (filterTimeframe === "month") {
+          matchesTimeframe = tDate.getFullYear() === now.getFullYear() && tDate.getMonth() === now.getMonth();
+        }
+      }
+
+      return matchesSearch && matchesSetup && matchesResult && matchesSession && matchesMistake && matchesTimeframe;
+    });
+  }, [accountTrades, searchQuery, filterSetup, filterResult, filterSession, filterMistake, filterTimeframe]);
+
+  const hasActiveFilters = searchQuery !== "" || filterSetup !== "All" || filterResult !== "All" || filterSession !== "All" || filterMistake !== "All" || filterTimeframe !== "all";
+
+  // --- Pagination Logic (30 trades per page) ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 30;
+
+  // Auto reset to page 1 on filter change
+  const filterKey = `${searchQuery}_${filterSetup}_${filterResult}_${filterSession}_${filterMistake}_${filterTimeframe}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setCurrentPage(1);
+  }
+
+  const totalPages = Math.max(1, Math.ceil(filteredTrades.length / pageSize));
+  const paginatedTrades = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredTrades.slice(start, start + pageSize);
+  }, [filteredTrades, currentPage, pageSize]);
+
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setFilterSetup("All");
+    setFilterResult("All");
+    setFilterSession("All");
+    setFilterMistake("All");
+    setFilterTimeframe("all");
+    setCurrentPage(1);
+  };
 
   useEffect(() => {
     fetchPreferences();
-  }, [fetchPreferences]);
+    fetchPlaybooks();
+  }, [fetchPreferences, fetchPlaybooks]);
 
-  // Paste image handler
+  // Support pre-fill from Position Size Calculator via URL parameters
+  const [prevParamsKey, setPrevParamsKey] = useState(() => searchParams.toString());
+  const currentParamsKey = searchParams.toString();
+  if (currentParamsKey !== prevParamsKey) {
+    setPrevParamsKey(currentParamsKey);
+    if (searchParams.get("newTrade") === "true" || searchParams.get("action") === "new") {
+      const qAsset = searchParams.get("asset");
+      const qLot = searchParams.get("lotSize");
+      const qRisk = searchParams.get("riskAmount");
+      setInitialTradeData({
+        asset: qAsset || undefined,
+        lotSize: qLot ? parseFloat(qLot) : undefined,
+        riskAmount: qRisk ? parseFloat(qRisk) : undefined,
+      });
+      setTradeToEdit(null);
+      setIsAdding(true);
+    }
+  }
+
+  const handleOpenAdd = useCallback(() => {
+    setTradeToEdit(null);
+    setInitialTradeData(undefined);
+    setIsAdding(true);
+  }, []);
+
+  // Keyboard shortcut: Press 'N' to quickly open Add Trade drawer
   useEffect(() => {
-    const handlePaste = (e: ClipboardEvent) => {
-      if (!isAdding) return;
-      const items = e.clipboardData?.items;
-      if (!items) return;
-
-      for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf("image") !== -1) {
-          const blob = items[i].getAsFile();
-          if (blob) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-              setScreenshot(event.target?.result as string);
-              toast.success(t('screenshot_pasted'));
-            };
-            reader.readAsDataURL(blob);
-          }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === "n" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const target = e.target as HTMLElement | null;
+        if (target && (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable)) {
+          return;
         }
+        e.preventDefault();
+        handleOpenAdd();
       }
     };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleOpenAdd]);
 
-    window.addEventListener("paste", handlePaste);
-    return () => window.removeEventListener("paste", handlePaste);
-  }, [isAdding, t]);
+  // Handle URL query params (e.g. ?view=calendar, ?search=...)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const view = searchParams?.get("view");
+      if (view === "calendar") {
+        setViewMode("calendar");
+      } else if (view === "table") {
+        setViewMode("table");
+      }
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeAccountId) return toast.error(t('select_active_account_first'));
-    
-    const parsedPnl = parseFloat(pnl);
-    const parsedLotSize = parseFloat(lotSize);
-    if (isNaN(parsedPnl)) return toast.error(t('invalid_pnl'));
-    if (isNaN(parsedLotSize)) return toast.error(t('invalid_lot_size'));
-
-    setSaving(true);
-    try {
-      await addTrade({
-        accountId: activeAccountId,
-        asset,
-        lotSize: parsedLotSize,
-        pnl: parsedPnl,
-        result,
-        setup,
-        confluences,
-        emotion,
-        mistake,
-        notes,
-        screenshotFile: screenshot || undefined,
-      });
-      toast.success(t('trade_logged_success'));
-      
-      // Reset basic form
-      setPnl("0");
-      setNotes("");
-      setConfluences([]);
-      setScreenshot(null);
-      setIsAdding(false);
-    } catch {
-      toast.error(t('failed_to_save'));
-    } finally {
-      setSaving(false);
-    }
-  };
+      const search = searchParams?.get("search");
+      if (search) {
+        setSearchQuery(search);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [searchParams]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -157,186 +275,71 @@ export default function JournalPage() {
             {t('active_account')}: <span className="font-semibold text-green-400">{activeAccount.name}</span>
           </p>
         </motion.div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsCompactView(!isCompactView)}
-            className="hidden md:flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-white/5"
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* View Mode Toggle: Bảng Lệnh <-> Lịch PnL <-> Playbook Setups */}
+          <div className="flex items-center bg-gray-950/80 border border-white/10 rounded-xl p-1 shadow-inner">
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={clsx(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+                viewMode === "table"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-gray-400 hover:text-white"
+              )}
+            >
+              <AlignJustify className="w-3.5 h-3.5" />
+              <span>{t('view_list')}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("calendar")}
+              className={clsx(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+                viewMode === "calendar"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-gray-400 hover:text-white"
+              )}
+            >
+              <CalendarIcon className="w-3.5 h-3.5" />
+              <span>{t('view_calendar')}</span>
+            </button>
+            <Link
+              href="/playbook"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer text-gray-400 hover:text-purple-300 hover:bg-purple-500/10"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-purple-400" />
+              <span>{t('tab_playbook_setups')}</span>
+            </Link>
+          </div>
+
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleOpenAdd}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-green-600/20 border border-green-500/50 px-3.5 py-2 text-xs sm:text-sm font-semibold text-green-400 shadow-[0_0_15px_rgba(22,163,74,0.2)] hover:bg-green-600 hover:text-white transition-all cursor-pointer"
           >
-            <AlignJustify className="w-4 h-4" />
-            {isCompactView ? 'Normal View' : 'Compact View'}
-          </button>
-          
-          <AnimatePresence>
-            {!isAdding && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setIsAdding(true)}
-                className="inline-flex items-center rounded-xl bg-green-600/20 border border-green-500/50 px-4 py-2 text-sm font-semibold text-green-400 shadow-[0_0_15px_rgba(22,163,74,0.2)] hover:bg-green-600 hover:text-white transition-all"
-              >
-                <PlusCircle className="-ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
-                <span className="hidden sm:inline">{t('log_new_trade')}</span>
-                <span className="sm:hidden">Log Trade</span>
-              </motion.button>
-            )}
-          </AnimatePresence>
+            <PlusCircle className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">{t('log_new_trade')}</span>
+            <span className="sm:hidden">{t('btn_new_trade_short')}</span>
+            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-green-950/60 border border-green-500/40 rounded text-green-300">N</kbd>
+          </motion.button>
         </div>
       </div>
 
-      <AnimatePresence>
-        {isAdding && (
-          <motion.form 
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
-            onSubmit={handleSave}
-          >
-            <div className="bg-gray-900/60 backdrop-blur-xl shadow-2xl ring-1 ring-white/10 sm:rounded-2xl p-6 mb-8 relative">
-              {/* Subtle background glow */}
-              <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent rounded-2xl pointer-events-none" />
-
-              <div className="flex items-center justify-between mb-6 relative z-10">
-                <h3 className="text-xl font-bold text-white">{t('fast_trade_entry')}</h3>
-                <span className="text-xs font-medium px-2 py-1 bg-white/5 rounded-md text-gray-400 border border-white/10">{t('tip_paste_screenshot')}</span>
-              </div>
-              
-              <div className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-6 relative z-10">
-                
-                {/* Inputs Group */}
-                <div className="sm:col-span-2 space-y-1">
-                  <label className="block text-sm font-medium text-gray-300">{t('asset_ticker')}</label>
-                  <input type="text" required value={asset} onChange={e => setAsset(e.target.value.toUpperCase())} className="block w-full rounded-xl border-0 bg-white/5 py-2 text-white shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-green-500 sm:text-sm px-4 transition-all" />
-                </div>
-
-                <div className="sm:col-span-2 space-y-1">
-                  <label className="block text-sm font-medium text-gray-300">{t('lot_size')}</label>
-                  <input type="number" step="0.01" required value={lotSize} onChange={e => setLotSize(e.target.value)} className="block w-full rounded-xl border-0 bg-white/5 py-2 text-white shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-green-500 sm:text-sm px-4 transition-all" />
-                </div>
-
-                <div className="sm:col-span-2 space-y-1">
-                  <label className="block text-sm font-medium text-gray-300">{t('pnl_usd')}</label>
-                  <input type="number" required value={pnl} onChange={e => setPnl(e.target.value)} className={clsx("block w-full rounded-xl border-0 py-2 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm px-4 transition-all font-bold", 
-                    !isNaN(parseFloat(pnl)) && parseFloat(pnl) > 0 ? "bg-green-500/10 text-green-400 ring-green-500/30 focus:ring-green-500" : 
-                    !isNaN(parseFloat(pnl)) && parseFloat(pnl) < 0 ? "bg-red-500/10 text-red-400 ring-red-500/30 focus:ring-red-500" : 
-                    "bg-white/5 text-white ring-white/10 focus:ring-gray-500"
-                  )} />
-                </div>
-
-                {/* Pills Selectors */}
-                <div className="sm:col-span-6 space-y-3">
-                  <label className="block text-sm font-medium text-gray-300">{t('result')}</label>
-                  <div className="flex flex-wrap gap-2">
-                    {RESULTS.map(r => (
-                      <button key={r} type="button" onClick={() => setResult(r)} className={clsx("px-4 py-1.5 rounded-full text-sm font-semibold transition-all border", result === r ? (r === 'Win' ? 'bg-green-500/20 border-green-500/50 text-green-400 shadow-[0_0_10px_rgba(22,163,74,0.3)]' : r === 'Loss' ? 'bg-red-500/20 border-red-500/50 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'bg-gray-700 border-gray-600 text-white') : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10')}>
-                        {tTag(r)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="sm:col-span-6 space-y-3">
-                  <label className="block text-sm font-medium text-gray-300">{t('setup')}</label>
-                  <div className="flex flex-wrap gap-2">
-                    {SETUPS.map(s => (
-                      <button key={s} type="button" onClick={() => setSetup(s)} className={clsx("px-4 py-1.5 rounded-full text-sm font-semibold transition-all border", setup === s ? 'bg-blue-500/20 border-blue-500/50 text-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.3)]' : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10')}>
-                        {tTag(s)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="sm:col-span-6 space-y-3">
-                  <label className="block text-sm font-medium text-gray-300">{t('confluences')}</label>
-                  <div className="flex flex-wrap gap-2">
-                    {(preferences?.confluenceTags || []).map(c => (
-                      <button 
-                        key={c} 
-                        type="button" 
-                        onClick={() => setConfluences(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])} 
-                        className={clsx("px-4 py-1.5 rounded-full text-sm font-semibold transition-all border", confluences.includes(c) ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-400 shadow-[0_0_10px_rgba(99,102,241,0.3)]' : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10')}
-                      >
-                        {tTag(c)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="sm:col-span-6 space-y-3">
-                  <label className="block text-sm font-medium text-gray-300">{t('emotion')}</label>
-                  <div className="flex flex-wrap gap-2">
-                    {(preferences?.psychologyTags || EMOTIONS).map(e => (
-                      <button key={e} type="button" onClick={() => setEmotion(e)} className={clsx("px-4 py-1.5 rounded-full text-sm font-semibold transition-all border", emotion === e ? 'bg-purple-500/20 border-purple-500/50 text-purple-400 shadow-[0_0_10px_rgba(139,92,246,0.3)]' : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10')}>
-                        {tTag(e)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="sm:col-span-6 space-y-3">
-                  <label className="block text-sm font-medium text-gray-300">{t('mistakes')}</label>
-                  <div className="flex flex-wrap gap-2">
-                    {(preferences?.mistakeTags || MISTAKES).map(m => (
-                      <button key={m} type="button" onClick={() => setMistake(m)} className={clsx("px-4 py-1.5 rounded-full text-sm font-semibold transition-all border", mistake === m ? (m === 'None' ? 'bg-green-500/20 border-green-500/50 text-green-400' : 'bg-orange-500/20 border-orange-500/50 text-orange-400 shadow-[0_0_10px_rgba(249,115,22,0.3)]') : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10')}>
-                        {tTag(m)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Notes and Screenshot */}
-                <div className="sm:col-span-4 space-y-1">
-                  <label className="block text-sm font-medium text-gray-300">{t('notes')}</label>
-                  <textarea rows={4} value={notes} onChange={e => setNotes(e.target.value)} className="block w-full rounded-xl border-0 bg-white/5 py-2 text-white shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-green-500 sm:text-sm px-4 transition-all resize-none" placeholder={t('notes_placeholder')} />
-                </div>
-                
-                <div className="sm:col-span-2 space-y-1">
-                  <label className="block text-sm font-medium text-gray-300">{t('screenshot')}</label>
-                  {screenshot ? (
-                    <div className="relative rounded-xl overflow-hidden ring-1 ring-white/10 h-[104px] group">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={screenshot} alt="Trade setup" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                      <button type="button" onClick={() => setScreenshot(null)} className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded-full p-1.5 hover:bg-red-500 transition-colors">
-                        <X className="w-4 h-4 text-white" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex justify-center items-center rounded-xl border-2 border-dashed border-white/20 h-[104px] bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/40 transition-all cursor-pointer relative overflow-hidden group">
-                      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <div className="text-center relative z-10">
-                        <ImageIcon className="mx-auto h-6 w-6 text-gray-400 group-hover:text-blue-400 transition-colors mb-2" aria-hidden="true" />
-                        <div className="text-xs text-gray-400">
-                          {t('press')} <span className="font-semibold text-white px-1.5 py-0.5 bg-white/10 rounded shadow-sm">Ctrl+V</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-              </div>
-
-              <div className="mt-8 flex items-center justify-end gap-x-4 relative z-10 border-t border-white/10 pt-6">
-                <button type="button" onClick={() => setIsAdding(false)} className="text-sm font-semibold text-gray-400 hover:text-white transition-colors">
-                  {c('cancel')}
-                </button>
-                <motion.button 
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  type="submit" 
-                  disabled={saving}
-                  className="inline-flex justify-center items-center rounded-xl bg-green-600 px-6 py-2.5 text-sm font-bold text-white shadow-[0_0_15px_rgba(22,163,74,0.4)] hover:bg-green-500 disabled:opacity-50 transition-all"
-                >
-                  <Save className="-ml-0.5 mr-2 h-4 w-4" aria-hidden="true" />
-                  {saving ? c('saving') : t('save_trade')}
-                </motion.button>
-              </div>
-            </div>
-          </motion.form>
-        )}
-      </AnimatePresence>
+      <TradeSlideOverDrawer
+        isOpen={isAdding}
+        onClose={() => {
+          setIsAdding(false);
+          setTradeToEdit(null);
+        }}
+        onSaved={() => {
+          setIsAdding(false);
+          setTradeToEdit(null);
+        }}
+        tradeToEdit={tradeToEdit}
+        initialData={initialTradeData}
+      />
 
       {accountTrades.length === 0 ? (
         <EmptyState 
@@ -347,138 +350,384 @@ export default function JournalPage() {
         />
       ) : (
         <div className="space-y-4">
-          {/* Toolbar */}
-          <div className="flex flex-col sm:flex-row gap-4 bg-gray-900/40 backdrop-blur-md p-4 rounded-2xl border border-white/5">
-            <div className="flex-1 relative">
-              <input 
-                type="text" 
-                placeholder="Search symbol..." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
-              />
+
+          {/* Daily Loss Warning Banner */}
+          {dailyLossRule && (dailyLossRule.isWarning || dailyLossRule.isBreached) && (
+            <div className={clsx(
+              "p-4 rounded-2xl border flex items-center justify-between gap-3 shadow-lg",
+              dailyLossRule.isBreached
+                ? "bg-rose-500/15 border-rose-500/40 text-rose-300"
+                : "bg-amber-500/15 border-amber-500/40 text-amber-300"
+            )}>
+              <div className="flex items-center gap-3">
+                <div className={clsx(
+                  "p-2 rounded-xl shrink-0",
+                  dailyLossRule.isBreached ? "bg-rose-500/20 text-rose-400" : "bg-amber-500/20 text-amber-400"
+                )}>
+                  {dailyLossRule.isBreached ? <Lock className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-white flex items-center gap-2">
+                    {dailyLossRule.isBreached
+                      ? t('hard_stop_breach_title')
+                      : t('hard_stop_warn_title')}
+                    {dailyLossRule.isBreached && dailyLossRule.enableHardStop && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-bold uppercase">
+                        Hard Stop Active
+                      </span>
+                    )}
+                  </h4>
+                  <p className="text-xs opacity-90 mt-0.5">
+                    {t('hard_stop_loss_details', { current: dailyLossRule.currentLoss.toLocaleString(), limit: dailyLossRule.maxLossLimit.toLocaleString(), percent: dailyLossRule.lossPercent })}
+                    {dailyLossRule.isBreached && dailyLossRule.enableHardStop && t('hard_stop_lock_notice')}
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="flex gap-2 relative">
-              <select 
-                value={filterSetup}
-                onChange={(e) => setFilterSetup(e.target.value)}
-                className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 pr-10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none min-w-[140px] cursor-pointer"
-              >
-                <option value="All" className="bg-gray-900 text-white">{t('all_setups')}</option>
-                {SETUPS.map(s => <option key={s} value={s} className="bg-gray-900 text-white">{tTag(s)}</option>)}
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                <ChevronDown className="w-4 h-4" />
+          )}
+
+          {/* Multi-dimensional Toolbar */}
+          <div className="bg-gray-900/40 backdrop-blur-md p-4 rounded-2xl border border-white/5 space-y-3">
+            <div className="flex flex-col md:flex-row gap-3">
+              {/* Search by Symbol */}
+              <div className="flex-1 relative">
+                <input 
+                  type="text" 
+                  placeholder={t('search_symbol_placeholder')} 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
+                />
+              </div>
+
+              {/* Timeframe Filter */}
+              <div className="relative">
+                <select 
+                  value={filterTimeframe}
+                  onChange={(e) => setFilterTimeframe(e.target.value)}
+                  className="w-full md:w-auto bg-gray-900 border border-white/10 rounded-xl px-3 py-2 pr-8 text-xs font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
+                >
+                  <option value="all">{t('filter_time_all')}</option>
+                  <option value="today">{t('filter_time_today')}</option>
+                  <option value="week">{t('filter_time_week')}</option>
+                  <option value="month">{t('filter_time_month')}</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+
+              {/* Result Filter */}
+              <div className="relative">
+                <select 
+                  value={filterResult}
+                  onChange={(e) => setFilterResult(e.target.value)}
+                  className="w-full md:w-auto bg-gray-900 border border-white/10 rounded-xl px-3 py-2 pr-8 text-xs font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
+                >
+                  <option value="All">{t('filter_res_all')}</option>
+                  <option value="Win">{t('filter_res_win')}</option>
+                  <option value="Loss">{t('filter_res_loss')}</option>
+                  <option value="Break Even">{t('filter_res_be')}</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+
+              {/* Session Filter */}
+              <div className="relative">
+                <select 
+                  value={filterSession}
+                  onChange={(e) => setFilterSession(e.target.value)}
+                  className="w-full md:w-auto bg-gray-900 border border-white/10 rounded-xl px-3 py-2 pr-8 text-xs font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
+                >
+                  <option value="All">{t('filter_session_all')}</option>
+                  {SESSIONS.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+
+              {/* Setup Filter */}
+              <div className="relative">
+                <select 
+                  value={filterSetup}
+                  onChange={(e) => setFilterSetup(e.target.value)}
+                  className="w-full md:w-auto bg-gray-900 border border-white/10 rounded-xl px-3 py-2 pr-8 text-xs font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
+                >
+                  <option value="All">{t('filter_setup_all')}</option>
+                  {dynamicSetups.map(s => (
+                    <option key={s} value={s}>{tTag(s)}</option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+
+              {/* Layout Mode Switcher (Table vs Cards) */}
+              <div className="flex items-center rounded-xl bg-gray-950/80 border border-white/10 p-0.5 shrink-0 self-start md:self-auto">
+                <button
+                  type="button"
+                  onClick={() => handleLayoutChange("table")}
+                  className={clsx(
+                    "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                    layoutMode === "table" ? "bg-white/10 text-white shadow-sm" : "text-gray-400 hover:text-white"
+                  )}
+                  title={tCards("view_table")}
+                >
+                  <LayoutList className="w-3.5 h-3.5" />
+                  <span className="hidden xl:inline">{tCards("view_table")}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLayoutChange("cards")}
+                  className={clsx(
+                    "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                    layoutMode === "cards" ? "bg-white/10 text-white shadow-sm" : "text-gray-400 hover:text-white"
+                  )}
+                  title={tCards("view_cards")}
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span className="hidden xl:inline">{tCards("view_cards")}</span>
+                </button>
+              </div>
+
+              {/* Reset Button */}
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold border border-rose-500/20 transition-all cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  {t('filter_reset')}
+                </button>
+              )}
+            </div>
+
+            {/* Filter Stats Badge */}
+            <div className="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-white/5">
+              <span>
+                {t('showing_trades', { filtered: filteredTrades.length, total: accountTrades.length })}
+              </span>
+              <div className="flex items-center gap-3 font-mono">
+                {(() => {
+                  const pnlSum = filteredTrades.reduce((acc, t) => acc + t.pnl, 0);
+                  const wins = filteredTrades.filter(t => t.result === "Win").length;
+                  const decisive = filteredTrades.filter(t => t.result === "Win" || t.result === "Loss").length;
+                  const winRate = decisive > 0 ? Math.round((wins / decisive) * 100) : 0;
+                  return (
+                    <>
+                      <span>{t('net_pnl_label')}: <strong className={pnlSum >= 0 ? "text-emerald-400" : "text-rose-400"}>{pnlSum >= 0 ? `+$${pnlSum.toLocaleString()}` : `-$${Math.abs(pnlSum).toLocaleString()}`}</strong></span>
+                      <span>{t('win_rate_label')}: <strong className="text-white">{winRate}%</strong></span>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
 
           {filteredTrades.length === 0 ? (
              <div className="text-center py-10 bg-white/5 rounded-2xl border border-white/5">
-               <p className="text-sm text-gray-500">No trades match your filters.</p>
+               <p className="text-sm text-gray-400">{t('no_filter_matches')}</p>
              </div>
           ) : (
           <>
-            {/* Trade History - Desktop Table */}
-            <div className="hidden md:block bg-gray-900/40 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden shadow-2xl">
-              <div className="overflow-x-auto max-h-[600px] overflow-y-auto custom-scrollbar">
-                <table className="min-w-full divide-y divide-white/5 relative">
-                  <thead className="bg-gray-950/90 backdrop-blur-xl sticky top-0 z-20 shadow-md">
-                    <tr>
-                      <th scope="col" className="py-4 pl-6 pr-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('date')}</th>
-                      <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('asset')}</th>
-                      <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('lots')}</th>
-                      <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('tags')}</th>
-                      <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('pnl')}</th>
-                      <th scope="col" className="relative py-4 pl-3 pr-6 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('actions')}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5 bg-transparent">
-                    <AnimatePresence>
-                      {filteredTrades.map((trade) => (
-                      <motion.tr 
-                        key={trade.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        onClick={() => setSelectedTrade(trade)}
-                        className="hover:bg-white/[0.04] transition-colors group cursor-pointer"
-                      >
-                        <td className={clsx("whitespace-nowrap pl-6 pr-3 text-sm text-gray-300", isCompactView ? "py-2" : "py-4")}>
-                          {format(new Date(trade.date), "MMM d, HH:mm")}
-                        </td>
-                        <td className={clsx("whitespace-nowrap px-3 text-sm font-bold text-white", isCompactView ? "py-2" : "py-4")}>{trade.asset}</td>
-                        <td className={clsx("whitespace-nowrap px-3 text-sm text-gray-400", isCompactView ? "py-2" : "py-4")}>{trade.lotSize}</td>
-                        <td className={clsx("whitespace-nowrap px-3 text-sm text-gray-300", isCompactView ? "py-2" : "py-4")}>
-                          <div className="flex flex-wrap gap-1.5">
-                            <span className="inline-flex items-center rounded-md bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 text-xs font-medium text-blue-400">
-                              {tTag(trade.setup)}
-                            </span>
-                            {!isCompactView && trade.confluences?.map(c => (
-                              <span key={c} className="inline-flex items-center rounded-md bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-xs font-medium text-indigo-400">
-                                {tTag(c)}
+            {viewMode === "calendar" ? (
+              <JournalCalendarView
+                calendarDate={calendarDate}
+                setCalendarDate={setCalendarDate}
+                selectedCalendarDate={selectedCalendarDate}
+                setSelectedCalendarDate={setSelectedCalendarDate}
+                trades={accountTrades}
+                onSelectTrade={(trade) => setSelectedTrade(trade)}
+                onSwitchToTable={() => setViewMode("table")}
+              />
+            ) : layoutMode === "cards" ? (
+              /* Visual Cards Grid Mode (All Screen Sizes) */
+              <TradeCardsView
+                trades={paginatedTrades}
+                onSelectTrade={(trade) => setSelectedTrade(trade)}
+                onEditTrade={(trade) => {
+                  setTradeToEdit(trade);
+                  setIsAdding(true);
+                }}
+                onDeleteTrade={(id) => handleDelete(id)}
+                onShareTrade={(trade) => setTradeToShare(trade)}
+              />
+            ) : (
+              /* Compact Desktop Table (4 Columns Pure, No Horizontal Scroll) */
+              <>
+                <div className="hidden md:block bg-gray-900/40 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden shadow-2xl">
+                  <table className="table-fixed w-full divide-y divide-white/5">
+                    <thead className="bg-gray-950/90 backdrop-blur-xl sticky top-0 z-20 shadow-md">
+                      <tr>
+                        <th scope="col" className="w-[20%] py-3 pl-5 pr-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('col_time_session')}</th>
+                        <th scope="col" className="w-[28%] px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('col_asset_setup')}</th>
+                        <th scope="col" className="w-[22%] px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('col_result_pnl_r')}</th>
+                        <th scope="col" className="w-[30%] py-3 pl-3 pr-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('col_discipline_tags')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 bg-transparent">
+                      <AnimatePresence>
+                        {paginatedTrades.map((trade) => (
+                        <motion.tr 
+                          key={trade.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
+                          onClick={() => setSelectedTrade(trade)}
+                          className="hover:bg-white/[0.04] transition-colors group cursor-pointer"
+                        >
+                          {/* 1. Thời Gian & Phiên (20%) */}
+                          <td className="py-3 pl-5 pr-2 text-sm">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-xs font-semibold text-gray-300">
+                                {format(new Date(trade.date), "dd/MM HH:mm")}
                               </span>
-                            ))}
-                            <span className="inline-flex items-center rounded-md bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 text-xs font-medium text-purple-400">
-                              {tTag(trade.emotion)}
-                            </span>
-                            {trade.mistake !== "None" && !isCompactView && (
-                              <span className="inline-flex items-center rounded-md bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 text-xs font-medium text-orange-400">
-                                {tTag(trade.mistake)}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className={clsx("whitespace-nowrap px-3 text-sm font-bold", isCompactView ? "py-2" : "py-4", trade.pnl > 0 ? 'text-green-400' : trade.pnl < 0 ? 'text-red-400' : 'text-gray-400')}>
-                          ${trade.pnl > 0 ? `+${trade.pnl}` : trade.pnl}
-                        </td>
-                        <td className={clsx("relative whitespace-nowrap pl-3 pr-6 text-right text-sm font-medium", isCompactView ? "py-2" : "py-4")}>
-                          <button onClick={(e) => { e.stopPropagation(); handleDelete(trade.id); }} className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-red-500/10 rounded-lg">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </motion.tr>
-                    ))}
-                  </AnimatePresence>
-                </tbody>
-              </table>
-            </div>
-          </div>
+                              {trade.session ? (
+                                <span className={clsx("inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium border w-fit", getSessionBadgeColor(trade.session))}>
+                                  {trade.session}
+                                </span>
+                              ) : (
+                                <span className={clsx("inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium border w-fit", getSessionBadgeColor(detectSession(trade.date)))}>
+                                  {detectSession(trade.date)}
+                                </span>
+                              )}
+                            </div>
+                          </td>
 
-          {/* Trade History - Mobile Card List */}
-          <div className="md:hidden space-y-4">
-            <AnimatePresence>
-              {filteredTrades.map((trade) => (
-                <motion.div
-                  key={trade.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  onClick={() => setSelectedTrade(trade)}
-                  className="bg-gray-900/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col gap-3 shadow-lg active:scale-[0.98] transition-transform"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="text-lg font-bold text-white tracking-tight">{trade.asset}</h4>
-                      <p className="text-xs text-gray-400">{format(new Date(trade.date), "MMM d, HH:mm")}</p>
-                    </div>
-                    <div className={clsx("text-lg font-black tracking-tight", trade.pnl > 0 ? 'text-green-400' : trade.pnl < 0 ? 'text-red-400' : 'text-gray-400')}>
-                      ${trade.pnl > 0 ? `+${trade.pnl}` : trade.pnl}
-                    </div>
+                          {/* 2. Lệnh & Setup (28%) */}
+                          <td className="py-3 px-3 text-sm">
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-black text-white font-mono tracking-tight">{trade.asset}</span>
+                                <span className="text-xs font-medium text-gray-400 font-mono">({trade.lotSize}L)</span>
+                              </div>
+                              <div className="flex flex-wrap gap-1 items-center">
+                                <span className="inline-flex items-center rounded-md bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 text-[11px] font-semibold text-blue-300">
+                                  {tTag(trade.setup)}
+                                </span>
+                                {trade.checklistResults && Object.keys(trade.checklistResults).length > 0 && Object.values(trade.checklistResults).every(Boolean) && (
+                                  <span className="inline-flex items-center gap-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
+                                    ⭐ A+
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* 3. Kết Quả (PnL & R) (22%) */}
+                          <td className="py-3 px-3 text-sm font-bold">
+                            <div className="flex flex-col gap-0.5">
+                              <span className={clsx("text-sm font-black tracking-tight font-mono tabular-nums", trade.pnl > 0 ? 'text-green-400' : trade.pnl < 0 ? 'text-red-400' : 'text-gray-400')}>
+                                ${trade.pnl > 0 ? `+${trade.pnl.toLocaleString()}` : trade.pnl.toLocaleString()}
+                              </span>
+                              {trade.rMultiple !== undefined && (
+                                <span className={clsx(
+                                  "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded w-fit border tabular-nums",
+                                  trade.rMultiple > 0 ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/30" :
+                                  trade.rMultiple < 0 ? "text-rose-400 bg-rose-500/10 border-rose-500/30" :
+                                  "text-gray-400 bg-gray-500/10 border-gray-500/20"
+                                )}>
+                                  {trade.rMultiple > 0 ? `+${trade.rMultiple.toFixed(2)}R` : `${trade.rMultiple.toFixed(2)}R`}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* 4. Kỷ Luật & Thẻ (30%) - Lồng nút Xóa & Sửa ở góc phải */}
+                          <td className="py-3 pl-3 pr-5 text-sm">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex flex-wrap gap-1.5 items-center flex-1 min-w-0">
+                                <span className="inline-flex items-center rounded-md bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 text-[11px] font-medium text-purple-300">
+                                  {tTag(trade.emotion)}
+                                </span>
+                                {trade.mistake && trade.mistake !== "None" && (
+                                  <span className="inline-flex items-center rounded-md bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 text-[11px] font-medium text-orange-400">
+                                    {tTag(trade.mistake)}
+                                  </span>
+                                )}
+                                {trade.confluences?.slice(0, 2).map(c => (
+                                  <span key={c} className="inline-flex items-center rounded-md bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-[10px] font-medium text-indigo-300">
+                                    {tTag(c)}
+                                  </span>
+                                ))}
+                              </div>
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setTradeToEdit(trade);
+                                    setIsAdding(true);
+                                  }}
+                                  className="text-gray-400 hover:text-blue-400 p-1.5 hover:bg-blue-500/10 rounded-lg cursor-pointer"
+                                  title={tCards('edit_trade')}
+                                >
+                                  <span className="text-xs">✎</span>
+                                </button>
+                                <button 
+                                  type="button" 
+                                  onClick={(e) => { e.stopPropagation(); handleDelete(trade.id); }} 
+                                  className="text-gray-400 hover:text-red-400 p-1.5 hover:bg-red-500/10 rounded-lg cursor-pointer"
+                                  title={t('delete_trade_tip')}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </motion.tr>
+                      ))}
+                      </AnimatePresence>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Fallback in Table View */}
+                <div className="md:hidden">
+                  <TradeCardsView
+                    trades={paginatedTrades}
+                    onSelectTrade={(trade) => setSelectedTrade(trade)}
+                    onEditTrade={(trade) => {
+                      setTradeToEdit(trade);
+                      setIsAdding(true);
+                    }}
+                    onDeleteTrade={(id) => handleDelete(id)}
+                    onShareTrade={(trade) => setTradeToShare(trade)}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-4 bg-gray-900/50 backdrop-blur-md rounded-2xl border border-white/5 text-xs text-gray-400">
+                <div>
+                  {t('pagination_showing', { start: (currentPage - 1) * pageSize + 1, end: Math.min(currentPage * pageSize, filteredTrades.length), total: filteredTrades.length })}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-gray-800 bg-gray-950/80 text-gray-300 hover:text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    {t('pagination_prev')}
+                  </button>
+                  <div className="px-3 py-1 rounded-lg bg-white/5 border border-white/5 font-mono text-xs">
+                    Trang <strong className="text-white">{currentPage}</strong> / {totalPages}
                   </div>
-                  
-                  <div className="flex flex-wrap gap-1.5 mt-1">
-                    <span className="inline-flex items-center rounded-md bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 text-xs font-medium text-blue-400">
-                      {tTag(trade.setup)}
-                    </span>
-                    <span className="inline-flex items-center rounded-md bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 text-xs font-medium text-purple-400">
-                      {tTag(trade.emotion)}
-                    </span>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-            </div>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-gray-800 bg-gray-950/80 text-gray-300 hover:text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    {t('pagination_next')}
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </>
           )}
         </div>
@@ -489,6 +738,20 @@ export default function JournalPage() {
         onClose={() => setSelectedTrade(null)}
         trade={selectedTrade}
       />
+
+      <ShareTradeModal
+        isOpen={tradeToShare !== null}
+        onClose={() => setTradeToShare(null)}
+        trade={tradeToShare}
+      />
     </div>
+  );
+}
+
+export default function JournalPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-gray-500">Loading Journal...</div>}>
+      <JournalContent />
+    </Suspense>
   );
 }

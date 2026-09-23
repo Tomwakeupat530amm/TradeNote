@@ -2,8 +2,13 @@
 
 import { useState } from "react";
 import { useAccountStore, Account } from "@/store/useAccountStore";
-import { PlusCircle, Save } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { PlusCircle, Save, ShieldAlert, ShieldCheck, Lock, Sparkles, BookOpen, Cpu } from "lucide-react";
+import { useTranslations, useLocale } from "next-intl";
+import { calculateAccount1RRisk } from "@/lib/riskEngine";
+import { PROP_FIRM_PRESETS, PropFirmPreset } from "@/lib/propPresets";
+import { Link } from "@/i18n/routing";
+import { toast } from "sonner";
+import clsx from "clsx";
 
 type AccountStatus = "Challenge" | "Funded";
 type DrawdownMode = "End of Day" | "Intraday";
@@ -14,6 +19,7 @@ export default function AccountsPage() {
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const t = useTranslations("Accounts");
   const c = useTranslations("Common");
+  const locale = useLocale();
 
   // Form State
   const [name, setName] = useState("");
@@ -29,6 +35,11 @@ export default function AccountsPage() {
   const [drawdownMode, setDrawdownMode] = useState<DrawdownMode>("End of Day");
   const [maxDailyLoss, setMaxDailyLoss] = useState("500");
   const [maxDailyLossType, setMaxDailyLossType] = useState<"%" | "$">("$");
+  const [defaultRiskType, setDefaultRiskType] = useState<"%" | "$">("%");
+  const [defaultRiskValue, setDefaultRiskValue] = useState("5");
+  const [riskBase, setRiskBase] = useState<"drawdown" | "balance">("drawdown");
+  const [enableHardStop, setEnableHardStop] = useState(false);
+  const [dailyLossAlertThreshold, setDailyLossAlertThreshold] = useState("80");
 
   const handleAddNew = () => {
     setName("");
@@ -42,8 +53,33 @@ export default function AccountsPage() {
     setDrawdownMode("End of Day");
     setMaxDailyLoss("500");
     setMaxDailyLossType("$");
+    setDefaultRiskType("%");
+    setDefaultRiskValue("5");
+    setRiskBase("drawdown");
+    setEnableHardStop(false);
+    setDailyLossAlertThreshold("80");
     setEditingAccountId(null);
     setIsAdding(true);
+  };
+
+  const handleApplyPreset = (preset: PropFirmPreset) => {
+    setName(preset.label);
+    setPlatform(preset.firmName);
+    setInitialBalance(preset.accountSize.toString());
+    setStatus("Challenge");
+    setTrailingMaxDrawdown(preset.rules.trailingMaxDrawdown.toString());
+    setDrawdownMode(preset.rules.drawdownMode || "End of Day");
+    setProfitTarget(preset.rules.profitTarget?.toString() || "");
+    setMaxPositions(preset.rules.maxPositions?.toString() || "10");
+    setConsistencyPercent(preset.rules.consistencyPercent?.toString() || "");
+    setMaxDailyLoss(preset.rules.maxDailyLoss?.toString() || "");
+    setMaxDailyLossType(preset.rules.maxDailyLossType || "$");
+    setDefaultRiskType(preset.rules.defaultRiskType || "$");
+    setDefaultRiskValue(preset.rules.defaultRiskValue?.toString() || "150");
+    setRiskBase(preset.rules.riskBase || "drawdown");
+    setEnableHardStop(preset.rules.enableHardStop ?? false);
+    setDailyLossAlertThreshold(preset.rules.dailyLossAlertThreshold?.toString() || "80");
+    toast.success(t('preset_applied_toast', { preset: preset.label }));
   };
 
   const handleEdit = (account: Account) => {
@@ -53,13 +89,19 @@ export default function AccountsPage() {
     setStatus((stat as AccountStatus) || "Challenge");
     setInitialBalance(account.initialBalance.toString());
     
-    setProfitTarget(account.rules.profitTarget?.toString() || "");
-    setMaxPositions(account.rules.maxPositions?.toString() || "");
-    setConsistencyPercent(account.rules.consistencyPercent?.toString() || "");
-    setTrailingMaxDrawdown(account.rules.trailingMaxDrawdown?.toString() || "");
-    setDrawdownMode(account.rules.drawdownMode || "End of Day");
-    setMaxDailyLoss(account.rules.maxDailyLoss?.toString() || "");
-    setMaxDailyLossType(account.rules.maxDailyLossType || "$");
+    const rules = account.rules || ({} as Account["rules"]);
+    setProfitTarget(rules.profitTarget?.toString() || "");
+    setMaxPositions(rules.maxPositions?.toString() || "");
+    setConsistencyPercent(rules.consistencyPercent?.toString() || "");
+    setTrailingMaxDrawdown(rules.trailingMaxDrawdown?.toString() || "");
+    setDrawdownMode(rules.drawdownMode || "End of Day");
+    setMaxDailyLoss(rules.maxDailyLoss?.toString() || "");
+    setMaxDailyLossType(rules.maxDailyLossType || "$");
+    setDefaultRiskType(rules.defaultRiskType || "%");
+    setDefaultRiskValue((rules.defaultRiskValue ?? 5).toString());
+    setRiskBase(rules.riskBase || "drawdown");
+    setEnableHardStop(rules.enableHardStop ?? false);
+    setDailyLossAlertThreshold((rules.dailyLossAlertThreshold ?? 80).toString());
     
     setEditingAccountId(account.id);
     setIsAdding(true);
@@ -79,6 +121,11 @@ export default function AccountsPage() {
         drawdownMode,
         maxDailyLoss: maxDailyLoss ? Number(maxDailyLoss) : undefined,
         maxDailyLossType,
+        defaultRiskType,
+        defaultRiskValue: defaultRiskValue ? Number(defaultRiskValue) : 5,
+        riskBase,
+        enableHardStop,
+        dailyLossAlertThreshold: Number(dailyLossAlertThreshold) || 80,
       },
     };
 
@@ -93,6 +140,28 @@ export default function AccountsPage() {
 
   return (
     <div className="space-y-6">
+      {/* System Subtabs: Accounts, Playbook, Simulator */}
+      <div className="flex items-center gap-2 border-b border-white/5 pb-4">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-bold">
+          <ShieldCheck className="w-3.5 h-3.5" />
+          {t('header_title')}
+        </div>
+        <Link
+          href="/playbook"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors"
+        >
+          <BookOpen className="w-3.5 h-3.5" />
+          {t('link_playbook')}
+        </Link>
+        <Link
+          href="/simulator"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors"
+        >
+          <Cpu className="w-3.5 h-3.5" />
+          {t('link_simulator')}
+        </Link>
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold leading-7 text-white sm:truncate sm:text-3xl sm:tracking-tight">
@@ -116,6 +185,34 @@ export default function AccountsPage() {
       {isAdding && (
         <form onSubmit={handleSave} className="bg-gray-900 shadow-sm ring-1 ring-gray-800 sm:rounded-xl p-6">
           <h3 className="text-lg font-medium leading-6 text-white mb-4">{editingAccountId ? t('edit_account') : t('add_new_account')}</h3>
+
+          {/* 1-Click Prop Firm Presets */}
+          {!editingAccountId && (
+            <div className="mb-6 p-4 rounded-xl bg-gray-950/70 border border-white/10">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
+                  {t('presets_title')}
+                </span>
+                <span className="text-[11px] text-gray-400">{t('presets_desc')}</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {PROP_FIRM_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => handleApplyPreset(preset)}
+                    className={clsx(
+                      "px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all hover:scale-[1.02] active:scale-[0.98]",
+                      preset.badgeColor
+                    )}
+                  >
+                    {preset.id === 'personal-standard' ? t('preset_personal') : preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
             <div className="sm:col-span-2">
               <label htmlFor="name" className="block text-sm font-medium leading-6 text-white">{t('account_name_label')}</label>
@@ -191,7 +288,7 @@ export default function AccountsPage() {
                 </div>
               </div>
 
-              <div className="sm:col-span-4">
+              <div className="sm:col-span-3">
                 <label htmlFor="maxDailyLoss" className="block text-sm font-medium leading-6 text-white">{t('max_daily_loss_label')}</label>
                 <div className="mt-2 flex rounded-md shadow-sm">
                   <select
@@ -211,6 +308,167 @@ export default function AccountsPage() {
                     className="block w-full min-w-0 flex-1 rounded-none rounded-r-md border-0 bg-white/5 py-1.5 px-3 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-green-500 sm:text-sm sm:leading-6"
                     placeholder="e.g. 500"
                   />
+                </div>
+              </div>
+
+              {/* Enhanced 1R Risk Base & Bullets Engine */}
+              <div className="sm:col-span-6 bg-gray-950/60 p-4 rounded-xl border border-white/10 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label htmlFor="defaultRiskValue" className="block text-sm font-bold text-white flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                    {t('risk_1r_target')}
+                  </label>
+                  <span className="text-[11px] text-gray-400">
+                    {t('risk_1r_desc')}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-medium text-gray-400 mb-1">{t('risk_base_label')}</label>
+                    <select
+                      value={defaultRiskType === "$" ? "fixed" : riskBase}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "fixed") {
+                          setDefaultRiskType("$");
+                          setDefaultRiskValue("100");
+                        } else if (val === "drawdown") {
+                          setDefaultRiskType("%");
+                          setRiskBase("drawdown");
+                          setDefaultRiskValue("5"); // 5% Drawdown
+                        } else {
+                          setDefaultRiskType("%");
+                          setRiskBase("balance");
+                          setDefaultRiskValue("1"); // 1% Balance
+                        }
+                      }}
+                      className="block w-full rounded-lg border-0 bg-white/5 py-2 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-emerald-500 sm:text-sm px-3"
+                    >
+                      <option className="bg-gray-900 text-white" value="drawdown">{t('risk_base_dd')}</option>
+                      <option className="bg-gray-900 text-white" value="balance">{t('risk_base_balance')}</option>
+                      <option className="bg-gray-900 text-white" value="fixed">{t('risk_base_fixed')}</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">
+                      {defaultRiskType === "$" ? t('risk_value_amount') : t('risk_value_ratio')}
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      name="defaultRiskValue"
+                      id="defaultRiskValue"
+                      value={defaultRiskValue}
+                      onChange={(e) => setDefaultRiskValue(e.target.value)}
+                      className="block w-full rounded-lg border-0 bg-white/5 py-2 px-3 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-emerald-500 sm:text-sm font-bold font-mono"
+                      placeholder={defaultRiskType === "$" ? "e.g. 100" : "e.g. 5"}
+                    />
+                  </div>
+                </div>
+
+                {/* Live Preview Card */}
+                {(() => {
+                  const previewDetails = calculateAccount1RRisk({
+                    id: "preview",
+                    name: name || t('label_default_account'),
+                    type: `${platform || "Prop"} - ${status}`,
+                    initialBalance: Number(initialBalance) || 50000,
+                    rules: {
+                      trailingMaxDrawdown: Number(trailingMaxDrawdown) || 2000,
+                      defaultRiskType,
+                      defaultRiskValue: Number(defaultRiskValue) || 1,
+                      riskBase,
+                    }
+                  }, locale);
+
+                  return (
+                    <div className={clsx(
+                      "mt-2 p-3 rounded-xl border backdrop-blur-md transition-all",
+                      previewDetails.safetyLevel === 'safe' ? "bg-emerald-500/5 border-emerald-500/20" :
+                      previewDetails.safetyLevel === 'moderate' ? "bg-amber-500/5 border-amber-500/20" :
+                      "bg-rose-500/10 border-rose-500/30"
+                    )}>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-400">{t('preview_actual_1r')}</span>
+                          <span className="text-lg font-bold font-mono text-emerald-400">
+                            ${previewDetails.riskDollar.toLocaleString()}
+                          </span>
+                          <span className="text-xs text-gray-400">{t('per_trade')}</span>
+                        </div>
+                        <span className={clsx(
+                          "text-xs font-bold px-2.5 py-1 rounded-full border flex items-center gap-1",
+                          previewDetails.safetyLevel === 'safe' ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300" :
+                          previewDetails.safetyLevel === 'moderate' ? "bg-amber-500/20 border-amber-500/40 text-amber-300" :
+                          "bg-rose-500/20 border-rose-500/40 text-rose-300 animate-pulse"
+                        )}>
+                          🛡️ {previewDetails.bullets} Bullets ({previewDetails.safetyLevel === 'safe' ? t('safety_safe') : previewDetails.safetyLevel === 'moderate' ? t('safety_moderate') : t('safety_danger')})
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-gray-400">
+                        {t('bullets_explanation', { riskBaseLabel: previewDetails.riskBaseLabel, bullets: previewDetails.bullets, maxDD: `$${(Number(trailingMaxDrawdown) || 2000).toLocaleString()}` })}
+                      </p>
+                      {previewDetails.safetyLevel === 'danger' && (
+                        <div className="mt-2 flex items-center gap-1.5 text-xs text-rose-400 font-semibold bg-rose-500/10 p-2 rounded-lg border border-rose-500/20">
+                          <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400" />
+                          <span>{t('danger_bullets_warning', { bullets: previewDetails.bullets })}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Hard Stop & Alert Thresholds */}
+              <div className="sm:col-span-6 rounded-2xl bg-gray-950/60 p-4 border border-white/5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <label className="text-sm font-semibold text-white flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-amber-400" />
+                      {t('hard_stop_title')}
+                    </label>
+                    <p className="text-xs text-gray-400">
+                      {t('hard_stop_desc')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEnableHardStop(!enableHardStop)}
+                    className={clsx(
+                      "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                      enableHardStop ? "bg-red-500" : "bg-gray-700"
+                    )}
+                  >
+                    <span
+                      className={clsx(
+                        "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                        enableHardStop ? "translate-x-5" : "translate-x-0"
+                      )}
+                    />
+                  </button>
+                </div>
+
+                <div className="pt-2 border-t border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">
+                      {t('alert_threshold_label')}
+                    </label>
+                    <input
+                      type="number"
+                      min="50"
+                      max="100"
+                      value={dailyLossAlertThreshold}
+                      onChange={(e) => setDailyLossAlertThreshold(e.target.value)}
+                      placeholder="80"
+                      className="block w-full rounded-lg border-0 bg-white/5 py-1.5 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-amber-500 sm:text-sm px-3"
+                    />
+                    <span className="text-[10px] text-gray-500 mt-0.5 block">
+                      {t('alert_threshold_hint', { threshold: dailyLossAlertThreshold })}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -252,9 +510,44 @@ export default function AccountsPage() {
                 <dt className="text-sm font-medium text-gray-400">{t('consistency')}</dt>
                 <dd className="mt-1 text-sm text-white">{account.rules.consistencyPercent}%</dd>
               </div>
-              <div className="sm:col-span-1">
-                <dt className="text-sm font-medium text-gray-400">{t('platform')}</dt>
-                <dd className="mt-1 text-sm text-white">{account.type.split(' - ')[0]}</dd>
+              <div className="sm:col-span-2">
+                <dt className="text-sm font-medium text-gray-400">{t('card_1r_bullets')}</dt>
+                <dd className="mt-1 flex flex-wrap items-center justify-between gap-1 text-sm">
+                  {(() => {
+                    const rInfo = calculateAccount1RRisk(account, locale);
+                    return (
+                      <>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-emerald-400 font-bold font-mono text-base">
+                            ${rInfo.riskDollar.toLocaleString()}
+                          </span>
+                          <span className="text-[11px] text-gray-400">
+                            ({rInfo.riskBase === 'drawdown' ? `${account.rules.defaultRiskValue ?? 5}% DD` : rInfo.riskBase === 'balance' ? `${account.rules.defaultRiskValue ?? 1}% Balance` : t('risk_fixed_short')})
+                          </span>
+                        </div>
+                        <span className={clsx(
+                          "text-[10px] font-bold px-2 py-0.5 rounded-full border",
+                          rInfo.safetyLevel === 'safe' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" :
+                          rInfo.safetyLevel === 'moderate' ? "bg-amber-500/10 border-amber-500/30 text-amber-300" :
+                          "bg-rose-500/10 border-rose-500/30 text-rose-300"
+                        )}>
+                          🛡️ {rInfo.bullets} Bullets
+                        </span>
+                      </>
+                    );
+                  })()}
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-sm font-medium text-gray-400">{t('platform_label')}</dt>
+                <dd className="mt-1 flex items-center justify-between text-sm text-white">
+                  <span>{account.type.split(' - ')[0]}</span>
+                  {account.rules.enableHardStop && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 text-xs font-semibold text-rose-300">
+                      <Lock className="w-3 h-3" /> {t('hard_stop_active')}
+                    </span>
+                  )}
+                </dd>
               </div>
             </dl>
             <div className="mt-6 flex gap-3">

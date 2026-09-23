@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import { Trade, useTradeStore } from "@/store/useTradeStore";
 import { usePreferenceStore } from "@/store/usePreferenceStore";
-import { X } from "lucide-react";
+import { X, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { TradeEditForm } from "./TradeEditForm";
 import { TradeViewDetails } from "./TradeViewDetails";
 
@@ -39,6 +40,10 @@ export default function TradeDetailsModal({ isOpen, onClose, trade }: TradeDetai
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, zoomImageSrc, onClose]);
 
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const t = useTranslations("TradeDetailsModal");
+  const c = useTranslations("Common");
+
   const [prevTrade, setPrevTrade] = useState<Trade | null>(null);
 
   // Reset editing state when a new trade is opened
@@ -46,19 +51,24 @@ export default function TradeDetailsModal({ isOpen, onClose, trade }: TradeDetai
     setPrevTrade(trade);
     setIsEditing(false);
     setZoomImageSrc(null);
+    setIsConfirmingDelete(false);
   }
 
   if (!isOpen || !trade) return null;
 
-  const handleDelete = async () => {
-    if (confirm("Are you sure you want to delete this trade?")) {
-      try {
-        await deleteTrade(trade.id);
-        toast.success("Trade deleted.");
-        onClose();
-      } catch {
-        toast.error("Failed to delete trade.");
-      }
+  const handleDelete = () => {
+    setIsConfirmingDelete(true);
+  };
+
+  const handleExecuteDelete = async () => {
+    try {
+      await deleteTrade(trade.id);
+      toast.success(c("trade_deleted"));
+      onClose();
+    } catch {
+      toast.error(c("error"));
+    } finally {
+      setIsConfirmingDelete(false);
     }
   };
 
@@ -101,10 +111,10 @@ export default function TradeDetailsModal({ isOpen, onClose, trade }: TradeDetai
           <div className="flex items-center justify-between border-b border-gray-800 p-6">
             <div>
               <h3 className="text-xl font-bold">
-                {isEditing ? "Edit Trade Log" : `Trade Detail: ${trade.asset}`}
+                {isEditing ? t("edit_trade_log") : `${t("trade_detail")}: ${trade.asset}`}
               </h3>
               <p className="text-xs text-gray-400 mt-1">
-                Logged on {format(new Date(trade.date), "PPP p")}
+                {t("logged_on")} {format(new Date(trade.date), "PPP p")}
               </p>
             </div>
             <button
@@ -116,7 +126,39 @@ export default function TradeDetailsModal({ isOpen, onClose, trade }: TradeDetai
           </div>
 
           {/* Body */}
-          <div className="p-6 flex-1 overflow-y-auto">
+          <div className="p-6 flex-1 overflow-y-auto space-y-4">
+            {/* Inline Delete Confirmation Banner */}
+            <AnimatePresence>
+              {isConfirmingDelete && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0, y: -10 }}
+                  animate={{ opacity: 1, height: "auto", y: 0 }}
+                  exit={{ opacity: 0, height: 0, y: -10 }}
+                  className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg"
+                >
+                  <div className="flex items-center gap-2 text-rose-300 text-sm">
+                    <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+                    <span>{c("confirm_delete")}</span>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setIsConfirmingDelete(false)}
+                      className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold text-gray-300 transition-colors cursor-pointer"
+                    >
+                      {t("cancel")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExecuteDelete}
+                      className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-xs font-semibold text-white shadow-lg transition-colors cursor-pointer"
+                    >
+                      {t("delete_log")}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
             {isEditing ? (
               <TradeEditForm
                 trade={trade}

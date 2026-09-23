@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "../globals.css";
-import { Sidebar } from "@/components/Sidebar";
-import { Header } from "@/components/Header";
+import { AppShell } from "@/components/AppShell";
 import { AuthProvider } from "@/components/AuthProvider";
 import { Toaster } from 'sonner';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { routing } from '@/i18n/routing';
+import { ClientLocaleDetector } from "@/components/ClientLocaleDetector";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -52,16 +52,9 @@ export default async function RootLayout({
     >
       <body className="flex h-full flex-col md:flex-row text-white" suppressHydrationWarning>
         <NextIntlClientProvider messages={messages}>
+          <ClientLocaleDetector />
           <AuthProvider>
-            <div className="hidden md:flex md:w-72 md:flex-col md:fixed md:inset-y-0 z-50">
-              <Sidebar />
-            </div>
-            <div className="flex flex-col flex-1 md:pl-72 min-h-screen">
-              <Header />
-              <main className="flex-1 overflow-y-auto bg-gray-950 p-4 sm:p-6 lg:p-8">
-                {children}
-              </main>
-            </div>
+            <AppShell>{children}</AppShell>
             <Toaster theme="dark" position="top-right" richColors />
           </AuthProvider>
         </NextIntlClientProvider>

@@ -1,0 +1,143 @@
+import { Trade } from "@/store/useTradeStore";
+
+export interface AggregatedTradingHabits {
+  accountName?: string;
+  totalTrades: number;
+  totalPnL: number;
+  winRate: number;
+  winsCount: number;
+  lossesCount: number;
+  averageR: number;
+  sessionBreakdown: Record<string, { trades: number; pnl: number; winRate: number }>;
+  mistakeCosts: Record<string, { count: number; totalLoss: number }>;
+  revengeStreakLoss: number;
+  revengeStreakCount: number;
+  setupPerformance: Record<string, { count: number; winRate: number; pnl: number }>;
+  assetPerformance: Record<string, { count: number; winRate: number; pnl: number }>;
+}
+
+/**
+ * Pre-processes and aggregates raw trade logs into a concise JSON payload (Level 1 Processing).
+ * Eliminates noisy data and extracts psychological & execution leaks.
+ */
+export function aggregateTradingHabits(trades: Trade[], accountName?: string): AggregatedTradingHabits {
+  const sortedTrades = [...trades].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  
+  const totalTrades = sortedTrades.length;
+  const wins = sortedTrades.filter(t => t.pnl > 0);
+  const losses = sortedTrades.filter(t => t.pnl < 0);
+  const totalPnL = sortedTrades.reduce((sum, t) => sum + t.pnl, 0);
+  const winRate = totalTrades > 0 ? Math.round((wins.length / totalTrades) * 100) : 0;
+
+  // Average R
+  const rValues = sortedTrades.map(t => {
+    if (t.rMultiple !== undefined) return t.rMultiple;
+    const risk = t.riskAmount || 500;
+    return risk > 0 ? t.pnl / risk : 0;
+  });
+  const averageR = totalTrades > 0 ? Number((rValues.reduce((a, b) => a + b, 0) / totalTrades).toFixed(2)) : 0;
+
+  // 1. Session Breakdown
+  const sessionMap: Record<string, { trades: number; pnl: number; wins: number }> = {};
+  sortedTrades.forEach(t => {
+    const sess = t.session || 'New York';
+    if (!sessionMap[sess]) sessionMap[sess] = { trades: 0, pnl: 0, wins: 0 };
+    sessionMap[sess].trades += 1;
+    sessionMap[sess].pnl += t.pnl;
+    if (t.pnl > 0) sessionMap[sess].wins += 1;
+  });
+
+  const sessionBreakdown: Record<string, { trades: number; pnl: number; winRate: number }> = {};
+  Object.entries(sessionMap).forEach(([sess, data]) => {
+    sessionBreakdown[sess] = {
+      trades: data.trades,
+      pnl: Math.round(data.pnl),
+      winRate: data.trades > 0 ? Math.round((data.wins / data.trades) * 100) : 0
+    };
+  });
+
+  // 2. Mistake Costs
+  const mistakeMap: Record<string, { count: number; totalLoss: number }> = {};
+  sortedTrades.forEach(t => {
+    if (t.mistake && t.mistake !== 'None') {
+      if (!mistakeMap[t.mistake]) mistakeMap[t.mistake] = { count: 0, totalLoss: 0 };
+      mistakeMap[t.mistake].count += 1;
+      if (t.pnl < 0) {
+        mistakeMap[t.mistake].totalLoss += Math.abs(t.pnl);
+      }
+    }
+  });
+
+  // 3. Revenge / Tilt Streak Detector
+  // Detect trades entered within 60 minutes after a loss
+  let revengeStreakLoss = 0;
+  let revengeStreakCount = 0;
+  for (let i = 1; i < sortedTrades.length; i++) {
+    const prevTrade = sortedTrades[i - 1];
+    const currTrade = sortedTrades[i];
+    
+    if (prevTrade.pnl < 0) {
+      const timeDiffMinutes = (new Date(currTrade.date).getTime() - new Date(prevTrade.date).getTime()) / (1000 * 60);
+      if (timeDiffMinutes >= 0 && timeDiffMinutes <= 60) {
+        revengeStreakCount += 1;
+        if (currTrade.pnl < 0) {
+          revengeStreakLoss += Math.abs(currTrade.pnl);
+        }
+      }
+    }
+  }
+
+  // 4. Setup Performance
+  const setupMap: Record<string, { count: number; wins: number; pnl: number }> = {};
+  sortedTrades.forEach(t => {
+    const s = t.setup || 'Other';
+    if (!setupMap[s]) setupMap[s] = { count: 0, wins: 0, pnl: 0 };
+    setupMap[s].count += 1;
+    setupMap[s].pnl += t.pnl;
+    if (t.pnl > 0) setupMap[s].wins += 1;
+  });
+
+  const setupPerformance: Record<string, { count: number; winRate: number; pnl: number }> = {};
+  Object.entries(setupMap).forEach(([s, data]) => {
+    setupPerformance[s] = {
+      count: data.count,
+      winRate: data.count > 0 ? Math.round((data.wins / data.count) * 100) : 0,
+      pnl: Math.round(data.pnl)
+    };
+  });
+
+  // 5. Asset Performance (MNQ vs Gold vs others)
+  const assetMap: Record<string, { count: number; wins: number; pnl: number }> = {};
+  sortedTrades.forEach(t => {
+    const a = t.asset || 'Unknown';
+    if (!assetMap[a]) assetMap[a] = { count: 0, wins: 0, pnl: 0 };
+    assetMap[a].count += 1;
+    assetMap[a].pnl += t.pnl;
+    if (t.pnl > 0) assetMap[a].wins += 1;
+  });
+
+  const assetPerformance: Record<string, { count: number; winRate: number; pnl: number }> = {};
+  Object.entries(assetMap).forEach(([a, data]) => {
+    assetPerformance[a] = {
+      count: data.count,
+      winRate: data.count > 0 ? Math.round((data.wins / data.count) * 100) : 0,
+      pnl: Math.round(data.pnl)
+    };
+  });
+
+  return {
+    accountName,
+    totalTrades,
+    totalPnL: Math.round(totalPnL),
+    winRate,
+    winsCount: wins.length,
+    lossesCount: losses.length,
+    averageR,
+    sessionBreakdown,
+    mistakeCosts: mistakeMap,
+    revengeStreakLoss: Math.round(revengeStreakLoss),
+    revengeStreakCount,
+    setupPerformance,
+    assetPerformance
+  };
+}

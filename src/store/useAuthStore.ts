@@ -10,6 +10,8 @@ interface AuthState {
   checkSession: () => Promise<void>;
 }
 
+let authSubscription: { unsubscribe: () => void } | null = null;
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isLoading: true,
@@ -23,8 +25,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     const { data: { session } } = await supabase.auth.getSession();
     set({ user: session?.user || null, isLoading: false });
 
-    supabase.auth.onAuthStateChange((_event, session) => {
-      set({ user: session?.user || null });
-    });
+    // Register listener only once (Singleton pattern)
+    if (!authSubscription) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        set({ user: session?.user || null });
+      });
+      authSubscription = subscription;
+    }
   }
 }));

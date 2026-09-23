@@ -20,6 +20,11 @@ import { ResultsTable } from './components/ResultsTable';
 import { StratifiedTable } from './components/StratifiedTable';
 import { AnalysisTable } from './components/AnalysisTable';
 import { WorkflowViewer } from './components/WorkflowViewer';
+import { useAccountStore } from '@/store/useAccountStore';
+import { useTradeStore } from '@/store/useTradeStore';
+import { RefreshCw, Sparkles, ArrowLeft } from 'lucide-react';
+import { Link } from '@/i18n/routing';
+import { toast } from 'sonner';
 
 Chart.register(...registerables);
 
@@ -27,6 +32,10 @@ const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 0 
 
 export default function SimulatorPage() {
   const t = useTranslations('Simulator');
+  const { accounts, activeAccountId } = useAccountStore();
+  const { trades } = useTradeStore();
+  const activeAccount = accounts.find(a => a.id === activeAccountId) || accounts[0];
+  const accountTrades = trades.filter(t => t.accountId === activeAccountId);
 
   // ── Fund Rules ──
   const [preset, setPreset] = useState('topstep50');
@@ -45,6 +54,53 @@ export default function SimulatorPage() {
   const [dailyStop, setDailyStop] = useState(1000);
   const [dailyTarget, setDailyTarget] = useState(1500);
   const [hiddenRisk] = useState(500);
+
+  // ── Sync from Active Account ──
+  const handleSyncFromAccount = () => {
+    if (!activeAccount) {
+      toast.error(t('toast_no_account'));
+      return;
+    }
+    if (accountTrades.length === 0) {
+      toast.info(t('toast_no_trades', { name: activeAccount.name }));
+      if (activeAccount.initialBalance) setBalance(activeAccount.initialBalance);
+      if (activeAccount.rules?.trailingMaxDrawdown) setMaxDrawdown(activeAccount.rules.trailingMaxDrawdown);
+      if (activeAccount.rules?.profitTarget) setEvalTarget(activeAccount.rules.profitTarget);
+      if (activeAccount.rules?.maxDailyLoss) setDailyStop(activeAccount.rules.maxDailyLoss);
+      return;
+    }
+
+    const wins = accountTrades.filter(t => t.result === 'Win');
+    const losses = accountTrades.filter(t => t.result === 'Loss');
+    const actualWinrate = Math.round((wins.length / accountTrades.length) * 100);
+
+    const totalWinPnl = wins.reduce((s, t) => s + t.pnl, 0);
+    const totalLossPnl = Math.abs(losses.reduce((s, t) => s + t.pnl, 0));
+    const avgWin = wins.length > 0 ? totalWinPnl / wins.length : 0;
+    const avgLoss = losses.length > 0 ? totalLossPnl / losses.length : 0;
+    
+    let calculatedRR = 1.5;
+    if (avgLoss > 0 && avgWin > 0) {
+      calculatedRR = Number((avgWin / avgLoss).toFixed(2));
+    }
+
+    setWinrate(actualWinrate);
+    setRr(calculatedRR);
+    if (activeAccount.initialBalance) setBalance(activeAccount.initialBalance);
+    if (activeAccount.rules?.trailingMaxDrawdown) setMaxDrawdown(activeAccount.rules.trailingMaxDrawdown);
+    if (activeAccount.rules?.profitTarget) setEvalTarget(activeAccount.rules.profitTarget);
+    if (activeAccount.rules?.maxDailyLoss) setDailyStop(activeAccount.rules.maxDailyLoss);
+
+    toast.success(
+      t('toast_sync_success', {
+        name: activeAccount.name,
+        winrate: actualWinrate,
+        rr: calculatedRR,
+        count: accountTrades.length,
+      })
+    );
+  };
+
 
   // ── Sweep ──
   const [sweepVar, setSweepVar] = useState('risk');
@@ -266,7 +322,29 @@ export default function SimulatorPage() {
       <div style={{ background: 'var(--bg-base)', color: 'var(--text-primary)', minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
         {/* Header */}
         <header style={{ padding: '16px 32px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1 style={{ fontSize: 20, fontWeight: 700 }}>{t('title')}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <Link
+              href="/analytics"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 12px',
+                borderRadius: 10,
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: '#cbd5e1',
+                fontSize: 12,
+                fontWeight: 600,
+                textDecoration: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <ArrowLeft style={{ width: 14, height: 14 }} />
+              <span>{t('back_to_analytics')}</span>
+            </Link>
+            <h1 style={{ fontSize: 20, fontWeight: 700 }}>{t('title')}</h1>
+          </div>
           <button className={styles['btn-guide']} onClick={() => setGuideOpen(true)}>
             {t('btnGuide')}
           </button>
@@ -331,6 +409,33 @@ export default function SimulatorPage() {
 
             {/* Strategy Engine */}
             <div className={styles['section-title']}>{t('sections.strategyEngine')}</div>
+
+            {/* Quick Account Sync Card */}
+            <div className="mb-3.5 p-3 rounded-xl bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-blue-950/40 border border-indigo-500/20">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-white flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                  {t('sync_card_title')}
+                </span>
+                <span className="text-[10px] text-gray-400 font-mono">
+                  {activeAccount?.name || t('account_fallback')}
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-400 mb-2">
+                {accountTrades.length > 0
+                  ? t('sync_card_has_trades', { count: accountTrades.length })
+                  : t('sync_card_no_trades')}
+              </p>
+              <button
+                type="button"
+                onClick={handleSyncFromAccount}
+                className="w-full py-1.5 px-3 rounded-lg bg-indigo-600/80 hover:bg-indigo-600 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition-all border border-indigo-400/30"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                {t('btn_sync')}
+              </button>
+            </div>
+
             <div className={styles['input-group']}>
               <label><span>{t('strategy.winrate')}</span><span>%</span></label>
               <input type="number" value={winrate} step={1} onChange={e => setWinrate(+e.target.value)} />

@@ -13,6 +13,9 @@ export interface AccountRules {
   dailyLossAlertThreshold?: number; // e.g. 80 (%)
   drawdownAlertThreshold?: number; // e.g. 80 (%)
   enableHardStop?: boolean;
+  defaultRiskType?: "%" | "$";
+  defaultRiskValue?: number;
+  riskBase?: "drawdown" | "balance";
 }
 
 export interface Account {
@@ -64,7 +67,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
         name: d.name,
         type: d.type,
         initialBalance: d.initial_balance,
-        rules: d.rules,
+        rules: d.rules && typeof d.rules === "object" ? d.rules : { trailingMaxDrawdown: 0 },
       }));
       
       set({ accounts: formattedAccounts });

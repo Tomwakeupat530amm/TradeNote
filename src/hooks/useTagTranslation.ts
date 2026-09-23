@@ -14,9 +14,7 @@ export function useTagTranslation() {
     // Convert tag to key format: "Break Even" -> "Break_Even", "Support/Resistance" -> "Support_Resistance"
     const key = tag.replace(/[\s\/]/g, '_');
     
-    // @ts-ignore - In case the key is dynamic
     if (t.has(key)) {
-      // @ts-ignore
       return t(key);
     }
     

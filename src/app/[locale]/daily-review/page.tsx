@@ -2,8 +2,12 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useReviewStore, DailyReview, PeriodicReview, CreatePeriodicReviewInput } from "@/store/useReviewStore";
+import { useTradeStore } from "@/store/useTradeStore";
+import { useAccountStore } from "@/store/useAccountStore";
+import { DailyExecutiveReportCard } from "@/components/DailyExecutiveReportCard";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO, isSameDay } from "date-fns";
 import { Save, Calendar, Sun, Moon, Star, TrendingUp, Target, BarChart2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -11,7 +15,10 @@ import { toast } from "sonner";
 import clsx from "clsx";
 import { useTranslations } from "next-intl";
 
-export default function ReviewsPage() {
+function ReviewsContent() {
+  const searchParams = useSearchParams();
+  const paramDate = searchParams?.get('date');
+
   const { 
     currentReview, 
     fetchReviewForDate, 
@@ -24,9 +31,23 @@ export default function ReviewsPage() {
   } = useReviewStore();
   
   const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly'>('daily');
-  const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [selectedDate, setSelectedDate] = useState(() => paramDate || format(new Date(), "yyyy-MM-dd"));
   const [saving, setSaving] = useState(false);
   const t = useTranslations("DailyReview");
+
+  const { trades } = useTradeStore();
+  const { accounts, activeAccountId } = useAccountStore();
+  const activeAccount = accounts.find((a) => a.id === activeAccountId);
+  const accountTrades = useMemo(() => {
+    return activeAccountId ? trades.filter((t) => t.accountId === activeAccountId) : trades;
+  }, [trades, activeAccountId]);
+
+  const [prevParamDate, setPrevParamDate] = useState(paramDate);
+  if (paramDate && paramDate !== prevParamDate) {
+    setPrevParamDate(paramDate);
+    setSelectedDate(paramDate);
+    setActiveTab('daily');
+  }
 
   useEffect(() => {
     fetchPeriodicReviews();
@@ -111,15 +132,22 @@ export default function ReviewsPage() {
 
       <AnimatePresence mode="wait">
         {activeTab === 'daily' && (
-          <DailyForm 
-            key="daily"
-            currentReview={currentReview}
-            selectedDate={selectedDate}
-            isLoading={isLoading}
-            saveReview={saveReview}
-            saving={saving}
-            setSaving={setSaving}
-          />
+          <div className="space-y-6">
+            <DailyExecutiveReportCard
+              trades={accountTrades}
+              account={activeAccount}
+              targetDateStr={selectedDate}
+            />
+            <DailyForm 
+              key="daily"
+              currentReview={currentReview}
+              selectedDate={selectedDate}
+              isLoading={isLoading}
+              saveReview={saveReview}
+              saving={saving}
+              setSaving={setSaving}
+            />
+          </div>
         )}
         {(activeTab === 'weekly' || activeTab === 'monthly') && (
           <PeriodicForm 
@@ -135,6 +163,14 @@ export default function ReviewsPage() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function ReviewsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-gray-500">Loading reviews...</div>}>
+      <ReviewsContent />
+    </Suspense>
   );
 }
 

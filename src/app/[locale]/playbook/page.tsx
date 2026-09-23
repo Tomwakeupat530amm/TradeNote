@@ -1,19 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { usePlaybookStore, Playbook } from "@/store/usePlaybookStore";
+import { useTradeStore } from "@/store/useTradeStore";
+import { useAccountStore } from "@/store/useAccountStore";
 import { motion, AnimatePresence } from "framer-motion";
-import { BookOpen, Plus, X, Upload, Trash2, Edit } from "lucide-react";
+import { BookOpen, Plus, X, Upload, Trash2, Edit, Activity, Target, AlignJustify, Calendar } from "lucide-react";
+import { Link } from "@/i18n/routing";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
+import clsx from "clsx";
 
 export default function PlaybookPage() {
   const t = useTranslations("Playbook");
   const { playbooks, addPlaybook, updatePlaybook, deletePlaybook } = usePlaybookStore();
+  const { trades } = useTradeStore();
+  const { activeAccountId } = useAccountStore();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPlaybook, setEditingPlaybook] = useState<Playbook | null>(null);
+  
+  // Filter trades for active account
+  const accountTrades = useMemo(() => trades.filter(t => t.accountId === activeAccountId), [trades, activeAccountId]);
+
+  // Edge stats calculator per setup title
+  const getPlaybookStats = useCallback((title: string) => {
+    const normTitle = title.trim().toLowerCase();
+    const setupTrades = accountTrades.filter(t => t.setup && t.setup.trim().toLowerCase() === normTitle);
+    const total = setupTrades.length;
+    const wins = setupTrades.filter(t => t.result === 'Win').length;
+    const losses = setupTrades.filter(t => t.result === 'Loss').length;
+    const be = setupTrades.filter(t => t.result === 'Break Even').length;
+    const winRate = total > 0 ? (wins / total) * 100 : 0;
+    const netPnl = setupTrades.reduce((sum, t) => sum + t.pnl, 0);
+    
+    const rValues = setupTrades.map(t => {
+      const risk = (t.riskAmount && t.riskAmount > 0) ? t.riskAmount : 100;
+      return t.pnl / risk;
+    });
+    const avgR = rValues.length > 0 ? rValues.reduce((s, r) => s + r, 0) / rValues.length : 0;
+
+    return { total, wins, losses, be, winRate, netPnl, avgR };
+  }, [accountTrades]);
   
   // Form State
   const [title, setTitle] = useState("");
@@ -140,15 +169,39 @@ export default function PlaybookPage() {
             {t('subtitle')}
           </p>
         </motion.div>
-        <motion.button
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          onClick={openAddModal}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          {t('add_playbook')}
-        </motion.button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Sub-nav tabs: Journal Table <-> Calendar <-> Playbook (Active) */}
+          <div className="flex items-center bg-gray-950/80 border border-white/10 rounded-xl p-1 shadow-inner">
+            <Link
+              href="/journal"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer text-gray-400 hover:text-white"
+            >
+              <AlignJustify className="w-3.5 h-3.5" />
+              <span>{t('tab_view_table')}</span>
+            </Link>
+            <Link
+              href="/journal?view=calendar"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer text-gray-400 hover:text-white"
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>{t('tab_view_calendar')}</span>
+            </Link>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600/30 text-purple-300 border border-purple-500/40 shadow-xs">
+              <BookOpen className="w-3.5 h-3.5 text-purple-400" />
+              <span>{t('tab_playbook_setups')}</span>
+            </div>
+          </div>
+
+          <motion.button
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            onClick={openAddModal}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-colors cursor-pointer shadow-sm shadow-indigo-500/20"
+          >
+            <Plus className="w-5 h-5" />
+            {t('add_playbook')}
+          </motion.button>
+        </div>
       </div>
 
       {playbooks.length === 0 ? (
@@ -168,54 +221,93 @@ export default function PlaybookPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           <AnimatePresence>
-            {playbooks.map(playbook => (
-              <motion.div
-                key={playbook.id}
-                layout
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                onClick={() => setViewingPlaybook(playbook)}
-                className="bg-gray-900/60 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden cursor-pointer hover:border-indigo-500/50 hover:shadow-2xl hover:shadow-indigo-500/10 transition-all group"
-              >
-                <div className="h-48 bg-gray-800 relative w-full border-b border-white/5 flex items-center justify-center overflow-hidden">
-                  {playbook.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img 
-                      src={playbook.imageUrl} 
-                      alt={playbook.title}
-                      className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
-                    />
-                  ) : (
-                    <BookOpen className="w-16 h-16 text-gray-700" />
-                  )}
-                  <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={(e) => openEditModal(playbook, e)}
-                      className="p-2 bg-gray-900/80 backdrop-blur text-white rounded-lg hover:bg-indigo-600 transition-colors"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={(e) => handleDelete(playbook.id, e)}
-                      className="p-2 bg-gray-900/80 backdrop-blur text-white rounded-lg hover:bg-red-600 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+            {playbooks.map(playbook => {
+              const stats = getPlaybookStats(playbook.title);
+              return (
+                <motion.div
+                  key={playbook.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  onClick={() => setViewingPlaybook(playbook)}
+                  className="bg-gray-900/60 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden cursor-pointer hover:border-indigo-500/50 hover:shadow-2xl hover:shadow-indigo-500/10 transition-all group"
+                >
+                  <div className="h-48 bg-gray-800 relative w-full border-b border-white/5 flex items-center justify-center overflow-hidden">
+                    {playbook.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img 
+                        src={playbook.imageUrl} 
+                        alt={playbook.title}
+                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
+                      />
+                    ) : (
+                      <BookOpen className="w-16 h-16 text-gray-700" />
+                    )}
+                    <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={(e) => openEditModal(playbook, e)}
+                        className="p-2 bg-gray-900/80 backdrop-blur text-white rounded-lg hover:bg-indigo-600 transition-colors"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={(e) => handleDelete(playbook.id, e)}
+                        className="p-2 bg-gray-900/80 backdrop-blur text-white rounded-lg hover:bg-red-600 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-bold text-white mb-2">{playbook.title}</h3>
-                  <p className="text-sm text-gray-400 line-clamp-2 mb-4">
-                    {playbook.description || t('no_description')}
-                  </p>
-                  <div className="flex items-center justify-between text-xs font-medium text-gray-500">
-                    <span>{playbook.rules.length} {t('rules')}</span>
-                    <span>{format(parseISO(playbook.createdAt), 'MMM d, yyyy')}</span>
+                  <div className="p-6">
+                    <h3 className="text-xl font-bold text-white mb-1.5">{playbook.title}</h3>
+                    <p className="text-sm text-gray-400 line-clamp-2 mb-3">
+                      {playbook.description || t('no_description')}
+                    </p>
+
+                    {/* Edge Performance Card Strip */}
+                    <div className="mb-4">
+                      {stats.total === 0 ? (
+                        <div className="flex items-center justify-between text-xs text-gray-500 bg-white/[0.02] px-3 py-2 rounded-xl border border-white/5">
+                          <span>{t('no_live_trades')}</span>
+                          <span className="text-[10px] font-mono text-gray-600">{t('trades_count_zero')}</span>
+                        </div>
+                      ) : (
+                        <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-gray-400 flex items-center gap-1">
+                              <Target className="w-3.5 h-3.5 text-indigo-400" />
+                              {t('live_edge_label')}
+                            </span>
+                            <span className={clsx(
+                              "font-bold font-mono px-2 py-0.5 rounded-md text-[11px]",
+                              stats.winRate >= 50 ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" :
+                              stats.winRate >= 40 ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" :
+                              "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                            )}>
+                              {t('winrate_pill', { winRate: stats.winRate.toFixed(0), wins: stats.wins, total: stats.total })}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs font-mono">
+                            <span className={stats.netPnl >= 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                              {stats.netPnl >= 0 ? "+" : ""}${Math.round(stats.netPnl).toLocaleString()}
+                            </span>
+                            <span className="text-gray-400">
+                              Avg: <strong className={stats.avgR >= 0 ? "text-emerald-400" : "text-rose-400"}>{stats.avgR >= 0 ? "+" : ""}{stats.avgR.toFixed(2)}R</strong>
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs font-medium text-gray-500 pt-2 border-t border-white/5">
+                      <span>{playbook.rules.length} {t('rules')}</span>
+                      <span>{format(parseISO(playbook.createdAt), 'MMM d, yyyy')}</span>
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         </div>
       )}
@@ -246,6 +338,54 @@ export default function PlaybookPage() {
               </div>
               <div className="p-6 overflow-y-auto custom-scrollbar flex-1 flex flex-col lg:flex-row gap-8">
                 <div className="flex-1 space-y-6">
+                  {/* Detailed Edge Analytics Card in Modal */}
+                  {(() => {
+                    const modalStats = getPlaybookStats(viewingPlaybook.title);
+                    return (
+                      <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/40 via-gray-900/60 to-gray-900 border border-indigo-500/20">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                            <Activity className="w-4 h-4" />
+                            {t('modal_edge_title')}
+                          </h4>
+                          <span className="text-xs text-gray-400 font-mono">{t('modal_edge_subtitle')}</span>
+                        </div>
+                        {modalStats.total === 0 ? (
+                          <p className="text-xs text-gray-500 italic">{t('modal_edge_empty', { title: viewingPlaybook.title })}</p>
+                        ) : (
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div className="bg-black/30 p-3 rounded-xl border border-white/5">
+                              <span className="text-[11px] text-gray-400 block mb-0.5">{t('stat_trades')}</span>
+                              <span className="text-lg font-bold text-white font-mono">{modalStats.total}</span>
+                              <span className="text-[10px] text-gray-500 block font-mono">W:{modalStats.wins} L:{modalStats.losses} BE:{modalStats.be}</span>
+                            </div>
+                            <div className="bg-black/30 p-3 rounded-xl border border-white/5">
+                              <span className="text-[11px] text-gray-400 block mb-0.5">{t('stat_winrate')}</span>
+                              <span className={clsx("text-lg font-bold font-mono", modalStats.winRate >= 50 ? "text-emerald-400" : "text-amber-400")}>
+                                {modalStats.winRate.toFixed(1)}%
+                              </span>
+                              <span className="text-[10px] text-gray-500 block">{t('stat_winrate_sub')}</span>
+                            </div>
+                            <div className="bg-black/30 p-3 rounded-xl border border-white/5">
+                              <span className="text-[11px] text-gray-400 block mb-0.5">{t('stat_net_pnl')}</span>
+                              <span className={clsx("text-lg font-bold font-mono", modalStats.netPnl >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                                {modalStats.netPnl >= 0 ? "+" : ""}${Math.round(modalStats.netPnl).toLocaleString()}
+                              </span>
+                              <span className="text-[10px] text-gray-500 block">{t('stat_net_pnl_sub')}</span>
+                            </div>
+                            <div className="bg-black/30 p-3 rounded-xl border border-white/5">
+                              <span className="text-[11px] text-gray-400 block mb-0.5">{t('stat_avg_r')}</span>
+                              <span className={clsx("text-lg font-bold font-mono", modalStats.avgR >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                                {modalStats.avgR >= 0 ? "+" : ""}{modalStats.avgR.toFixed(2)}R
+                              </span>
+                              <span className="text-[10px] text-gray-500 block">{t('stat_avg_r_sub')}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {viewingPlaybook.description && (
                     <div>
                       <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-2">{t('description')}</h4>
@@ -282,6 +422,7 @@ export default function PlaybookPage() {
           </div>
         )}
       </AnimatePresence>
+
 
       {/* Add/Edit Modal */}
       <AnimatePresence>

@@ -8,8 +8,8 @@ export const routing = defineRouting({
   // Used when no locale matches
   defaultLocale: 'en',
   
-  // Disable automatic language detection to strictly default to English for first-time visitors
-  localeDetection: false
+  // Automatic language detection: defaults to 'vi' for Vietnamese users, 'en' for everyone else
+  localeDetection: true
 });
 
 // Lightweight wrappers around Next.js' navigation APIs

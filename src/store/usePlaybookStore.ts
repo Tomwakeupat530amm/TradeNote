@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from './useAuthStore';
+import { compressScreenshot } from '@/lib/imageCompressor';
 
 export interface Playbook {
   id: string;
@@ -21,7 +22,7 @@ interface PlaybookState {
   deletePlaybook: (id: string) => Promise<void>;
 }
 
-export const usePlaybookStore = create<PlaybookState>((set) => ({
+export const usePlaybookStore = create<PlaybookState>((set, get) => ({
   playbooks: [],
   isLoading: false,
 
@@ -59,14 +60,14 @@ export const usePlaybookStore = create<PlaybookState>((set) => ({
     let finalImageUrl = playbook.imageUrl;
 
     if (playbook.imageFile && typeof playbook.imageFile === 'string' && playbook.imageFile.startsWith('data:image')) {
-      const response = await fetch(playbook.imageFile);
-      const blob = await response.blob();
-      const filename = `${user.id}/playbook_${Date.now()}.png`;
+      const compressed = await compressScreenshot(playbook.imageFile);
+      const filename = `${user.id}/playbook_${Date.now()}.${compressed.extension}`;
 
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('trade-screenshots') // Reusing the same bucket for convenience, or we could create a new one, but let's reuse
-        .upload(filename, blob, {
-          contentType: 'image/png'
+        .from('trade-screenshots')
+        .upload(filename, compressed.blob, {
+          contentType: compressed.contentType,
+          upsert: true
         });
 
       if (uploadError) {
@@ -118,14 +119,14 @@ export const usePlaybookStore = create<PlaybookState>((set) => ({
     let finalImageUrl = updates.imageUrl;
 
     if (updates.imageFile && typeof updates.imageFile === 'string' && updates.imageFile.startsWith('data:image')) {
-      const response = await fetch(updates.imageFile);
-      const blob = await response.blob();
-      const filename = `${user.id}/playbook_${Date.now()}.png`;
+      const compressed = await compressScreenshot(updates.imageFile);
+      const filename = `${user.id}/playbook_${Date.now()}.${compressed.extension}`;
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('trade-screenshots')
-        .upload(filename, blob, {
-          contentType: 'image/png'
+        .upload(filename, compressed.blob, {
+          contentType: compressed.contentType,
+          upsert: true
         });
 
       if (uploadError) {
@@ -174,6 +175,20 @@ export const usePlaybookStore = create<PlaybookState>((set) => ({
   },
 
   deletePlaybook: async (id) => {
+    const playbookToDelete = get().playbooks.find(p => p.id === id);
+    if (playbookToDelete?.imageUrl) {
+      try {
+        const url = new URL(playbookToDelete.imageUrl);
+        const parts = url.pathname.split('/trade-screenshots/');
+        if (parts.length > 1) {
+          const storagePath = decodeURIComponent(parts[1]);
+          await supabase.storage.from('trade-screenshots').remove([storagePath]);
+        }
+      } catch (storageErr) {
+        console.warn('Could not remove playbook image from storage:', storageErr);
+      }
+    }
+
     const { error } = await supabase
       .from('playbooks')
       .delete()

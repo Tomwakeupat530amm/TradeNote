@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Trade, useTradeStore, TradeResult } from "@/store/useTradeStore";
 import { usePreferenceStore } from "@/store/usePreferenceStore";
-import { X, Save, Image as ImageIcon } from "lucide-react";
+import { X, Save, Image as ImageIcon, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { useTagTranslation } from "@/hooks/useTagTranslation";
+import { useTranslations } from "next-intl";
+import { processClipboardImage } from "@/lib/imageCompressor";
 
 const RESULTS: TradeResult[] = ["Win", "Loss", "Break Even"];
 const SETUPS = ["Breakout", "Pullback", "Reversal", "Continuation", "Other"];
@@ -22,6 +24,7 @@ interface TradeEditFormProps {
 }
 
 export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpen }: TradeEditFormProps) {
+  const t = useTranslations("TradeDetailsModal");
   const { updateTrade } = useTradeStore();
   const { preferences } = usePreferenceStore();
   const tTag = useTagTranslation();
@@ -30,6 +33,8 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
   const [asset, setAsset] = useState(trade.asset);
   const [lotSize, setLotSize] = useState(trade.lotSize.toString());
   const [pnl, setPnl] = useState(trade.pnl.toString());
+  const [riskAmount, setRiskAmount] = useState(trade.riskAmount ? trade.riskAmount.toString() : "500");
+  const [session, setSession] = useState(trade.session || "New York");
   const [result, setResult] = useState<TradeResult>(trade.result);
   const [setup, setSetup] = useState(trade.setup);
   const [confluences, setConfluences] = useState<string[]>(trade.confluences || []);
@@ -39,6 +44,43 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>(trade.screenshotUrl);
   const [screenshotRemoved, setScreenshotRemoved] = useState(false);
+  const [compressionRatio, setCompressionRatio] = useState<number | null>(null);
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const numRisk = parseFloat(riskAmount) || 500;
+  const numPnl = parseFloat(pnl) || 0;
+  const calculatedR = numRisk > 0 ? Number((numPnl / numRisk).toFixed(2)) : 0;
+
+  // Core image processor (Ultra-fast WebP compression)
+  const processImageFile = useCallback(async (file: File | Blob) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload a valid image file.");
+      return;
+    }
+    setIsProcessingImage(true);
+    try {
+      const res = await processClipboardImage(file);
+      setScreenshot(res.dataUrl);
+      setScreenshotRemoved(false);
+      setCompressionRatio(res.ratioPercent);
+      if (res.ratioPercent > 0) {
+        toast.success(t("clipboard_pasted", { ratio: res.ratioPercent }));
+      } else {
+        toast.success("Screenshot attached!");
+      }
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setScreenshot(event.target?.result as string);
+        setScreenshotRemoved(false);
+        toast.success("Screenshot pasted successfully!");
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsProcessingImage(false);
+    }
+  }, [t]);
 
   // Paste image handler for edit mode
   useEffect(() => {
@@ -51,13 +93,9 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
         if (items[i].type.indexOf("image") !== -1) {
           const blob = items[i].getAsFile();
           if (blob) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-              setScreenshot(event.target?.result as string);
-              setScreenshotRemoved(false);
-              toast.success("Screenshot pasted successfully!");
-            };
-            reader.readAsDataURL(blob);
+            e.preventDefault();
+            processImageFile(blob);
+            break;
           }
         }
       }
@@ -65,7 +103,30 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
 
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, [isOpen]);
+  }, [isOpen, processImageFile]);
+
+  // Drag & drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragging) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+      processImageFile(files[0]);
+    }
+  };
 
   const emotionsList = preferences?.psychologyTags || DEFAULT_EMOTIONS;
   const mistakesList = preferences?.mistakeTags || DEFAULT_MISTAKES;
@@ -84,6 +145,9 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
         emotion,
         mistake,
         notes,
+        riskAmount: numRisk,
+        rMultiple: calculatedR,
+        session,
         screenshotUrl: screenshotRemoved ? undefined : screenshotUrl,
         screenshotFile: screenshotRemoved ? null : (screenshot || undefined),
       });
@@ -100,7 +164,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
     <form onSubmit={handleSave} className="space-y-6">
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
         <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-300">Asset / Ticker</label>
+          <label className="block text-sm font-medium text-gray-300">{t("asset_ticker")}</label>
           <input
             type="text"
             required
@@ -111,7 +175,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
         </div>
 
         <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-300">Lot Size</label>
+          <label className="block text-sm font-medium text-gray-300">{t("lot_size")}</label>
           <input
             type="number"
             step="0.01"
@@ -122,27 +186,64 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
           />
         </div>
 
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-300">PnL ($)</label>
-          <input
-            type="number"
-            required
-            value={pnl}
-            onChange={(e) => setPnl(e.target.value)}
-            className={clsx(
-              "block w-full rounded-xl border-0 py-2 shadow-sm ring-1 ring-inset focus:ring-2 sm:text-sm px-4 font-bold",
-              Number(pnl) > 0
-                ? "bg-green-500/10 text-green-400 ring-green-500/30 focus:ring-green-500"
-                : Number(pnl) < 0
-                ? "bg-red-500/10 text-red-400 ring-red-500/30 focus:ring-red-500"
-                : "bg-white/5 text-white ring-white/10 focus:ring-gray-500"
-            )}
-          />
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-300">{t("pnl")}</label>
+            <input
+              type="number"
+              required
+              value={pnl}
+              onChange={(e) => setPnl(e.target.value)}
+              className={clsx(
+                "block w-full rounded-xl border-0 py-2 shadow-sm ring-1 ring-inset focus:ring-2 sm:text-sm px-4 font-bold",
+                Number(pnl) > 0
+                  ? "bg-green-500/10 text-green-400 ring-green-500/30 focus:ring-green-500"
+                  : Number(pnl) < 0
+                  ? "bg-red-500/10 text-red-400 ring-red-500/30 focus:ring-red-500"
+                  : "bg-white/5 text-white ring-white/10 focus:ring-gray-500"
+              )}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-300">{t("risk_amount")}</label>
+            <input
+              type="number"
+              required
+              value={riskAmount}
+              onChange={(e) => setRiskAmount(e.target.value)}
+              className="block w-full rounded-xl border-0 bg-white/5 py-2 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-indigo-500 sm:text-sm px-4"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-300">{t("r_multiple")}</label>
+            <div className={clsx(
+              "flex items-center justify-between h-[38px] px-4 rounded-xl border sm:text-sm font-bold font-mono",
+              calculatedR > 0 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
+              calculatedR < 0 ? "bg-rose-500/10 border-rose-500/30 text-rose-400" :
+              "bg-white/5 border-white/10 text-gray-400"
+            )}>
+              <span>{calculatedR > 0 ? `+${calculatedR}R` : `${calculatedR}R`}</span>
+              <span className="text-xs text-gray-500 font-normal">PnL / Risk</span>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-300">{t("session")}</label>
+            <select
+              value={session}
+              onChange={(e) => setSession(e.target.value)}
+              className="block w-full rounded-xl border-0 bg-gray-900 border-white/10 py-2 text-white shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-blue-500 sm:text-sm px-3 cursor-pointer"
+            >
+              {["Asian", "London", "London-NY Overlap", "New York"].map((s) => (
+                <option key={s} value={s} className="bg-gray-900 text-white">{s}</option>
+              ))}
+            </select>
+          </div>
         </div>
-      </div>
 
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-300">Result</label>
+        <label className="block text-sm font-medium text-gray-300">{t("result")}</label>
         <div className="flex flex-wrap gap-2">
           {RESULTS.map((r) => (
             <button
@@ -167,7 +268,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
       </div>
 
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-300">Setup</label>
+        <label className="block text-sm font-medium text-gray-300">{t("setup")}</label>
         <div className="flex flex-wrap gap-2">
           {SETUPS.map((s) => (
             <button
@@ -188,7 +289,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
       </div>
 
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-300">Confluences</label>
+        <label className="block text-sm font-medium text-gray-300">{t("confluences")}</label>
         <div className="flex flex-wrap gap-2">
           {(preferences?.confluenceTags || []).map((c) => (
             <button
@@ -209,7 +310,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
       </div>
 
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-300">Emotion</label>
+        <label className="block text-sm font-medium text-gray-300">{t("emotion")}</label>
         <div className="flex flex-wrap gap-2">
           {emotionsList.map((e) => (
             <button
@@ -230,7 +331,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
       </div>
 
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-300">Mistakes</label>
+        <label className="block text-sm font-medium text-gray-300">{t("mistakes")}</label>
         <div className="flex flex-wrap gap-2">
           {mistakesList.map((m) => (
             <button
@@ -254,7 +355,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
         <div className="sm:col-span-2 space-y-1">
-          <label className="block text-sm font-medium text-gray-300">Notes</label>
+          <label className="block text-sm font-medium text-gray-300">{t("notes")}</label>
           <textarea
             rows={5}
             value={notes}
@@ -264,8 +365,14 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
         </div>
 
         <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-300">Screenshot</label>
-          {screenshot || (screenshotUrl && !screenshotRemoved) ? (
+          <label className="block text-sm font-medium text-gray-300">{t("screenshot")}</label>
+          
+          {isProcessingImage ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 h-[120px] p-3 text-center text-emerald-300 animate-pulse">
+              <Loader2 className="w-5 h-5 animate-spin text-emerald-400 mb-1" />
+              <span className="text-xs font-semibold">Optimizing screenshot...</span>
+            </div>
+          ) : screenshot || (screenshotUrl && !screenshotRemoved) ? (
             <div 
               className="relative rounded-xl overflow-hidden ring-1 ring-white/10 h-[120px] group cursor-zoom-in" 
               onClick={() => setZoomImageSrc(screenshot || screenshotUrl || null)}
@@ -276,6 +383,17 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
                 alt="Trade setup"
                 className="w-full h-full object-cover transition-transform group-hover:scale-105"
               />
+
+              {/* Floating WebP Optimization Badge */}
+              <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-sm border border-emerald-500/40 text-[10px] font-mono font-bold text-emerald-300 shadow-md">
+                <Sparkles className="w-2.5 h-2.5 text-emerald-400" />
+                <span>
+                  {compressionRatio && compressionRatio > 0
+                    ? `WebP -${compressionRatio}%`
+                    : t("paste_badge")}
+                </span>
+              </div>
+
               <button
                 type="button"
                 onClick={(e) => {
@@ -283,21 +401,40 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
                   setScreenshot(null);
                   setScreenshotUrl(undefined);
                   setScreenshotRemoved(true);
+                  setCompressionRatio(null);
                 }}
-                className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded-full p-1.5 hover:bg-red-500 transition-colors z-10"
+                className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded-full p-1.5 hover:bg-red-500 transition-colors z-10 shadow-md"
               >
                 <X className="w-4 h-4 text-white" />
               </button>
             </div>
           ) : (
-            <div className="flex justify-center items-center rounded-xl border border-dashed border-white/20 h-[120px] bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
-              <div className="text-center">
-                <ImageIcon className="mx-auto h-6 w-6 text-gray-500 mb-1" />
-                <div className="text-xs text-gray-400">
-                  Press <span className="font-semibold text-white">Ctrl+V</span> to paste
-                </div>
+            <label
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={clsx(
+                "flex flex-col justify-center items-center rounded-xl border border-dashed h-[120px] transition-all cursor-pointer p-3 text-center",
+                isDragging
+                  ? "border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/30"
+                  : "border-white/20 bg-white/[0.02] hover:bg-white/[0.05] hover:border-emerald-500/40"
+              )}
+            >
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) processImageFile(f);
+                }}
+                className="hidden"
+              />
+              <ImageIcon className={clsx("mx-auto h-5 w-5 mb-1 transition-colors", isDragging ? "text-emerald-400" : "text-gray-500")} />
+              <div className="text-xs text-gray-300 font-medium leading-tight">
+                {isDragging ? t("drop_active") : t("drag_drop_hint")}
               </div>
-            </div>
+              <span className="text-[10px] text-gray-500 mt-0.5">{t("press_paste")}</span>
+            </label>
           )}
         </div>
       </div>
@@ -308,7 +445,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
           onClick={onCancel}
           className="text-sm font-semibold text-gray-400 hover:text-white transition-colors px-4 py-2"
         >
-          Cancel
+          {t("cancel")}
         </button>
         <button
           type="submit"
@@ -316,7 +453,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
           className="inline-flex justify-center items-center rounded-xl bg-green-600 px-6 py-2.5 text-sm font-bold text-white shadow-[0_0_15px_rgba(22,163,74,0.4)] hover:bg-green-500 disabled:opacity-50 transition-all"
         >
           <Save className="-ml-0.5 mr-2 h-4 w-4" />
-          {saving ? "Saving..." : "Save Changes"}
+          {saving ? t("saving") : t("save_changes")}
         </button>
       </div>
     </form>
