@@ -6,11 +6,12 @@ import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/routing";
 import { 
   LayoutDashboard, Users, Activity, Settings, LogOut, ReceiptText, Quote,
-  TrendingUp, Target, Award, PanelLeftClose, PanelLeftOpen
+  TrendingUp, Target, Award, PanelLeftClose, PanelLeftOpen, BookOpen
 } from "lucide-react";
 import clsx from "clsx";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useSidebarStore } from "@/store/useSidebarStore";
+import { useGuideStore } from "@/store/useGuideStore";
 import { motion } from "framer-motion";
 
 const navigation = [
@@ -151,8 +152,31 @@ export function Sidebar() {
               </ul>
             </li>
 
-            {/* Footer Actions: Settings & Sign Out */}
+            {/* Footer Actions: Guide, Settings & Sign Out */}
             <li className="mt-auto space-y-1.5">
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => useGuideStore.getState().openGuide()}
+                  className={clsx(
+                    "w-full flex items-center rounded-xl p-2.5 text-sm font-semibold transition-all text-gray-400 hover:bg-emerald-500/10 hover:text-emerald-300 border border-transparent hover:border-emerald-500/20 cursor-pointer",
+                    isCollapsed ? "justify-center" : "gap-x-3 -mx-1"
+                  )}
+                >
+                  <BookOpen
+                    className="h-5 w-5 shrink-0 text-gray-400 group-hover:text-emerald-400 transition-colors"
+                    aria-hidden="true"
+                  />
+                  {!isCollapsed && <span className="truncate">{tSidebar("user_guide")}</span>}
+                </button>
+                {/* Floating Tooltip */}
+                {isCollapsed && (
+                  <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-gray-900 border border-emerald-500/30 text-xs font-semibold text-emerald-300 shadow-2xl pointer-events-none opacity-0 group-hover:opacity-100 group-hover:scale-100 scale-95 transition-all z-50 whitespace-nowrap">
+                    {tSidebar("user_guide")}
+                  </div>
+                )}
+              </div>
+
               <div className="relative group">
                 <Link
                   href="/settings"

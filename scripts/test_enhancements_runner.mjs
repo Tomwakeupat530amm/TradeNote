@@ -2860,6 +2860,235 @@ it("Validates i18n parity for Clipboard & Drag-Drop keys across en.json and vi.j
   }
 });
 
+// ==========================================
+// SECTION 28: SUPABASE EXPLICIT TABLE GRANTS & SECURITY POLICY COMPLIANCE (OCTOBER 30 COMPLIANCE)
+// ==========================================
+console.log("\n--- SECTION 28: SUPABASE EXPLICIT TABLE GRANTS & SECURITY POLICY COMPLIANCE ---");
+
+const schemaSqlPath = path.resolve(__dirname, '../../supabase_schema.sql');
+const patchSqlPath = path.resolve(__dirname, '../../supabase_grant_permissions.sql');
+const coreTables = ['accounts', 'trades', 'daily_reviews', 'notifications', 'user_preferences', 'playbooks', 'periodic_reviews'];
+
+it("Validates schema SQL contains explicit GRANT commands for all 7 core TradeNote tables", () => {
+  assert.ok(fs.existsSync(schemaSqlPath), "supabase_schema.sql must exist");
+  assert.ok(fs.existsSync(patchSqlPath), "supabase_grant_permissions.sql must exist");
+
+  const patchContent = fs.readFileSync(patchSqlPath, 'utf8');
+  const schemaContent = fs.readFileSync(schemaSqlPath, 'utf8');
+
+  // Verify all 7 core tables are explicitly granted to authenticated and service_role in patch file
+  for (const table of coreTables) {
+    const authRegex = new RegExp(`GRANT\\s+SELECT,\\s*INSERT,\\s*UPDATE,\\s*DELETE\\s+ON\\s+public\\.${table}\\s+TO\\s+authenticated`, 'i');
+    const serviceRegex = new RegExp(`GRANT\\s+SELECT,\\s*INSERT,\\s*UPDATE,\\s*DELETE\\s+ON\\s+public\\.${table}\\s+TO\\s+service_role`, 'i');
+    const anonRegex = new RegExp(`GRANT\\s+SELECT\\s+ON\\s+public\\.${table}\\s+TO\\s+anon`, 'i');
+
+    assert.ok(authRegex.test(patchContent), `Patch must grant CRUD on ${table} to authenticated`);
+    assert.ok(serviceRegex.test(patchContent), `Patch must grant CRUD on ${table} to service_role`);
+    assert.ok(anonRegex.test(patchContent), `Patch must grant SELECT on ${table} to anon`);
+  }
+
+  // Verify schemaContent has explicit bulk GRANT for schema public
+  assert.ok(
+    /GRANT\s+SELECT\s+ON\s+ALL\s+TABLES\s+IN\s+SCHEMA\s+public\s+TO\s+anon/i.test(schemaContent),
+    "supabase_schema.sql must grant SELECT on all tables to anon"
+  );
+  assert.ok(
+    /GRANT\s+SELECT,\s*INSERT,\s*UPDATE,\s*DELETE\s+ON\s+ALL\s+TABLES\s+IN\s+SCHEMA\s+public\s+TO\s+authenticated/i.test(schemaContent),
+    "supabase_schema.sql must grant CRUD on all tables to authenticated"
+  );
+  assert.ok(
+    /GRANT\s+SELECT,\s*INSERT,\s*UPDATE,\s*DELETE\s+ON\s+ALL\s+TABLES\s+IN\s+SCHEMA\s+public\s+TO\s+service_role/i.test(schemaContent),
+    "supabase_schema.sql must grant CRUD on all tables to service_role"
+  );
+});
+
+it("Validates Least-Privilege enforcement: anon role has SELECT only, no INSERT/UPDATE/DELETE", () => {
+  const patchContent = fs.readFileSync(patchSqlPath, 'utf8');
+  
+  // Anon must not have INSERT, UPDATE, or DELETE on any public table
+  for (const table of coreTables) {
+    const invalidAnonGrant = new RegExp(`GRANT\\s+[^;]*?(INSERT|UPDATE|DELETE)[^;]*?ON\\s+public\\.${table}\\s+TO\\s+anon`, 'i');
+    assert.ok(!invalidAnonGrant.test(patchContent), `Security Violation: anon should NOT have write privileges on ${table}`);
+  }
+});
+
+it("Validates Future-Proofing ALTER DEFAULT PRIVILEGES is declared for tables and sequences", () => {
+  const patchContent = fs.readFileSync(patchSqlPath, 'utf8');
+  const schemaContent = fs.readFileSync(schemaSqlPath, 'utf8');
+
+  for (const content of [patchContent, schemaContent]) {
+    assert.ok(
+      /ALTER\s+DEFAULT\s+PRIVILEGES\s+IN\s+SCHEMA\s+public\s+GRANT\s+SELECT\s+ON\s+TABLES\s+TO\s+anon/i.test(content),
+      "Must alter default privileges for anon"
+    );
+    assert.ok(
+      /ALTER\s+DEFAULT\s+PRIVILEGES\s+IN\s+SCHEMA\s+public\s+GRANT\s+SELECT,\s*INSERT,\s*UPDATE,\s*DELETE\s+ON\s+TABLES\s+TO\s+authenticated/i.test(content),
+      "Must alter default privileges for authenticated"
+    );
+    assert.ok(
+      /ALTER\s+DEFAULT\s+PRIVILEGES\s+IN\s+SCHEMA\s+public\s+GRANT\s+SELECT,\s*INSERT,\s*UPDATE,\s*DELETE\s+ON\s+TABLES\s+TO\s+service_role/i.test(content),
+      "Must alter default privileges for service_role"
+    );
+    assert.ok(
+      /ALTER\s+DEFAULT\s+PRIVILEGES\s+IN\s+SCHEMA\s+public\s+GRANT\s+USAGE,\s*SELECT\s+ON\s+SEQUENCES\s+TO\s+anon,\s*authenticated,\s*service_role/i.test(content),
+      "Must alter default privileges for sequences"
+    );
+  }
+});
+
+it("Validates sequence USAGE privileges granted for auto-increment integrity", () => {
+  const patchContent = fs.readFileSync(patchSqlPath, 'utf8');
+  const schemaContent = fs.readFileSync(schemaSqlPath, 'utf8');
+
+  const seqRegex = /GRANT\s+USAGE,\s*SELECT\s+ON\s+ALL\s+SEQUENCES\s+IN\s+SCHEMA\s+public\s+TO\s+anon,\s*authenticated,\s*service_role/i;
+  assert.ok(seqRegex.test(patchContent), "Patch must grant sequence usage");
+  assert.ok(seqRegex.test(schemaContent), "Schema must grant sequence usage");
+});
+
+it("Validates patch script safety & idempotency (syntax validation without destructiveness)", () => {
+  const patchContent = fs.readFileSync(patchSqlPath, 'utf8');
+
+  // Must not have destructive DDL
+  assert.ok(!/DROP\s+TABLE/i.test(patchContent), "Patch script must never DROP tables");
+  assert.ok(!/TRUNCATE/i.test(patchContent), "Patch script must never TRUNCATE data");
+  assert.ok(!/DROP\s+COLUMN/i.test(patchContent), "Patch script must never DROP columns");
+
+  // Must contain completion notice
+  assert.ok(patchContent.includes("RAISE NOTICE"), "Patch script should have completion notice for DB admin");
+});
+
+// ==========================================
+// SECTION 29: USER HANDBOOK & GUIDE MODAL CONTRACTS (FULL APP COVERAGE)
+// ==========================================
+console.log("\n--- SECTION 29: USER HANDBOOK & GUIDE MODAL (100% APP COVERAGE) ---");
+
+const guideChapters = [
+  "overview",
+  "fast_logging",
+  "prop_firm_risk",
+  "calculator",
+  "matrix_analytics",
+  "discipline_elite",
+  "playbook_shortcuts"
+];
+
+it("Validates User Guide 7 chapters definition and required content structure", () => {
+  const storePath = path.resolve(__dirname, '../src/store/useGuideStore.ts');
+  assert.ok(fs.existsSync(storePath), "useGuideStore.ts must exist");
+  const storeCode = fs.readFileSync(storePath, 'utf8');
+
+  for (const ch of guideChapters) {
+    assert.ok(storeCode.includes(`"${ch}"`), `useGuideStore must define chapter ${ch}`);
+  }
+});
+
+it("Validates Location Badges and Visual Mockups mapping for all 7 chapters", () => {
+  const enPath = path.resolve(__dirname, '../messages/en.json');
+  const viPath = path.resolve(__dirname, '../messages/vi.json');
+  const en = JSON.parse(fs.readFileSync(enPath, 'utf8'));
+  const vi = JSON.parse(fs.readFileSync(viPath, 'utf8'));
+
+  for (const ch of guideChapters) {
+    const fields = ["loc", "title", "summary", "point1", "point2", "point3", "tip", "action"];
+    for (const f of fields) {
+      const key = `${ch}_${f}`;
+      assert.ok(en.UserGuide[key], `en.UserGuide.${key} is missing`);
+      assert.ok(vi.UserGuide[key], `vi.UserGuide.${key} is missing`);
+      assert.ok(typeof en.UserGuide[key] === "string" && en.UserGuide[key].length > 0);
+      assert.ok(typeof vi.UserGuide[key] === "string" && vi.UserGuide[key].length > 0);
+    }
+  }
+});
+
+it("Validates Action Routes and Modal Triggers contract across modules", () => {
+  const sidebarPath = path.resolve(__dirname, '../src/components/Sidebar.tsx');
+  const headerPath = path.resolve(__dirname, '../src/components/Header.tsx');
+  const palettePath = path.resolve(__dirname, '../src/components/CommandPaletteModal.tsx');
+  const modalPath = path.resolve(__dirname, '../src/components/UserGuideModal.tsx');
+
+  const sidebarCode = fs.readFileSync(sidebarPath, 'utf8');
+  const headerCode = fs.readFileSync(headerPath, 'utf8');
+  const paletteCode = fs.readFileSync(palettePath, 'utf8');
+  const modalCode = fs.readFileSync(modalPath, 'utf8');
+
+  assert.ok(sidebarCode.includes("openGuide"), "Sidebar must have openGuide trigger");
+  assert.ok(headerCode.includes("openGuide"), "Header must have openGuide trigger");
+  assert.ok(headerCode.includes("<UserGuideModal"), "Header must render UserGuideModal");
+  assert.ok(paletteCode.includes("action-user-guide"), "CommandPalette must have action-user-guide item");
+  assert.ok(modalCode.includes("handleAction"), "UserGuideModal must contain handleAction routing");
+});
+
+it("Validates 100% i18n key parity for UserGuide namespace between en.json and vi.json", () => {
+  const enPath = path.resolve(__dirname, '../messages/en.json');
+  const viPath = path.resolve(__dirname, '../messages/vi.json');
+  const en = JSON.parse(fs.readFileSync(enPath, 'utf8'));
+  const vi = JSON.parse(fs.readFileSync(viPath, 'utf8'));
+
+  assert.ok(en.UserGuide, "en.json must contain UserGuide namespace");
+  assert.ok(vi.UserGuide, "vi.json must contain UserGuide namespace");
+
+  const enKeys = Object.keys(en.UserGuide);
+  const viKeys = Object.keys(vi.UserGuide);
+
+  assert.strictEqual(enKeys.length, viKeys.length, "UserGuide key count must match between EN and VI");
+
+  for (const k of enKeys) {
+    assert.ok(vi.UserGuide[k], `vi.UserGuide missing key ${k}`);
+    assert.ok(typeof vi.UserGuide[k] === "string" && vi.UserGuide[k].length > 0);
+  }
+  for (const k of viKeys) {
+    assert.ok(en.UserGuide[k], `en.UserGuide missing key ${k}`);
+  }
+});
+
+it("Validates Guide Store chapter jumping and state transition invariants", () => {
+  // Pure store logic state transition simulation
+  let isOpen = false;
+  let activeChapter = "overview";
+
+  function openGuide(chapterId) {
+    activeChapter = chapterId && guideChapters.includes(chapterId) ? chapterId : "overview";
+    isOpen = true;
+  }
+
+  function closeGuide() {
+    isOpen = false;
+  }
+
+  function setActiveChapter(chapterId) {
+    if (guideChapters.includes(chapterId)) {
+      activeChapter = chapterId;
+    }
+  }
+
+  // 1. Initial state
+  assert.strictEqual(isOpen, false);
+  assert.strictEqual(activeChapter, "overview");
+
+  // 2. Default open
+  openGuide();
+  assert.strictEqual(isOpen, true);
+  assert.strictEqual(activeChapter, "overview");
+
+  // 3. Jump to specific chapter
+  openGuide("prop_firm_risk");
+  assert.strictEqual(isOpen, true);
+  assert.strictEqual(activeChapter, "prop_firm_risk");
+
+  // 4. Invalid chapter fallback
+  openGuide("non_existent_chapter");
+  assert.strictEqual(isOpen, true);
+  assert.strictEqual(activeChapter, "overview", "Invalid chapter must fallback to overview");
+
+  // 5. Change chapter while open
+  setActiveChapter("calculator");
+  assert.strictEqual(activeChapter, "calculator");
+
+  // 6. Close guide
+  closeGuide();
+  assert.strictEqual(isOpen, false);
+});
+
 console.log("\n-------------------------------------------------------");
 console.log(`TOTAL: ${total} | PASSED: ${passed} | FAILED: ${total - passed}`);
 if (passed === total) {

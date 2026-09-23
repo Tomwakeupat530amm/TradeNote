@@ -2,11 +2,12 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Bell, Search, Sparkles, Check, Trash2, Info, AlertTriangle, AlertCircle, Menu, X, Calculator, PlusCircle, Volume2, VolumeX, ShieldAlert } from "lucide-react";
+import { Bell, Search, Sparkles, Check, Trash2, Info, AlertTriangle, AlertCircle, Menu, X, Calculator, PlusCircle, Volume2, VolumeX, ShieldAlert, HelpCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useNotificationStore } from "@/store/useNotificationStore";
 import { usePreferenceStore } from "@/store/usePreferenceStore";
+import { useGuideStore } from "@/store/useGuideStore";
 import clsx from "clsx";
 import { formatDistanceToNow } from "date-fns";
 import { LanguageSwitcher } from "./LanguageSwitcher";
@@ -16,6 +17,7 @@ import { PositionSizeCalculator } from "./PositionSizeCalculator";
 import { CommandPaletteModal } from "./CommandPaletteModal";
 import { QuickLogTradeModal } from "./QuickLogTradeModal";
 import { DisciplineShieldModal } from "./DisciplineShieldModal";
+import { UserGuideModal } from "./UserGuideModal";
 import { isSoundEnabled, toggleSound } from "@/lib/soundEngine";
 
 export function Header() {
@@ -184,6 +186,19 @@ export function Header() {
           >
             <ShieldAlert className="h-4 w-4 text-indigo-400" />
             <span className="hidden xl:inline">Zen Shield</span>
+          </motion.button>
+
+          {/* User Guide Handbook Quick Trigger */}
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            type="button"
+            onClick={() => useGuideStore.getState().openGuide()}
+            title={t('tooltip_guide')}
+            className="relative p-2.5 rounded-xl text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all cursor-pointer shadow-xs"
+          >
+            <span className="sr-only">User Guide</span>
+            <HelpCircle className="h-4 w-4 text-emerald-400" />
           </motion.button>
           
           {/* Notifications Dropdown */}
@@ -368,6 +383,12 @@ export function Header() {
       isOpen={isShieldOpen}
       onClose={() => setIsShieldOpen(false)}
       initialReason="manual"
+    />
+
+    {/* User Handbook & Guide Modal */}
+    <UserGuideModal
+      onOpenQuickLog={() => setIsQuickLogOpen(true)}
+      onOpenCalculator={() => setIsCalculatorOpen(true)}
     />
     </>
   );

@@ -5,6 +5,7 @@ import { useRouter } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
 import { useTradeStore } from "@/store/useTradeStore";
 import { useAccountStore } from "@/store/useAccountStore";
+import { useGuideStore } from "@/store/useGuideStore";
 import {
   Search,
   LayoutDashboard,
@@ -96,6 +97,20 @@ export function CommandPaletteModal({
         onSelect: () => {
           onClose();
           router.push("/journal?action=new");
+        },
+      },
+      {
+        id: "action-user-guide",
+        category: "action",
+        categoryLabel: t("tab_actions"),
+        title: t("action_guide_title"),
+        subtitle: t("action_guide_desc"),
+        icon: BookOpen,
+        badge: t("action_guide_badge"),
+        badgeColor: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+        onSelect: () => {
+          onClose();
+          useGuideStore.getState().openGuide();
         },
       },
       {
