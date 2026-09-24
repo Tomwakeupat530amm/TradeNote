@@ -13,6 +13,7 @@ import { useTranslations } from "next-intl";
 import { Trade } from "@/store/useTradeStore";
 import { detectSession } from "@/lib/sessionUtils";
 import { useTagTranslation } from "@/hooks/useTagTranslation";
+import { getAssetBadgeStyle } from "@/lib/assetColors";
 
 interface TradeCardsViewProps {
   trades: Trade[];
@@ -80,14 +81,23 @@ export function TradeCardsView({
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-base font-black text-white font-mono tracking-tight">
-                        {trade.asset}
-                      </span>
+                      {(() => {
+                        const assetStyle = getAssetBadgeStyle(trade.asset);
+                        return (
+                          <span className={clsx(
+                            "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-black font-mono tracking-tight border shadow-2xs",
+                            assetStyle.bg, assetStyle.text, assetStyle.border
+                          )}>
+                            <span className={clsx("w-1.5 h-1.5 rounded-full shrink-0", assetStyle.dot)} />
+                            {trade.asset}
+                          </span>
+                        );
+                      })()}
                       <span className="text-xs font-mono text-gray-400">
                         ({trade.lotSize}L)
                       </span>
                     </div>
-                    <span className="text-[11px] text-gray-400 block mt-0.5">
+                    <span className="text-[11px] text-gray-400 block mt-1">
                       {format(new Date(trade.date), "dd/MM/yyyy • HH:mm")}
                     </span>
                   </div>
@@ -111,10 +121,13 @@ export function TradeCardsView({
                 <div className="flex items-baseline justify-between py-1 border-y border-white/5">
                   <div className="flex flex-col">
                     <span className={clsx(
-                      "text-xl font-black font-mono tracking-tight tabular-nums",
+                      "text-xl font-black font-mono tracking-tight tabular-nums flex items-baseline gap-0.5",
                       trade.pnl > 0 ? "text-emerald-400" : trade.pnl < 0 ? "text-rose-400" : "text-gray-300"
                     )}>
-                      {trade.pnl > 0 ? `+$${trade.pnl.toLocaleString()}` : `$${trade.pnl.toLocaleString()}`}
+                      <span className="text-sm font-medium opacity-70">
+                        {trade.pnl > 0 ? "+$" : trade.pnl < 0 ? "-$" : "$"}
+                      </span>
+                      <span>{Math.abs(trade.pnl).toLocaleString()}</span>
                     </span>
                   </div>
 

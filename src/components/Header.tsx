@@ -2,12 +2,11 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Bell, Search, Sparkles, Check, Trash2, Info, AlertTriangle, AlertCircle, Menu, X, Calculator, PlusCircle, Volume2, VolumeX, ShieldAlert, HelpCircle } from "lucide-react";
+import { Bell, Search, Sparkles, Check, Trash2, Info, AlertTriangle, AlertCircle, Menu, X, Calculator, PlusCircle, Volume2, VolumeX, ShieldAlert, ShieldCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useNotificationStore } from "@/store/useNotificationStore";
 import { usePreferenceStore } from "@/store/usePreferenceStore";
-import { useGuideStore } from "@/store/useGuideStore";
 import clsx from "clsx";
 import { formatDistanceToNow } from "date-fns";
 import { LanguageSwitcher } from "./LanguageSwitcher";
@@ -187,19 +186,6 @@ export function Header() {
             <ShieldAlert className="h-4 w-4 text-indigo-400" />
             <span className="hidden xl:inline">Zen Shield</span>
           </motion.button>
-
-          {/* User Guide Handbook Quick Trigger */}
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            type="button"
-            onClick={() => useGuideStore.getState().openGuide()}
-            title={t('tooltip_guide')}
-            className="relative p-2.5 rounded-xl text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all cursor-pointer shadow-xs"
-          >
-            <span className="sr-only">User Guide</span>
-            <HelpCircle className="h-4 w-4 text-emerald-400" />
-          </motion.button>
           
           {/* Notifications Dropdown */}
           <div className="relative" ref={dropdownRef}>
@@ -242,11 +228,19 @@ export function Header() {
                     </div>
                   </div>
                   
+                  {/* Live Discipline & Risk Health Indicator */}
+                  <div className="px-4 py-2.5 bg-emerald-500/10 border-b border-emerald-500/15 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 text-emerald-300 font-medium">
+                      <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
+                      <span>{t('risk_status_safe')}</span>
+                    </div>
+                  </div>
+
                   <div className="max-h-96 overflow-y-auto">
                     {notifications.length === 0 ? (
                       <div className="p-8 text-center text-sm text-gray-500 flex flex-col items-center">
                         <Bell className="h-8 w-8 text-gray-700 mb-2" />
-                        No notifications yet.
+                        {t('no_notifications')}
                       </div>
                     ) : (
                       <ul className="divide-y divide-white/5">

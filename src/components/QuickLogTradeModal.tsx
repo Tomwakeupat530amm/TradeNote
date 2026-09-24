@@ -18,6 +18,7 @@ import clsx from "clsx";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/routing";
 import { processClipboardImage } from "@/lib/imageCompressor";
+import { getAssetBadgeStyle } from "@/lib/assetColors";
 
 interface QuickLogTradeModalProps {
   isOpen: boolean;
@@ -60,6 +61,18 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pnlInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus PnL input when modal opens for instant typing
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        pnlInputRef.current?.focus();
+        pnlInputRef.current?.select();
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
 
   // Discipline Shield Cooldown Check
   const [cooldownRemaining, setCooldownRemaining] = useState<number | null>(null);
@@ -400,21 +413,28 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
                     className="w-36 rounded-xl bg-gray-950/80 border border-white/10 px-3.5 py-2 text-sm font-bold font-mono text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 uppercase"
                   />
                   <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto py-1">
-                    {QUICK_ASSETS.map((item) => (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => setAsset(item)}
-                        className={clsx(
-                          "px-2.5 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all border",
-                          asset === item
-                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-xs"
-                            : "bg-white/5 text-gray-400 border-white/5 hover:text-white hover:bg-white/10"
-                        )}
-                      >
-                        {item}
-                      </button>
-                    ))}
+                    {QUICK_ASSETS.map((item) => {
+                      const style = getAssetBadgeStyle(item);
+                      const isSelected = asset === item;
+                      return (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() => setAsset(item)}
+                          className={clsx(
+                            "px-2.5 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all border active:scale-[0.96]",
+                            isSelected
+                              ? clsx(style.bg, style.text, style.border, "shadow-sm ring-1 ring-white/20")
+                              : "bg-white/5 text-gray-400 border-white/5 hover:text-white hover:bg-white/10"
+                          )}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span className={clsx("w-1.5 h-1.5 rounded-full shrink-0", isSelected ? style.dot : "bg-gray-500")} />
+                            {item}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -431,7 +451,7 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
                         type="button"
                         onClick={() => setPnlSign("+")}
                         className={clsx(
-                          "px-2.5 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1",
+                          "px-2.5 py-1 rounded text-xs font-bold transition-all flex items-center gap-1 active:scale-[0.96]",
                           pnlSign === "+" ? "bg-emerald-600 text-white shadow-xs" : "text-gray-400 hover:text-white"
                         )}
                       >
@@ -442,7 +462,7 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
                         type="button"
                         onClick={() => setPnlSign("-")}
                         className={clsx(
-                          "px-2.5 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1",
+                          "px-2.5 py-1 rounded text-xs font-bold transition-all flex items-center gap-1 active:scale-[0.96]",
                           pnlSign === "-" ? "bg-rose-600 text-white shadow-xs" : "text-gray-400 hover:text-white"
                         )}
                       >
@@ -453,19 +473,40 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
                   </div>
                   <div className="relative">
                     <span className={clsx(
-                      "absolute inset-y-0 left-0 pl-3.5 flex items-center text-base font-bold",
+                      "absolute inset-y-0 left-0 pl-3.5 flex items-center text-base font-bold select-none",
                       pnlSign === "+" ? "text-emerald-400" : "text-rose-400"
                     )}>
                       {pnlSign === "+" ? "+$" : "-$"}
                     </span>
                     <input
+                      ref={pnlInputRef}
                       type="number"
                       step="any"
                       required
                       value={pnl}
-                      onChange={(e) => setPnl(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "-") {
+                          e.preventDefault();
+                          setPnlSign("-");
+                        } else if (e.key === "+") {
+                          e.preventDefault();
+                          setPnlSign("+");
+                        }
+                      }}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val.includes("-")) {
+                          setPnlSign("-");
+                          setPnl(val.replace(/-/g, ""));
+                        } else if (val.includes("+")) {
+                          setPnlSign("+");
+                          setPnl(val.replace(/\+/g, ""));
+                        } else {
+                          setPnl(val);
+                        }
+                      }}
                       placeholder="0.00"
-                      className="w-full rounded-xl bg-gray-950/80 border border-white/10 pl-10 pr-4 py-2.5 text-lg font-bold font-mono tabular-nums text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      className="w-full rounded-xl bg-gray-950/80 border border-white/10 pl-10 pr-4 py-2.5 text-lg font-bold font-mono tabular-nums text-white focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
                     />
                   </div>
                 </div>
@@ -637,14 +678,14 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
                   <button
                     type="button"
                     onClick={onClose}
-                    className="px-4 py-2 text-xs font-semibold text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-colors"
+                    className="px-4 py-2 text-xs font-semibold text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-all active:scale-[0.97] cursor-pointer"
                   >
                     {c("cancel")}
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="flex items-center gap-2 px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 rounded-xl transition-all shadow-md shadow-emerald-500/20 disabled:opacity-50"
+                    className="flex items-center gap-2 px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 rounded-xl transition-all shadow-md shadow-emerald-500/20 disabled:opacity-50 active:scale-[0.97] cursor-pointer"
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>{isSubmitting ? c("saving") : t("save_trade_btn")}</span>

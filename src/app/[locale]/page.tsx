@@ -55,6 +55,10 @@ export default function Dashboard() {
   // Use RPC stats if available, fallback to local calculation
   const totalPnL = accountStats ? accountStats.total_pnl : accountTrades.reduce((acc, trade) => acc + trade.pnl, 0);
   const currentBalance = activeAccount.initialBalance + totalPnL;
+  const isPersonalAccount = Boolean(activeAccount.type && activeAccount.type.toLowerCase().includes("personal"));
+  const capitalGrowthPercent = activeAccount.initialBalance > 0
+    ? ((totalPnL / activeAccount.initialBalance) * 100)
+    : 0;
 
   // R-Multiple calculations
   const totalR = accountTrades.reduce((acc, trade) => {
@@ -273,68 +277,111 @@ export default function Dashboard() {
           </div>
         </motion.div>
 
-        {/* Profit Target Card */}
-        <motion.div variants={itemVariants} className="relative overflow-hidden rounded-3xl border border-white/5 bg-gray-900/40 backdrop-blur-xl p-6 shadow-2xl group hover:bg-gray-900/60 transition-all sm:col-span-2 lg:col-span-2 hover:border-white/10 hover:shadow-[0_0_40px_rgba(34,197,94,0.1)]">
-          <div className="absolute inset-0 bg-gradient-to-br from-green-500/0 via-transparent to-transparent group-hover:from-green-500/5 transition-colors duration-500 pointer-events-none" />
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 group-hover:scale-110 transition-all duration-500">
-            <Target className="w-24 h-24 text-green-400" />
-          </div>
-          <div className="relative z-10">
-            <div className="flex justify-between items-start">
-              <dt className="truncate text-sm font-medium text-gray-400 flex items-center gap-2">
-                <div className="p-1.5 bg-green-500/20 rounded-lg"><Target className="w-4 h-4 text-green-400" /></div>
-                {t('profit_target_progress')}
-              </dt>
-              <span className={clsx(
-                "text-xs font-semibold px-2.5 py-1 rounded-lg border",
-                activeAccount.rules.profitTarget && totalPnL >= activeAccount.rules.profitTarget
-                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
-                  : "bg-white/5 text-gray-400 border-white/10"
-              )}>
-                {activeAccount.rules.profitTarget && totalPnL >= activeAccount.rules.profitTarget
-                  ? t('target_passed')
-                  : `${t('target')}: ${activeAccount.rules.profitTarget ? `$${activeAccount.rules.profitTarget.toLocaleString()}` : "N/A"}`}
-              </span>
+        {/* Adaptive Card: Personal Capital Growth vs Prop Firm Profit Target */}
+        {isPersonalAccount ? (
+          <motion.div variants={itemVariants} className="relative overflow-hidden rounded-3xl border border-white/5 bg-gray-900/40 backdrop-blur-xl p-6 shadow-2xl group hover:bg-gray-900/60 transition-all sm:col-span-2 lg:col-span-2 hover:border-white/10 hover:shadow-[0_0_40px_rgba(16,185,129,0.1)]">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/0 via-transparent to-transparent group-hover:from-emerald-500/5 transition-colors duration-500 pointer-events-none" />
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 group-hover:scale-110 transition-all duration-500">
+              <TrendingUp className="w-24 h-24 text-emerald-400" />
             </div>
-            
-            <div className="mt-4 flex items-baseline gap-2">
-              <span className="text-4xl font-bold tracking-tight text-white">
-                ${Math.max(0, totalPnL).toLocaleString()}
-              </span>
-              <span className="text-sm text-gray-400">{t('earned')}</span>
-            </div>
+            <div className="relative z-10">
+              <div className="flex justify-between items-start">
+                <dt className="truncate text-sm font-medium text-gray-400 flex items-center gap-2">
+                  <div className="p-1.5 bg-emerald-500/20 rounded-lg"><TrendingUp className="w-4 h-4 text-emerald-400" /></div>
+                  {t('capital_growth')}
+                </dt>
+                <span className={clsx(
+                  "text-xs font-semibold px-2.5 py-1 rounded-lg border",
+                  capitalGrowthPercent >= 0
+                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                    : "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                )}>
+                  {t('net_roi')}: {capitalGrowthPercent >= 0 ? `+${capitalGrowthPercent.toFixed(2)}%` : `${capitalGrowthPercent.toFixed(2)}%`}
+                </span>
+              </div>
+              
+              <div className="mt-4 flex items-baseline gap-2">
+                <span className={clsx("text-4xl font-bold tracking-tight font-mono", totalPnL >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                  {totalPnL >= 0 ? `+$${totalPnL.toLocaleString()}` : `-$${Math.abs(totalPnL).toLocaleString()}`}
+                </span>
+                <span className="text-sm text-gray-400">{t('personal_growth_desc')}</span>
+              </div>
 
-            {activeAccount.rules.profitTarget && (
-              <div className="mt-5 relative">
-                <div className="w-full bg-gray-950/50 rounded-full h-3 overflow-hidden border border-white/10 shadow-inner relative">
-                  {/* Background Track */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-gray-800 to-gray-700 opacity-30" />
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.min((Math.max(0, totalPnL) / activeAccount.rules.profitTarget) * 100, 100)}%` }}
-                    transition={{ duration: 1.5, ease: "easeOut", delay: 0.2 }}
-                    className="bg-gradient-to-r from-green-500 to-emerald-400 h-full rounded-full relative shadow-[0_0_10px_rgba(52,211,153,0.5)]"
-                  >
-                    <div className="absolute inset-0 bg-white/20 w-full h-full animate-pulse rounded-full"></div>
-                    <div className="absolute right-0 top-0 bottom-0 w-4 bg-white/30 rounded-full animate-ping opacity-50"></div>
-                  </motion.div>
+              <div className="mt-5 grid grid-cols-2 gap-3 pt-3 border-t border-white/5 text-xs">
+                <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                  <span className="text-gray-400 block text-[11px]">{t('initial_deposit')}</span>
+                  <span className="font-bold text-white font-mono text-sm">${activeAccount.initialBalance.toLocaleString()}</span>
                 </div>
-                <div className="mt-2 flex justify-between text-xs font-medium">
-                  <span>$0</span>
-                  {totalPnL >= activeAccount.rules.profitTarget ? (
-                    <span className="text-emerald-400 font-bold flex items-center gap-1">
-                      {t('target_exceeded', { exceeded: (totalPnL - activeAccount.rules.profitTarget).toLocaleString() })}
-                    </span>
-                  ) : (
-                    <span className="text-gray-500">
-                      {((Math.max(0, totalPnL) / activeAccount.rules.profitTarget) * 100).toFixed(1)}% {t('completed')}
-                    </span>
-                  )}
+                <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                  <span className="text-gray-400 block text-[11px]">{t('balance')}</span>
+                  <span className="font-bold text-white font-mono text-sm">${currentBalance.toLocaleString()}</span>
                 </div>
               </div>
-            )}
-          </div>
-        </motion.div>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div variants={itemVariants} className="relative overflow-hidden rounded-3xl border border-white/5 bg-gray-900/40 backdrop-blur-xl p-6 shadow-2xl group hover:bg-gray-900/60 transition-all sm:col-span-2 lg:col-span-2 hover:border-white/10 hover:shadow-[0_0_40px_rgba(34,197,94,0.1)]">
+            <div className="absolute inset-0 bg-gradient-to-br from-green-500/0 via-transparent to-transparent group-hover:from-green-500/5 transition-colors duration-500 pointer-events-none" />
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 group-hover:scale-110 transition-all duration-500">
+              <Target className="w-24 h-24 text-green-400" />
+            </div>
+            <div className="relative z-10">
+              <div className="flex justify-between items-start">
+                <dt className="truncate text-sm font-medium text-gray-400 flex items-center gap-2">
+                  <div className="p-1.5 bg-green-500/20 rounded-lg"><Target className="w-4 h-4 text-green-400" /></div>
+                  {t('profit_target_progress')}
+                </dt>
+                <span className={clsx(
+                  "text-xs font-semibold px-2.5 py-1 rounded-lg border",
+                  activeAccount.rules.profitTarget && totalPnL >= activeAccount.rules.profitTarget
+                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                    : "bg-white/5 text-gray-400 border-white/10"
+                )}>
+                  {activeAccount.rules.profitTarget && totalPnL >= activeAccount.rules.profitTarget
+                    ? t('target_passed')
+                    : `${t('target')}: ${activeAccount.rules.profitTarget ? `$${activeAccount.rules.profitTarget.toLocaleString()}` : "N/A"}`}
+                </span>
+              </div>
+              
+              <div className="mt-4 flex items-baseline gap-2">
+                <span className="text-4xl font-bold tracking-tight text-white">
+                  ${Math.max(0, totalPnL).toLocaleString()}
+                </span>
+                <span className="text-sm text-gray-400">{t('earned')}</span>
+              </div>
+
+              {activeAccount.rules.profitTarget && (
+                <div className="mt-5 relative">
+                  <div className="w-full bg-gray-950/50 rounded-full h-3 overflow-hidden border border-white/10 shadow-inner relative">
+                    {/* Background Track */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-gray-800 to-gray-700 opacity-30" />
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min((Math.max(0, totalPnL) / activeAccount.rules.profitTarget) * 100, 100)}%` }}
+                      transition={{ duration: 1.5, ease: "easeOut", delay: 0.2 }}
+                      className="bg-gradient-to-r from-green-500 to-emerald-400 h-full rounded-full relative shadow-[0_0_10px_rgba(52,211,153,0.5)]"
+                    >
+                      <div className="absolute inset-0 bg-white/20 w-full h-full animate-pulse rounded-full"></div>
+                      <div className="absolute right-0 top-0 bottom-0 w-4 bg-white/30 rounded-full animate-ping opacity-50"></div>
+                    </motion.div>
+                  </div>
+                  <div className="mt-2 flex justify-between text-xs font-medium">
+                    <span>$0</span>
+                    {totalPnL >= activeAccount.rules.profitTarget ? (
+                      <span className="text-emerald-400 font-bold flex items-center gap-1">
+                        {t('target_exceeded', { exceeded: (totalPnL - activeAccount.rules.profitTarget).toLocaleString() })}
+                      </span>
+                    ) : (
+                      <span className="text-gray-500">
+                        {((Math.max(0, totalPnL) / activeAccount.rules.profitTarget) * 100).toFixed(1)}% {t('completed')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
       </motion.div>
       <motion.div 
         variants={containerVariants}
@@ -365,7 +412,7 @@ export default function Dashboard() {
                 <ShieldAlert className={clsx("w-6 h-6", drawdownPercentage > 80 ? 'text-red-500' : 'text-gray-400')} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white">{t('drawdown_guard')}</h3>
+                <h3 className="text-lg font-bold text-white">{isPersonalAccount ? t('personal_guard') : t('drawdown_guard')}</h3>
                 <p className="text-sm text-gray-400">{t('limit')}: ${maxDrawdownLimit.toLocaleString()}</p>
               </div>
             </div>

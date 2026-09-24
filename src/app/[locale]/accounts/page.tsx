@@ -10,7 +10,7 @@ import { Link } from "@/i18n/routing";
 import { toast } from "sonner";
 import clsx from "clsx";
 
-type AccountStatus = "Challenge" | "Funded";
+type AccountStatus = "Challenge" | "Funded" | "Personal";
 type DrawdownMode = "End of Day" | "Intraday";
 
 export default function AccountsPage() {
@@ -241,6 +241,7 @@ export default function AccountsPage() {
                 <select id="status" name="status" value={status} onChange={e => setStatus(e.target.value as AccountStatus)} className="block w-full rounded-md border-0 bg-white/5 py-1.5 text-white shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-green-500 sm:text-sm sm:leading-6 px-3">
                   <option className="bg-gray-800" value="Challenge">{t('challenge')}</option>
                   <option className="bg-gray-800" value="Funded">{t('funded')}</option>
+                  <option className="bg-gray-800" value="Personal">{t('personal')}</option>
                 </select>
               </div>
             </div>
@@ -493,7 +494,14 @@ export default function AccountsPage() {
           <div key={account.id} className={`bg-gray-900 rounded-xl border p-6 flex flex-col ${activeAccountId === account.id ? 'border-green-500 ring-1 ring-green-500' : 'border-gray-800'}`}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-white">{account.name}</h3>
-              <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${account.type.includes('Challenge') ? 'bg-blue-500/10 text-blue-400 ring-blue-500/20' : 'bg-green-500/10 text-green-400 ring-green-500/20'}`}>
+              <span className={clsx(
+                "inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset",
+                account.type.includes('Personal')
+                  ? 'bg-purple-500/10 text-purple-400 ring-purple-500/20'
+                  : account.type.includes('Challenge')
+                  ? 'bg-blue-500/10 text-blue-400 ring-blue-500/20'
+                  : 'bg-green-500/10 text-green-400 ring-green-500/20'
+              )}>
                 {account.type}
               </span>
             </div>

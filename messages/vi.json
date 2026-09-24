@@ -29,7 +29,10 @@
     "calculator_btn": "Máy Tính",
     "quick_log_btn": "Ghi Lệnh",
     "tooltip_quick_log": "Ghi lệnh nhanh (Phím tắt: N)",
-    "tooltip_guide": "Sổ tay hướng dẫn sử dụng toàn diện"
+    "tooltip_guide": "Sổ tay hướng dẫn sử dụng toàn diện",
+    "risk_status_safe": "Tất cả giới hạn rủi ro & kỷ luật đang trong vùng an toàn",
+    "risk_status_alert": "Cảnh báo rủi ro đang hoạt động - Chú ý",
+    "risk_status_title": "Kỷ Luật & Bảo Vệ Rủi Ro"
   },
   "Sidebar": {
     "brand": "TradeNote",
@@ -155,7 +158,12 @@
     "detail_r_multiple": "Hệ số R-Multiple",
     "detail_session": "Phiên Giao Dịch",
     "btn_zoom_in": "Phóng to",
-    "btn_share": "Chia sẻ"
+    "btn_share": "Chia sẻ",
+    "capital_growth": "Tăng Trưởng Vốn",
+    "net_roi": "Tỉ Suất Sinh Lời",
+    "personal_guard": "Bảo Vệ Vốn Cá Nhân",
+    "personal_growth_desc": "Tăng trưởng tài khoản so với số vốn ban đầu",
+    "initial_deposit": "Vốn Ban Đầu"
   },
   "Journal": {
     "title": "Nhật ký Giao dịch",
@@ -351,6 +359,7 @@
     "status": "Trạng thái",
     "challenge": "Thử thách",
     "funded": "Đã cấp vốn",
+    "personal": "Tài khoản cá nhân",
     "rules_limits": "Quy tắc & Giới hạn Giao dịch",
     "profit_target_label": "Mục tiêu Lợi nhuận ($)",
     "max_positions_label": "Số vị thế mở tối đa",

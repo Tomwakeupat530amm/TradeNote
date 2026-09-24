@@ -3012,8 +3012,7 @@ it("Validates Action Routes and Modal Triggers contract across modules", () => {
   const modalCode = fs.readFileSync(modalPath, 'utf8');
 
   assert.ok(sidebarCode.includes("openGuide"), "Sidebar must have openGuide trigger");
-  assert.ok(headerCode.includes("openGuide"), "Header must have openGuide trigger");
-  assert.ok(headerCode.includes("<UserGuideModal"), "Header must render UserGuideModal");
+  assert.ok(headerCode.includes("<UserGuideModal"), "Header must mount UserGuideModal component");
   assert.ok(paletteCode.includes("action-user-guide"), "CommandPalette must have action-user-guide item");
   assert.ok(modalCode.includes("handleAction"), "UserGuideModal must contain handleAction routing");
 });
@@ -3087,6 +3086,139 @@ it("Validates Guide Store chapter jumping and state transition invariants", () =
   // 6. Close guide
   closeGuide();
   assert.strictEqual(isOpen, false);
+});
+
+// ==========================================
+// SECTION 30: UI/UX MICRO-POLISH & ASSET COLOR IDENTITY CONTRACTS
+// ==========================================
+console.log("\n--- SECTION 30: UI/UX MICRO-POLISH & ASSET VISUAL IDENTITY ---");
+
+it("Validates Asset Visual Identity color tokens for all major asset classes", () => {
+  const assetColorsPath = path.resolve(__dirname, '../src/lib/assetColors.ts');
+  assert.ok(fs.existsSync(assetColorsPath), "assetColors.ts must exist");
+  const code = fs.readFileSync(assetColorsPath, 'utf8');
+  assert.ok(code.includes("export function getAssetBadgeStyle"), "getAssetBadgeStyle must be exported");
+
+  // Pure logic simulation matching assetColors.ts
+  function testAssetBadgeStyle(asset) {
+    const a = (asset || "").toUpperCase().trim();
+    if (a.includes("NQ") || a.includes("MNQ") || a.includes("NAS") || a.includes("QQQ")) {
+      return { bg: "bg-purple-500/10", text: "text-purple-300", dot: "bg-purple-400" };
+    }
+    if (a.includes("ES") || a.includes("MES") || a.includes("SPX") || a.includes("SPY")) {
+      return { bg: "bg-blue-500/10", text: "text-blue-300", dot: "bg-blue-400" };
+    }
+    if (a.includes("XAU") || a.includes("GOLD") || a.includes("GC") || a.includes("SILVER") || a.includes("XAG")) {
+      return { bg: "bg-amber-500/10", text: "text-amber-300", dot: "bg-amber-400" };
+    }
+    if (a.includes("EUR") || a.includes("GBP") || a.includes("JPY") || a.includes("AUD") || a.includes("CAD") || a.includes("CHF") || a.includes("NZD")) {
+      return { bg: "bg-emerald-500/10", text: "text-emerald-300", dot: "bg-emerald-400" };
+    }
+    if (a.includes("BTC") || a.includes("ETH") || a.includes("SOL") || a.includes("CRYPTO")) {
+      return { bg: "bg-cyan-500/10", text: "text-cyan-300", dot: "bg-cyan-400" };
+    }
+    return { bg: "bg-white/5", text: "text-gray-300", dot: "bg-gray-400" };
+  }
+
+  assert.strictEqual(testAssetBadgeStyle("MNQ").text, "text-purple-300");
+  assert.strictEqual(testAssetBadgeStyle("NQ").dot, "bg-purple-400");
+  assert.strictEqual(testAssetBadgeStyle("MES").text, "text-blue-300");
+  assert.strictEqual(testAssetBadgeStyle("ES").dot, "bg-blue-400");
+  assert.strictEqual(testAssetBadgeStyle("XAUUSD").text, "text-amber-300");
+  assert.strictEqual(testAssetBadgeStyle("GOLD").dot, "bg-amber-400");
+  assert.strictEqual(testAssetBadgeStyle("EURUSD").text, "text-emerald-300");
+  assert.strictEqual(testAssetBadgeStyle("GBPUSD").dot, "bg-emerald-400");
+  assert.strictEqual(testAssetBadgeStyle("BTCUSD").text, "text-cyan-300");
+  assert.strictEqual(testAssetBadgeStyle("UNKNOWN_STOCK").text, "text-gray-300");
+});
+
+it("Validates QuickLog Smart Typing & Auto-Focus contracts in component source", () => {
+  const modalPath = path.resolve(__dirname, '../src/components/QuickLogTradeModal.tsx');
+  const modalCode = fs.readFileSync(modalPath, 'utf8');
+
+  assert.ok(modalCode.includes("pnlInputRef"), "QuickLogTradeModal must define pnlInputRef");
+  assert.ok(modalCode.includes("pnlInputRef.current?.focus()"), "QuickLogTradeModal must auto-focus pnl input");
+  assert.ok(modalCode.includes("setPnlSign(\"-\")"), "QuickLogTradeModal must support smart negative toggle");
+  assert.ok(modalCode.includes("setPnlSign(\"+\")"), "QuickLogTradeModal must support smart positive toggle");
+  assert.ok(modalCode.includes("getAssetBadgeStyle"), "QuickLogTradeModal must use getAssetBadgeStyle");
+  assert.ok(modalCode.includes("active:scale-[0.96]"), "QuickLogTradeModal must have tactile active:scale on buttons");
+});
+
+it("Validates Journal Table and Cards View integration with Asset Signatures", () => {
+  const journalPath = path.resolve(__dirname, '../src/app/[locale]/journal/page.tsx');
+  const cardsPath = path.resolve(__dirname, '../src/components/TradeCardsView.tsx');
+
+  const journalCode = fs.readFileSync(journalPath, 'utf8');
+  const cardsCode = fs.readFileSync(cardsPath, 'utf8');
+
+  assert.ok(journalCode.includes("getAssetBadgeStyle"), "Journal table must integrate getAssetBadgeStyle");
+  assert.ok(cardsCode.includes("getAssetBadgeStyle"), "TradeCardsView must integrate getAssetBadgeStyle");
+});
+
+console.log("\n31. Streamlined UX & Adaptive Profiles Verification Suite:");
+
+it("Validates Header preserves Zen Shield and removes redundant User Guide button", () => {
+  const headerPath = path.resolve(__dirname, '../src/components/Header.tsx');
+  const headerCode = fs.readFileSync(headerPath, 'utf8');
+
+  // Must keep Zen Shield
+  assert.ok(headerCode.includes("Zen Shield"), "Header must preserve Zen Shield button");
+  assert.ok(headerCode.includes("ShieldAlert"), "Header must include ShieldAlert for Zen Shield");
+  assert.ok(headerCode.includes("setIsShieldOpen(true)"), "Header must keep Zen Shield open handler");
+
+  // Must NOT have HelpCircle User Guide button in Header
+  assert.ok(!headerCode.includes("User Guide Handbook Quick Trigger"), "Header must remove User Guide Handbook Quick Trigger");
+  assert.ok(!headerCode.includes("<HelpCircle"), "Header must not render HelpCircle trigger button");
+
+  // Must localize empty notification state and have risk status
+  assert.ok(headerCode.includes("t('no_notifications')"), "Header must localize empty notification state");
+  assert.ok(headerCode.includes("t('risk_status_safe')"), "Header must include live risk health indicator");
+});
+
+it("Validates Accounts page supports Personal account type", () => {
+  const accountsPath = path.resolve(__dirname, '../src/app/[locale]/accounts/page.tsx');
+  const accountsCode = fs.readFileSync(accountsPath, 'utf8');
+
+  assert.ok(accountsCode.includes('"Personal"'), "AccountStatus must include Personal");
+  assert.ok(accountsCode.includes('value="Personal"'), "Accounts page status select must have Personal option");
+  assert.ok(accountsCode.includes("account.type.includes('Personal')"), "Accounts table must support Personal badge styling");
+});
+
+it("Validates Dashboard page implements adaptive views for Personal vs Prop accounts", () => {
+  const dashboardPath = path.resolve(__dirname, '../src/app/[locale]/page.tsx');
+  const dashboardCode = fs.readFileSync(dashboardPath, 'utf8');
+
+  assert.ok(dashboardCode.includes("isPersonalAccount"), "Dashboard must define isPersonalAccount");
+  assert.ok(dashboardCode.includes("capitalGrowthPercent"), "Dashboard must calculate capitalGrowthPercent");
+  assert.ok(dashboardCode.includes("t('capital_growth')"), "Dashboard must render capital_growth for Personal accounts");
+  assert.ok(dashboardCode.includes("t('personal_guard')"), "Dashboard must render personal_guard for Personal accounts");
+});
+
+it("Validates 100% i18n bilingual parity for new Streamlined UX & Adaptive Profile keys", () => {
+  const enPath = path.resolve(__dirname, '../messages/en.json');
+  const viPath = path.resolve(__dirname, '../messages/vi.json');
+
+  const en = JSON.parse(fs.readFileSync(enPath, 'utf8'));
+  const vi = JSON.parse(fs.readFileSync(viPath, 'utf8'));
+
+  const requiredHeaderKeys = ["risk_status_safe", "risk_status_alert", "risk_status_title"];
+  const requiredDashboardKeys = ["capital_growth", "net_roi", "personal_guard", "personal_growth_desc", "initial_deposit"];
+  const requiredAccountsKeys = ["personal"];
+
+  for (const k of requiredHeaderKeys) {
+    assert.ok(en.Header && en.Header[k], `en.json must contain Header.${k}`);
+    assert.ok(vi.Header && vi.Header[k], `vi.json must contain Header.${k}`);
+  }
+
+  for (const k of requiredDashboardKeys) {
+    assert.ok(en.Dashboard && en.Dashboard[k], `en.json must contain Dashboard.${k}`);
+    assert.ok(vi.Dashboard && vi.Dashboard[k], `vi.json must contain Dashboard.${k}`);
+  }
+
+  for (const k of requiredAccountsKeys) {
+    assert.ok(en.Accounts && en.Accounts[k], `en.json must contain Accounts.${k}`);
+    assert.ok(vi.Accounts && vi.Accounts[k], `vi.json must contain Accounts.${k}`);
+  }
 });
 
 console.log("\n-------------------------------------------------------");

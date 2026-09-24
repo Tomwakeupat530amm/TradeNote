@@ -8,6 +8,7 @@ import { useAccountStore } from "@/store/useAccountStore";
 import { usePreferenceStore } from "@/store/usePreferenceStore";
 import { usePlaybookStore } from "@/store/usePlaybookStore";
 import { detectSession, getSessionBadgeColor, TradingSession } from "@/lib/sessionUtils";
+import { getAssetBadgeStyle } from "@/lib/assetColors";
 import TradeDetailsModal from "@/components/TradeDetailsModal";
 import { EmptyState } from "@/components/EmptyState";
 import { JournalCalendarView } from "@/components/JournalCalendarView";
@@ -596,8 +597,19 @@ function JournalContent() {
                           {/* 2. Lệnh & Setup (28%) */}
                           <td className="py-3 px-3 text-sm">
                             <div className="flex flex-col gap-1">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-sm font-black text-white font-mono tracking-tight">{trade.asset}</span>
+                              <div className="flex items-center gap-2">
+                                {(() => {
+                                  const assetStyle = getAssetBadgeStyle(trade.asset);
+                                  return (
+                                    <span className={clsx(
+                                      "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-black font-mono tracking-tight border shadow-2xs",
+                                      assetStyle.bg, assetStyle.text, assetStyle.border
+                                    )}>
+                                      <span className={clsx("w-1.5 h-1.5 rounded-full shrink-0", assetStyle.dot)} />
+                                      {trade.asset}
+                                    </span>
+                                  );
+                                })()}
                                 <span className="text-xs font-medium text-gray-400 font-mono">({trade.lotSize}L)</span>
                               </div>
                               <div className="flex flex-wrap gap-1 items-center">
@@ -616,8 +628,14 @@ function JournalContent() {
                           {/* 3. Kết Quả (PnL & R) (22%) */}
                           <td className="py-3 px-3 text-sm font-bold">
                             <div className="flex flex-col gap-0.5">
-                              <span className={clsx("text-sm font-black tracking-tight font-mono tabular-nums", trade.pnl > 0 ? 'text-green-400' : trade.pnl < 0 ? 'text-red-400' : 'text-gray-400')}>
-                                ${trade.pnl > 0 ? `+${trade.pnl.toLocaleString()}` : trade.pnl.toLocaleString()}
+                              <span className={clsx(
+                                "text-sm font-black tracking-tight font-mono tabular-nums flex items-baseline gap-0.5",
+                                trade.pnl > 0 ? 'text-emerald-400' : trade.pnl < 0 ? 'text-rose-400' : 'text-gray-400'
+                              )}>
+                                <span className="text-xs font-medium opacity-70">
+                                  {trade.pnl > 0 ? "+$" : trade.pnl < 0 ? "-$" : "$"}
+                                </span>
+                                <span>{Math.abs(trade.pnl).toLocaleString()}</span>
                               </span>
                               {trade.rMultiple !== undefined && (
                                 <span className={clsx(

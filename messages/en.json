@@ -29,7 +29,10 @@
     "calculator_btn": "Calculator",
     "quick_log_btn": "Log Trade",
     "tooltip_quick_log": "Quick Log Trade (Hotkey: N)",
-    "tooltip_guide": "Comprehensive user handbook & guide"
+    "tooltip_guide": "Comprehensive user handbook & guide",
+    "risk_status_safe": "All risk limits & discipline rules are safe",
+    "risk_status_alert": "Active Risk Alert - Pay Attention",
+    "risk_status_title": "Discipline & Risk Guard"
   },
   "Sidebar": {
     "brand": "TradeNote",
@@ -155,7 +158,12 @@
     "detail_r_multiple": "R-Multiple",
     "detail_session": "Trading Session",
     "btn_zoom_in": "Zoom in",
-    "btn_share": "Share"
+    "btn_share": "Share",
+    "capital_growth": "Capital Growth",
+    "net_roi": "Net ROI",
+    "personal_guard": "Capital Preservation Guard",
+    "personal_growth_desc": "Account growth relative to initial deposit",
+    "initial_deposit": "Initial Capital"
   },
   "Journal": {
     "title": "Trading Journal",
@@ -351,6 +359,7 @@
     "status": "Status",
     "challenge": "Challenge",
     "funded": "Funded",
+    "personal": "Personal",
     "rules_limits": "Trading Rules & Limits",
     "profit_target_label": "Profit Target ($)",
     "max_positions_label": "Max Open Positions",
