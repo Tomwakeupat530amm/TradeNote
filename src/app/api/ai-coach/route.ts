@@ -121,8 +121,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const primaryModel = process.env.OPENROUTER_MODEL || "deepseek/deepseek-v4-flash-0731:free";
-    const fallbackModel = "qwen/qwen3.8-27b:free";
+    const primaryModel = process.env.OPENROUTER_MODEL || "inclusionai/ling-3.0-flash-fin:free";
+    const candidateModels = [
+      primaryModel,
+      "nex-agi/nex-n2.5-pro:free",
+      "liquid/lfm-2.5-2.6b:free",
+      "nvidia/nemotron-3.5-lightning:free",
+    ].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx);
 
     const systemPrompt = isEnglish
       ? `You are a Senior Prop Firm Risk Manager and Behavioral Trading Psychology Specialist.
@@ -152,53 +157,73 @@ NGUYÊN TẮC BẮT BUỘC:
       ? `Here is my verified trading performance data:\n${JSON.stringify(payload, null, 2)}\n\nPlease diagnose and return the required 4-field JSON object in English.`
       : `Dưới đây là dữ liệu thống kê giao dịch thực tế của tôi:\n${JSON.stringify(payload, null, 2)}\n\nHãy phân tích và trả về đúng định dạng JSON 4 trường.`;
 
-    // Helper to call OpenRouter
+    // Helper to call OpenRouter with a 15-second per-model abort timeout
     const callOpenRouter = async (model: string) => {
-      return fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-          "HTTP-Referer": "https://tradenote.local",
-          "X-Title": "TradeNote Prop Journal"
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userMessage }
-          ],
-          temperature: 0.3,
-          response_format: { type: "json_object" }
-        })
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      try {
+        return await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+            "HTTP-Referer": "https://tradenote.local",
+            "X-Title": "TradeNote Prop Journal"
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userMessage }
+            ],
+            temperature: 0.3
+          }),
+          signal: controller.signal
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
     };
 
-    let response = await callOpenRouter(primaryModel);
-    
-    // Fallback if primary model fails
-    if (!response.ok) {
-      console.warn(`Primary model ${primaryModel} failed with ${response.status}. Retrying with fallback: ${fallbackModel}`);
-      response = await callOpenRouter(fallbackModel);
+    let response: Response | null = null;
+    let selectedModel = primaryModel;
+    let lastStatus = 500;
+    let lastErrorText = "";
+
+    // Waterfall cascade across candidate models
+    for (const model of candidateModels) {
+      try {
+        const res = await callOpenRouter(model);
+        if (res.ok) {
+          response = res;
+          selectedModel = model;
+          break;
+        } else {
+          lastStatus = res.status;
+          lastErrorText = await res.text();
+          console.warn(`Candidate model ${model} failed with ${res.status}. Cascading to next fallback...`);
+        }
+      } catch (err: unknown) {
+        console.warn(`Candidate model ${model} threw error:`, err);
+      }
     }
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error(`OpenRouter API error (${response.status}):`, errText);
+    if (!response || !response.ok) {
+      console.error(`All candidate OpenRouter models failed. Last error (${lastStatus}):`, lastErrorText);
       const friendlyMessage = isEnglish
-        ? (response.status === 429
-            ? "AI service is currently busy. Please wait a moment and try again."
-            : response.status === 401 || response.status === 403
+        ? (lastStatus === 429
+            ? "AI service is currently busy across provider pools. Please wait a moment and try again."
+            : lastStatus === 401 || lastStatus === 403
             ? "AI service configuration error. Please contact administrator."
             : "Unable to reach AI diagnostics service. Please try again shortly.")
-        : (response.status === 429
-            ? "Dịch vụ AI đang tạm thời quá tải lượt gọi. Vui lòng thử lại sau ít phút."
-            : response.status === 401 || response.status === 403
-            ? "Lỗi cấu hình dịch vụ AI. Vui lòng liên hệ quản trị viên."
+        : (lastStatus === 429
+            ? "Dịch vụ AI đang tạm thời bận lượt gọi trên tất cả các cụm máy chủ. Vui lòng thử lại sau ít phút."
+            : lastStatus === 401 || lastStatus === 403
+            ? "Lỗi cấu hình dịch vụ AI. Vui lòng kiểm tra API Key."
             : "Không thể kết nối đến máy chủ khám bệnh AI. Vui lòng thử lại sau ít phút.");
       return NextResponse.json(
         { error: friendlyMessage },
-        { status: response.status }
+        { status: lastStatus }
       );
     }
 
@@ -227,14 +252,14 @@ NGUYÊN TẮC BẮT BUỘC:
       const parsed = JSON.parse(cleanedContent) as AICoachResponse;
       return NextResponse.json({
         success: true,
-        model: data.model || primaryModel,
+        model: data.model || selectedModel,
         analysis: parsed
       });
     } catch {
       // If parsing fails, wrap the raw content into the structure
       return NextResponse.json({
         success: true,
-        model: data.model || primaryModel,
+        model: data.model || selectedModel,
         analysis: {
           big_leak: rawContent,
           real_edge: isEnglish ? "Need more trades to extract statistical edge." : "Cần tích lũy thêm dữ liệu để bóc tách thế mạnh.",

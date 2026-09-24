@@ -3221,6 +3221,27 @@ it("Validates 100% i18n bilingual parity for new Streamlined UX & Adaptive Profi
   }
 });
 
+console.log("\n32. AI Coach Zero-Downtime Resilience & Multi-Tier Waterfall Fallback:");
+
+it("Validates AI Coach route implements Multi-Tier Waterfall Fallback with healthy models", () => {
+  const routePath = path.resolve(__dirname, '../src/app/api/ai-coach/route.ts');
+  const routeCode = fs.readFileSync(routePath, 'utf8');
+
+  // Verify deprecated model is completely gone
+  assert.ok(!routeCode.includes("deepseek/deepseek-v4-flash-0731:free"), "Deprecated 404 model must be removed");
+
+  // Verify primary model and candidate list
+  assert.ok(routeCode.includes("inclusionai/ling-3.0-flash-fin:free"), "Primary model default must be inclusionai/ling-3.0-flash-fin:free");
+  assert.ok(routeCode.includes("nex-agi/nex-n2.5-pro:free"), "Fallback tier 1 must include nex-agi/nex-n2.5-pro:free");
+  assert.ok(routeCode.includes("liquid/lfm-2.5-2.6b:free"), "Fallback tier 2 must include liquid/lfm-2.5-2.6b:free");
+  assert.ok(routeCode.includes("nvidia/nemotron-3.5-lightning:free"), "Fallback tier 3 must include nvidia/nemotron-3.5-lightning:free");
+
+  // Verify cascade iteration and abort controller
+  assert.ok(routeCode.includes("for (const model of candidateModels)"), "Route must iterate through candidate models");
+  assert.ok(routeCode.includes("new AbortController()"), "Route must wrap each call in AbortController timeout");
+  assert.ok(routeCode.includes("model: data.model || selectedModel"), "Route must return the actual winning model name");
+});
+
 console.log("\n-------------------------------------------------------");
 console.log(`TOTAL: ${total} | PASSED: ${passed} | FAILED: ${total - passed}`);
 if (passed === total) {
