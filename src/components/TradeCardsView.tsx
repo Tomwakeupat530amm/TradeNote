@@ -137,16 +137,16 @@ export function TradeCardsView({
                         "text-xs font-mono font-bold px-2 py-0.5 rounded-lg border tabular-nums",
                         trade.rMultiple > 0 ? "text-emerald-300 bg-emerald-500/15 border-emerald-500/30" :
                         trade.rMultiple < 0 ? "text-rose-300 bg-rose-500/15 border-rose-500/30" :
-                        "text-gray-400 bg-gray-500/10 border-gray-500/20"
+                        "text-zinc-400 bg-zinc-800/40 border-zinc-700/50"
                       )}>
                         {trade.rMultiple > 0 ? `+${trade.rMultiple.toFixed(2)}R` : `${trade.rMultiple.toFixed(2)}R`}
                       </span>
                     )}
                     <span className={clsx(
-                      "text-[10px] font-bold uppercase px-1.5 py-0.5 rounded",
-                      trade.result === "Win" ? "bg-emerald-500/20 text-emerald-300" :
-                      trade.result === "Loss" ? "bg-rose-500/20 text-rose-300" :
-                      "bg-gray-500/20 text-gray-300"
+                      "text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border",
+                      trade.result === "Win" ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" :
+                      trade.result === "Loss" ? "bg-rose-500/20 text-rose-300 border-rose-500/30" :
+                      "bg-zinc-800/90 text-zinc-200 border-zinc-700/70 shadow-2xs"
                     )}>
                       {trade.result}
                     </span>

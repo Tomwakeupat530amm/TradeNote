@@ -15,7 +15,7 @@ import { JournalCalendarView } from "@/components/JournalCalendarView";
 import { TradeSlideOverDrawer } from "@/components/TradeSlideOverDrawer";
 import { TradeCardsView } from "@/components/TradeCardsView";
 import { ShareTradeModal } from "@/components/ShareTradeModal";
-import { PlusCircle, Trash2, AlignJustify, ChevronDown, ChevronLeft, ChevronRight, Calendar as CalendarIcon, BookOpen, RotateCcw, AlertTriangle, Lock, LayoutList, LayoutGrid } from "lucide-react";
+import { PlusCircle, Trash2, AlignJustify, ChevronDown, ChevronLeft, ChevronRight, Calendar as CalendarIcon, BookOpen, RotateCcw, AlertTriangle, Lock, LayoutList, LayoutGrid, Edit3, Image as ImageIcon, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -559,24 +559,26 @@ function JournalContent() {
                   <table className="table-fixed w-full divide-y divide-white/5">
                     <thead className="bg-gray-950/90 backdrop-blur-xl sticky top-0 z-20 shadow-md">
                       <tr>
-                        <th scope="col" className="w-[20%] py-3 pl-5 pr-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('col_time_session')}</th>
-                        <th scope="col" className="w-[28%] px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('col_asset_setup')}</th>
-                        <th scope="col" className="w-[22%] px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('col_result_pnl_r')}</th>
-                        <th scope="col" className="w-[30%] py-3 pl-3 pr-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('col_discipline_tags')}</th>
+                        <th scope="col" className="w-[16%] py-3 pl-5 pr-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('col_time_session')}</th>
+                        <th scope="col" className="w-[32%] px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('col_asset_setup')}</th>
+                        <th scope="col" className="w-[20%] px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('col_result_pnl_r')}</th>
+                        <th scope="col" className="w-[32%] py-3 pl-3 pr-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('col_discipline_tags')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5 bg-transparent">
                       <AnimatePresence>
-                        {paginatedTrades.map((trade) => (
-                        <motion.tr 
-                          key={trade.id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, x: -20 }}
-                          onClick={() => setSelectedTrade(trade)}
-                          className="hover:bg-white/[0.04] transition-colors group cursor-pointer"
-                        >
-                          {/* 1. Thời Gian & Phiên (20%) */}
+                        {paginatedTrades.map((trade) => {
+                          const isBreakEven = trade.result === "Break Even" || trade.pnl === 0;
+                          return (
+                          <motion.tr 
+                            key={trade.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            onClick={() => setSelectedTrade(trade)}
+                            className="border-b border-white/[0.06] hover:bg-white/[0.04] transition-colors group cursor-pointer"
+                          >
+                          {/* 1. Thời Gian & Phiên (16%) */}
                           <td className="py-3 pl-5 pr-2 text-sm">
                             <div className="flex flex-col gap-1">
                               <span className="text-xs font-semibold text-gray-300">
@@ -594,7 +596,7 @@ function JournalContent() {
                             </div>
                           </td>
 
-                          {/* 2. Lệnh & Setup (28%) */}
+                          {/* 2. Lệnh & Setup (32%) */}
                           <td className="py-3 px-3 text-sm">
                             <div className="flex flex-col gap-1">
                               <div className="flex items-center gap-2">
@@ -621,36 +623,57 @@ function JournalContent() {
                                     ⭐ A+
                                   </span>
                                 )}
+                                {trade.screenshotUrl && (
+                                  <span title={t('has_screenshot')} className="inline-flex items-center gap-0.5 rounded-md bg-sky-500/15 border border-sky-500/30 px-1.5 py-0.5 text-[10px] font-medium text-sky-300">
+                                    <ImageIcon className="w-3 h-3" />
+                                  </span>
+                                )}
+                                {trade.notes && trade.notes.trim().length > 0 && (
+                                  <span title={t('has_notes')} className="inline-flex items-center gap-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
+                                    <FileText className="w-3 h-3" />
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </td>
 
-                          {/* 3. Kết Quả (PnL & R) (22%) */}
+                          {/* 3. Kết Quả (PnL & R) (20%) */}
                           <td className="py-3 px-3 text-sm font-bold">
-                            <div className="flex flex-col gap-0.5">
-                              <span className={clsx(
-                                "text-sm font-black tracking-tight font-mono tabular-nums flex items-baseline gap-0.5",
-                                trade.pnl > 0 ? 'text-emerald-400' : trade.pnl < 0 ? 'text-rose-400' : 'text-gray-400'
-                              )}>
-                                <span className="text-xs font-medium opacity-70">
-                                  {trade.pnl > 0 ? "+$" : trade.pnl < 0 ? "-$" : "$"}
+                            {isBreakEven ? (
+                              <div className="flex flex-col gap-1 items-start">
+                                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-800/90 border border-zinc-700 text-zinc-200 font-mono text-xs font-bold shadow-xs">
+                                  <span className="text-[9px] px-1 py-0.2 rounded bg-zinc-700/80 text-zinc-300 font-bold uppercase tracking-wider">{t('badge_be')}</span>
+                                  <span>$0.00</span>
+                                </div>
+                                <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded border border-zinc-700/60 bg-zinc-800/40 text-zinc-400 tabular-nums">
+                                  0.00R
                                 </span>
-                                <span>{Math.abs(trade.pnl).toLocaleString()}</span>
-                              </span>
-                              {trade.rMultiple !== undefined && (
+                              </div>
+                            ) : (
+                              <div className="flex flex-col gap-0.5">
                                 <span className={clsx(
-                                  "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded w-fit border tabular-nums",
-                                  trade.rMultiple > 0 ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/30" :
-                                  trade.rMultiple < 0 ? "text-rose-400 bg-rose-500/10 border-rose-500/30" :
-                                  "text-gray-400 bg-gray-500/10 border-gray-500/20"
+                                  "text-sm font-black tracking-tight font-mono tabular-nums flex items-baseline gap-0.5",
+                                  trade.pnl > 0 ? 'text-emerald-400' : 'text-rose-400'
                                 )}>
-                                  {trade.rMultiple > 0 ? `+${trade.rMultiple.toFixed(2)}R` : `${trade.rMultiple.toFixed(2)}R`}
+                                  <span className="text-xs font-medium opacity-70">
+                                    {trade.pnl > 0 ? "+$" : "-$"}
+                                  </span>
+                                  <span>{Math.abs(trade.pnl).toLocaleString()}</span>
                                 </span>
-                              )}
-                            </div>
+                                {trade.rMultiple !== undefined && (
+                                  <span className={clsx(
+                                    "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded w-fit border tabular-nums",
+                                    trade.rMultiple > 0 ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/30" :
+                                    "text-rose-400 bg-rose-500/10 border-rose-500/30"
+                                  )}>
+                                    {trade.rMultiple > 0 ? `+${trade.rMultiple.toFixed(2)}R` : `${trade.rMultiple.toFixed(2)}R`}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </td>
 
-                          {/* 4. Kỷ Luật & Thẻ (30%) - Lồng nút Xóa & Sửa ở góc phải */}
+                          {/* 4. Kỷ Luật & Thẻ (32%) - Lồng nút Xóa & Sửa ở góc phải */}
                           <td className="py-3 pl-3 pr-5 text-sm">
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex flex-wrap gap-1.5 items-center flex-1 min-w-0">
@@ -676,15 +699,15 @@ function JournalContent() {
                                     setTradeToEdit(trade);
                                     setIsAdding(true);
                                   }}
-                                  className="text-gray-400 hover:text-blue-400 p-1.5 hover:bg-blue-500/10 rounded-lg cursor-pointer"
+                                  className="text-gray-400 hover:text-blue-400 p-1.5 hover:bg-blue-500/10 rounded-lg cursor-pointer transition-colors"
                                   title={tCards('edit_trade')}
                                 >
-                                  <span className="text-xs">✎</span>
+                                  <Edit3 className="w-3.5 h-3.5" />
                                 </button>
                                 <button 
                                   type="button" 
                                   onClick={(e) => { e.stopPropagation(); handleDelete(trade.id); }} 
-                                  className="text-gray-400 hover:text-red-400 p-1.5 hover:bg-red-500/10 rounded-lg cursor-pointer"
+                                  className="text-gray-400 hover:text-red-400 p-1.5 hover:bg-red-500/10 rounded-lg cursor-pointer transition-colors"
                                   title={t('delete_trade_tip')}
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -693,7 +716,8 @@ function JournalContent() {
                             </div>
                           </td>
                         </motion.tr>
-                      ))}
+                        );
+                      })}
                       </AnimatePresence>
                     </tbody>
                   </table>
