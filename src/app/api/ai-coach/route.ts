@@ -241,6 +241,27 @@ NGUYÊN TẮC BẮT BUỘC:
       );
     }
 
+function flattenString(val: unknown, fallback = ""): string {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === "string") return val.trim();
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  if (Array.isArray(val)) {
+    return val.map((item) => flattenString(item)).filter(Boolean).join(". ");
+  }
+  if (typeof val === "object") {
+    const obj = val as Record<string, unknown>;
+    const preferredKeys = ["description", "text", "content", "summary", "message", "leak", "edge", "rule", "impact", "detail"];
+    for (const key of preferredKeys) {
+      if (typeof obj[key] === "string" && obj[key]) return (obj[key] as string).trim();
+    }
+    const values = Object.entries(obj)
+      .map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`)
+      .join(" | ");
+    return values || JSON.stringify(val);
+  }
+  return String(val);
+}
+
     // Clean JSON content (remove markdown code blocks if present)
     const cleanedContent = rawContent
       .replace(/^```json\s*/i, '')
@@ -249,11 +270,18 @@ NGUYÊN TẮC BẮT BUỘC:
       .trim();
 
     try {
-      const parsed = JSON.parse(cleanedContent) as AICoachResponse;
+      const parsed = JSON.parse(cleanedContent) as Record<string, unknown>;
+      const safeAnalysis: AICoachResponse = {
+        big_leak: flattenString(parsed.big_leak || parsed.bigLeak, rawContent),
+        real_edge: flattenString(parsed.real_edge || parsed.realEdge, isEnglish ? "Maintain statistical discipline and focus on high-probability setups." : "Duy trì kỷ luật thống kê và tập trung vào các setup có xác suất cao."),
+        what_if: flattenString(parsed.what_if || parsed.whatIf, isEnglish ? "Eliminating recurring leaks will substantially enhance net account expectancy." : "Loại bỏ các lệnh lỗi lặp lại sẽ cải thiện đáng kể kỳ vọng lợi nhuận ròng."),
+        action_rule: flattenString(parsed.action_rule || parsed.actionRule, isEnglish ? "Strictly adhere to your pre-defined risk management rules." : "Tuân thủ nghiêm ngặt quy tắc quản lý rủi ro đã đề ra.")
+      };
+
       return NextResponse.json({
         success: true,
         model: data.model || selectedModel,
-        analysis: parsed
+        analysis: safeAnalysis
       });
     } catch {
       // If parsing fails, wrap the raw content into the structure
@@ -261,7 +289,7 @@ NGUYÊN TẮC BẮT BUỘC:
         success: true,
         model: data.model || selectedModel,
         analysis: {
-          big_leak: rawContent,
+          big_leak: flattenString(rawContent),
           real_edge: isEnglish ? "Need more trades to extract statistical edge." : "Cần tích lũy thêm dữ liệu để bóc tách thế mạnh.",
           what_if: isEnglish ? "Maintain discipline to optimize PnL." : "Duy trì kỷ luật để tối ưu hóa PnL.",
           action_rule: isEnglish ? "Strictly adhere to risk management rules." : "Tuân thủ nghiêm ngặt quy tắc quản lý rủi ro."

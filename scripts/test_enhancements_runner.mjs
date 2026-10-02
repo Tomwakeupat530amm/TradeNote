@@ -3242,6 +3242,26 @@ it("Validates AI Coach route implements Multi-Tier Waterfall Fallback with healt
   assert.ok(routeCode.includes("model: data.model || selectedModel"), "Route must return the actual winning model name");
 });
 
+console.log("\n33. AI Coach Client Crash Prevention & Error Boundary Hardening:");
+
+it("Validates formatSafeText prevents crash on object/array inputs and AICoachModal includes cache reset", () => {
+  const modalPath = path.resolve(__dirname, '../src/components/AICoachModal.tsx');
+  const modalCode = fs.readFileSync(modalPath, 'utf8');
+
+  assert.ok(modalCode.includes("formatSafeText"), "AICoachModal must export/use formatSafeText");
+  assert.ok(modalCode.includes("handleClearCache"), "AICoachModal must support clearing cache on demand");
+  assert.ok(modalCode.includes("RotateCcw"), "AICoachModal must have reset icon button");
+
+  const routePath = path.resolve(__dirname, '../src/app/api/ai-coach/route.ts');
+  const routeCode = fs.readFileSync(routePath, 'utf8');
+  assert.ok(routeCode.includes("flattenString"), "Route must flatten string outputs before returning JSON");
+
+  const errorBoundaryPath = path.resolve(__dirname, '../src/app/[locale]/error.tsx');
+  assert.ok(fs.existsSync(errorBoundaryPath), "App Router must include [locale]/error.tsx");
+  const errorCode = fs.readFileSync(errorBoundaryPath, 'utf8');
+  assert.ok(errorCode.includes("ErrorBoundary"), "error.tsx must export ErrorBoundary component");
+});
+
 console.log("\n-------------------------------------------------------");
 console.log(`TOTAL: ${total} | PASSED: ${passed} | FAILED: ${total - passed}`);
 if (passed === total) {

@@ -4,7 +4,7 @@ import { useState, useEffect, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   X, Sparkles, AlertTriangle, ShieldCheck, TrendingUp, 
-  Target, RefreshCw, Bot, Copy, Check 
+  Target, RefreshCw, Bot, Copy, Check, RotateCcw 
 } from "lucide-react";
 import { useTradeStore } from "@/store/useTradeStore";
 import { useAccountStore } from "@/store/useAccountStore";
@@ -26,6 +26,27 @@ interface AnalysisResult {
   action_rule: string;
 }
 
+export function formatSafeText(val: unknown): string {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "string") return val;
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  if (Array.isArray(val)) {
+    return val.map((item) => formatSafeText(item)).filter(Boolean).join(". ");
+  }
+  if (typeof val === "object") {
+    const obj = val as Record<string, unknown>;
+    const preferredKeys = ["description", "text", "content", "summary", "message", "leak", "edge", "rule", "impact", "detail"];
+    for (const key of preferredKeys) {
+      if (typeof obj[key] === "string" && obj[key]) return (obj[key] as string).trim();
+    }
+    const values = Object.entries(obj)
+      .map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`)
+      .join(" | ");
+    return values || JSON.stringify(val);
+  }
+  return String(val);
+}
+
 export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
   const t = useTranslations("AICoach");
   const locale = useLocale();
@@ -40,18 +61,36 @@ export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
 
   const accountTrades = trades.filter((t) => t.accountId === activeAccountId);
 
-  // Load cached analysis from localStorage if available
+  const handleClearCache = () => {
+    if (activeAccountId && typeof window !== "undefined") {
+      localStorage.removeItem(`ai_coach_${activeAccountId}`);
+      setResult(null);
+      toast.info(locale === "vi" ? "Đã đặt lại dữ liệu chẩn đoán" : "Diagnostics cache reset");
+    }
+  };
+
+  // Load cached analysis from localStorage if available with safe fallback
   useEffect(() => {
-    if (activeAccountId && typeof window !== 'undefined') {
+    if (activeAccountId && typeof window !== "undefined") {
       const cached = localStorage.getItem(`ai_coach_${activeAccountId}`);
       if (cached) {
         try {
           const parsed = JSON.parse(cached);
-          startTransition(() => {
-            setResult(parsed.analysis);
-          });
+          if (parsed && typeof parsed === "object" && parsed.analysis) {
+            const raw = parsed.analysis;
+            const normalized: AnalysisResult = {
+              big_leak: formatSafeText(raw.big_leak || raw.bigLeak),
+              real_edge: formatSafeText(raw.real_edge || raw.realEdge),
+              what_if: formatSafeText(raw.what_if || raw.whatIf),
+              action_rule: formatSafeText(raw.action_rule || raw.actionRule),
+            };
+            startTransition(() => {
+              setResult(normalized);
+            });
+          }
         } catch {
-          // ignore error
+          // If cache is corrupted, purge it safely
+          localStorage.removeItem(`ai_coach_${activeAccountId}`);
         }
       }
     }
@@ -92,12 +131,20 @@ export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
         throw new Error(data.error || "AI Coach error");
       }
 
-      setResult(data.analysis);
+      const rawAnalysis = (data.analysis && typeof data.analysis === 'object') ? data.analysis : {};
+      const normalized: AnalysisResult = {
+        big_leak: formatSafeText(rawAnalysis.big_leak || rawAnalysis.bigLeak),
+        real_edge: formatSafeText(rawAnalysis.real_edge || rawAnalysis.realEdge),
+        what_if: formatSafeText(rawAnalysis.what_if || rawAnalysis.whatIf),
+        action_rule: formatSafeText(rawAnalysis.action_rule || rawAnalysis.actionRule),
+      };
+
+      setResult(normalized);
 
       // Cache result
       if (activeAccountId && typeof window !== 'undefined') {
         localStorage.setItem(`ai_coach_${activeAccountId}`, JSON.stringify({
-          analysis: data.analysis,
+          analysis: normalized,
           timestamp: new Date().toISOString()
         }));
       }
@@ -112,8 +159,9 @@ export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
   };
 
   const handleCopyRule = () => {
-    if (!result?.action_rule) return;
-    navigator.clipboard.writeText(result.action_rule);
+    const ruleText = formatSafeText(result?.action_rule);
+    if (!ruleText) return;
+    navigator.clipboard.writeText(ruleText);
     setCopied(true);
     toast.success(t("toast_copied"));
     setTimeout(() => setCopied(false), 2000);
@@ -177,15 +225,28 @@ export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleRunAnalysis}
-                  disabled={loading || accountTrades.length === 0}
-                  className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white text-xs font-bold shadow-lg shadow-indigo-500/20 hover:opacity-95 transition-all disabled:opacity-50 shrink-0"
-                >
-                  <RefreshCw className={clsx("h-4 w-4", loading && "animate-spin")} />
-                  {loading ? t("btn_analyzing") : (result ? t("btn_reanalyze") : t("btn_start"))}
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleRunAnalysis}
+                    disabled={loading || accountTrades.length === 0}
+                    className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white text-xs font-bold shadow-lg shadow-indigo-500/20 hover:opacity-95 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    <RefreshCw className={clsx("h-4 w-4", loading && "animate-spin")} />
+                    {loading ? t("btn_analyzing") : (result ? t("btn_reanalyze") : t("btn_start"))}
+                  </button>
+
+                  {result && (
+                    <button
+                      type="button"
+                      onClick={handleClearCache}
+                      title={locale === "vi" ? "Xóa kết quả cũ" : "Reset cached result"}
+                      className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10 transition-colors cursor-pointer"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Loading State */}
@@ -220,7 +281,7 @@ export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
                       {t("sec_leak_title")}
                     </div>
                     <p className="text-sm text-gray-200 leading-relaxed">
-                      {result.big_leak}
+                      {formatSafeText(result.big_leak)}
                     </p>
                   </motion.div>
 
@@ -236,7 +297,7 @@ export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
                       {t("sec_edge_title")}
                     </div>
                     <p className="text-sm text-gray-200 leading-relaxed">
-                      {result.real_edge}
+                      {formatSafeText(result.real_edge)}
                     </p>
                   </motion.div>
 
@@ -252,7 +313,7 @@ export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
                       {t("sec_whatif_title")}
                     </div>
                     <p className="text-sm text-gray-200 leading-relaxed">
-                      {result.what_if}
+                      {formatSafeText(result.what_if)}
                     </p>
                   </motion.div>
 
@@ -271,14 +332,14 @@ export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
                       <button
                         type="button"
                         onClick={handleCopyRule}
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/30 transition-all"
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/30 transition-all cursor-pointer"
                       >
                         {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                         {copied ? t("copied") : t("copy_rule")}
                       </button>
                     </div>
                     <div className="p-3 rounded-xl bg-black/40 border border-amber-500/20 text-sm font-semibold text-amber-200">
-                      &quot;{result.action_rule}&quot;
+                      &quot;{formatSafeText(result.action_rule)}&quot;
                     </div>
                   </motion.div>
                 </div>
