@@ -7,7 +7,7 @@ Mọi SQL của dự án nằm ở thư mục này. Repo gốc `TradeNote/` khô
 | `schema.snapshot.sql` | Bản cài mới (fresh install) cho project trống. KHÔNG dùng để nâng cấp DB đang chạy. |
 | `patches/NNN_name.sql` + `.down.sql` | Patch đánh số, idempotent, có đường lui. Đây là cách DUY NHẤT để đổi DB đang chạy. |
 | `probes/*.sql` | SQL chỉ-đọc để chạy trong SQL Editor (baseline, đếm dữ liệu bẩn). |
-| `baseline/baseline_<ngày>.md` | Kết quả probe user dán lại (không chứa secret). |
+| `baseline/baseline_<ngày>.md` (+ `probe_<env>_<ngày>.json`) | Kết quả probe user dán lại (không chứa secret) + dữ liệu thô. |
 | `tests/` | Dữ liệu/kỳ vọng cho kiểm thử SQL (P1/P5 thêm). |
 | `legacy/*.sql` | 3 file SQL cũ, chỉ để tham chiếu. Không chạy lại. |
 | `seeds/mock_data.sql` | Dữ liệu mẫu (chuyển từ repo gốc). Chỉ dùng cho project TEST/local. |
@@ -38,7 +38,7 @@ Lùi: chạy `NNN_name.down.sql` theo thứ tự số GIẢM DẦN, rồi `delet
 | Số | Phase | Nội dung |
 |---|---|---|
 | 000 | P0 | `schema_migrations` |
-| 001 | P0 | `capture_baseline_drift` - định nghĩa thật của `get_account_stats` lấy từ probe 00 (chờ USER GATE 1) |
+| 001 | P0 | `capture_baseline_drift` - định nghĩa thật của `get_account_stats` lấy từ probe 00 PROD 11-10-26 (`baseline/baseline_11-10-26.md`); chỉ ghi nhận, không đổi hành vi; `.down.sql` = baseline không lùi |
 | 010-013 | P1 | RLS WITH CHECK + composite FK, thu hồi `anon` + DELETE preferences, storage theo tiền tố + `screenshot_path`, bucket private |
 | 020 | P2 | `ai_coach_usage` |
 | 030, 031 | P3 | `risk_nullable_estimated`, `backfill_flag_estimated` |

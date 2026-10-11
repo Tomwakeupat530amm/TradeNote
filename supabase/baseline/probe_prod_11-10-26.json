@@ -1,0 +1,1831 @@
+[
+  {
+    "section": "01_rls_flags",
+    "data": [
+      {
+        "table": "accounts",
+        "relrowsecurity": true,
+        "relforcerowsecurity": false
+      },
+      {
+        "table": "daily_reviews",
+        "relrowsecurity": true,
+        "relforcerowsecurity": false
+      },
+      {
+        "table": "notifications",
+        "relrowsecurity": true,
+        "relforcerowsecurity": false
+      },
+      {
+        "table": "periodic_reviews",
+        "relrowsecurity": true,
+        "relforcerowsecurity": false
+      },
+      {
+        "table": "playbooks",
+        "relrowsecurity": true,
+        "relforcerowsecurity": false
+      },
+      {
+        "table": "trades",
+        "relrowsecurity": true,
+        "relforcerowsecurity": false
+      },
+      {
+        "table": "user_preferences",
+        "relrowsecurity": true,
+        "relforcerowsecurity": false
+      }
+    ]
+  },
+  {
+    "section": "02_policies_public",
+    "data": [
+      {
+        "cmd": "DELETE",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "accounts",
+        "policy": "Users can delete their own accounts",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "INSERT",
+        "qual": null,
+        "roles": [
+          "public"
+        ],
+        "table": "accounts",
+        "policy": "Users can insert their own accounts",
+        "permissive": "PERMISSIVE",
+        "with_check": "(auth.uid() = user_id)"
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "accounts",
+        "policy": "Users can update their own accounts",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "accounts",
+        "policy": "Users can view their own accounts",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "DELETE",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "daily_reviews",
+        "policy": "Users can delete their own daily reviews",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "INSERT",
+        "qual": null,
+        "roles": [
+          "public"
+        ],
+        "table": "daily_reviews",
+        "policy": "Users can insert their own daily reviews",
+        "permissive": "PERMISSIVE",
+        "with_check": "(auth.uid() = user_id)"
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "daily_reviews",
+        "policy": "Users can update their own daily reviews",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "daily_reviews",
+        "policy": "Users can view their own daily reviews",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "DELETE",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "notifications",
+        "policy": "Users can delete their own notifications",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "INSERT",
+        "qual": null,
+        "roles": [
+          "public"
+        ],
+        "table": "notifications",
+        "policy": "Users can insert their own notifications",
+        "permissive": "PERMISSIVE",
+        "with_check": "(auth.uid() = user_id)"
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "notifications",
+        "policy": "Users can update their own notifications",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "notifications",
+        "policy": "Users can view their own notifications",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "DELETE",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "periodic_reviews",
+        "policy": "Users can delete their own periodic reviews",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "INSERT",
+        "qual": null,
+        "roles": [
+          "public"
+        ],
+        "table": "periodic_reviews",
+        "policy": "Users can insert their own periodic reviews",
+        "permissive": "PERMISSIVE",
+        "with_check": "(auth.uid() = user_id)"
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "periodic_reviews",
+        "policy": "Users can update their own periodic reviews",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "periodic_reviews",
+        "policy": "Users can view their own periodic reviews",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "DELETE",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "playbooks",
+        "policy": "Users can delete their own playbooks",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "INSERT",
+        "qual": null,
+        "roles": [
+          "public"
+        ],
+        "table": "playbooks",
+        "policy": "Users can insert their own playbooks",
+        "permissive": "PERMISSIVE",
+        "with_check": "(auth.uid() = user_id)"
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "playbooks",
+        "policy": "Users can update their own playbooks",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "playbooks",
+        "policy": "Users can view their own playbooks",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "DELETE",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "trades",
+        "policy": "Users can delete their own trades",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "INSERT",
+        "qual": null,
+        "roles": [
+          "public"
+        ],
+        "table": "trades",
+        "policy": "Users can insert their own trades",
+        "permissive": "PERMISSIVE",
+        "with_check": "(auth.uid() = user_id)"
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "trades",
+        "policy": "Users can update their own trades",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "trades",
+        "policy": "Users can view their own trades",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "INSERT",
+        "qual": null,
+        "roles": [
+          "public"
+        ],
+        "table": "user_preferences",
+        "policy": "Users can insert their own preferences",
+        "permissive": "PERMISSIVE",
+        "with_check": "(auth.uid() = user_id)"
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "user_preferences",
+        "policy": "Users can update their own preferences",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "table": "user_preferences",
+        "policy": "Users can view their own preferences",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      }
+    ]
+  },
+  {
+    "section": "03_policies_storage",
+    "data": [
+      {
+        "cmd": "SELECT",
+        "qual": "(bucket_id = 'avatars'::text)",
+        "roles": [
+          "public"
+        ],
+        "table": "objects",
+        "policy": "Anyone can view avatars",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(bucket_id = 'trade-screenshots'::text)",
+        "roles": [
+          "public"
+        ],
+        "table": "objects",
+        "policy": "Anyone can view screenshots",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "INSERT",
+        "qual": null,
+        "roles": [
+          "public"
+        ],
+        "table": "objects",
+        "policy": "Authenticated users can upload avatars",
+        "permissive": "PERMISSIVE",
+        "with_check": "((bucket_id = 'avatars'::text) AND (auth.role() = 'authenticated'::text))"
+      },
+      {
+        "cmd": "INSERT",
+        "qual": null,
+        "roles": [
+          "public"
+        ],
+        "table": "objects",
+        "policy": "Authenticated users can upload screenshots",
+        "permissive": "PERMISSIVE",
+        "with_check": "((bucket_id = 'trade-screenshots'::text) AND (auth.role() = 'authenticated'::text))"
+      },
+      {
+        "cmd": "DELETE",
+        "qual": "((bucket_id = 'avatars'::text) AND (auth.uid() = owner))",
+        "roles": [
+          "public"
+        ],
+        "table": "objects",
+        "policy": "Users can delete their own avatars",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "DELETE",
+        "qual": "((bucket_id = 'trade-screenshots'::text) AND (auth.uid() = owner))",
+        "roles": [
+          "public"
+        ],
+        "table": "objects",
+        "policy": "Users can delete their own screenshots",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "((bucket_id = 'avatars'::text) AND (auth.uid() = owner))",
+        "roles": [
+          "public"
+        ],
+        "table": "objects",
+        "policy": "Users can update their own avatars",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "((bucket_id = 'trade-screenshots'::text) AND (auth.uid() = owner))",
+        "roles": [
+          "public"
+        ],
+        "table": "objects",
+        "policy": "Users can update their own screenshots",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      }
+    ]
+  },
+  {
+    "section": "04_table_grants",
+    "data": [
+      {
+        "table": "accounts",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "accounts",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "accounts",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "accounts",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "accounts",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "accounts",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "accounts",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "accounts",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "accounts",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "accounts",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "accounts",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "accounts",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "accounts",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "accounts",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "accounts",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "accounts",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "accounts",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "accounts",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "accounts",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "accounts",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "accounts",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "daily_reviews",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "notifications",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "notifications",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "notifications",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "notifications",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "notifications",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "notifications",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "notifications",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "notifications",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "notifications",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "notifications",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "notifications",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "notifications",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "notifications",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "notifications",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "notifications",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "notifications",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "notifications",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "notifications",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "notifications",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "notifications",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "notifications",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "periodic_reviews",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "playbooks",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "trades",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "trades",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "trades",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "trades",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "trades",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "trades",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "trades",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "trades",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "trades",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "trades",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "trades",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "trades",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "trades",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "trades",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "trades",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "trades",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "trades",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "trades",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "trades",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "trades",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "trades",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "anon",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "authenticated",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "DELETE"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "INSERT"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "REFERENCES"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "SELECT"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "TRIGGER"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "TRUNCATE"
+      },
+      {
+        "table": "user_preferences",
+        "grantee": "service_role",
+        "grantable": "NO",
+        "privilege": "UPDATE"
+      }
+    ]
+  },
+  {
+    "section": "05_fn_get_account_stats",
+    "data": [
+      {
+        "name": "get_account_stats",
+        "proacl": "{=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+        "schema": "public",
+        "returns": "json",
+        "language": "plpgsql",
+        "proconfig": null,
+        "prosecdef": false,
+        "definition": "CREATE OR REPLACE FUNCTION public.get_account_stats(p_account_id uuid)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\r\nDECLARE\r\n  total_pnl NUMERIC;\r\n  win_rate NUMERIC;\r\n  total_trades INT;\r\n  wins INT;\r\n  losses INT;\r\n  profit_factor NUMERIC;\r\n  gross_profit NUMERIC;\r\n  gross_loss NUMERIC;\r\nBEGIN\r\n  -- Count totals\r\n  SELECT COUNT(*) INTO total_trades FROM trades WHERE account_id = p_account_id;\r\n  SELECT SUM(pnl) INTO total_pnl FROM trades WHERE account_id = p_account_id;\r\n  SELECT COUNT(*) INTO wins FROM trades WHERE account_id = p_account_id AND pnl > 0;\r\n  SELECT COUNT(*) INTO losses FROM trades WHERE account_id = p_account_id AND pnl < 0;\r\n  \r\n  -- Calculate Win Rate\r\n  IF total_trades > 0 THEN\r\n    win_rate := (wins::NUMERIC / total_trades) * 100;\r\n  ELSE\r\n    win_rate := 0;\r\n  END IF;\r\n\r\n  -- Calculate Profit Factor\r\n  SELECT SUM(pnl) INTO gross_profit FROM trades WHERE account_id = p_account_id AND pnl > 0;\r\n  SELECT SUM(ABS(pnl)) INTO gross_loss FROM trades WHERE account_id = p_account_id AND pnl < 0;\r\n  \r\n  IF gross_loss > 0 THEN\r\n    profit_factor := gross_profit / gross_loss;\r\n  ELSE\r\n    profit_factor := gross_profit; -- Infinity technically, but returning the raw profit\r\n  END IF;\r\n\r\n  -- Return as JSON\r\n  RETURN json_build_object(\r\n    'total_trades', total_trades,\r\n    'total_pnl', COALESCE(total_pnl, 0),\r\n    'win_rate', ROUND(win_rate, 2),\r\n    'wins', wins,\r\n    'losses', losses,\r\n    'profit_factor', ROUND(COALESCE(profit_factor, 0), 2)\r\n  );\r\nEND;\r\n$function$\n",
+        "provolatile": "v",
+        "identity_args": "p_account_id uuid"
+      }
+    ]
+  },
+  {
+    "section": "06_storage_buckets",
+    "data": [
+      {
+        "id": "avatars",
+        "name": "avatars",
+        "public": true,
+        "file_size_limit": null,
+        "allowed_mime_types": null
+      },
+      {
+        "id": "trade-screenshots",
+        "name": "trade-screenshots",
+        "public": true,
+        "file_size_limit": null,
+        "allowed_mime_types": null
+      }
+    ]
+  },
+  {
+    "section": "07_default_acl",
+    "data": [
+      {
+        "acl": "{postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres}",
+        "role": "postgres",
+        "schema": "storage",
+        "objtype": "S"
+      },
+      {
+        "acl": "{postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres}",
+        "role": "postgres",
+        "schema": "public",
+        "objtype": "S"
+      },
+      {
+        "acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+        "role": "postgres",
+        "schema": "public",
+        "objtype": "f"
+      },
+      {
+        "acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+        "role": "postgres",
+        "schema": "storage",
+        "objtype": "f"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "role": "postgres",
+        "schema": "public",
+        "objtype": "r"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "role": "postgres",
+        "schema": "storage",
+        "objtype": "r"
+      },
+      {
+        "acl": "{postgres=rwU/supabase_admin,dashboard_user=rwU/supabase_admin}",
+        "role": "supabase_admin",
+        "schema": "realtime",
+        "objtype": "S"
+      },
+      {
+        "acl": "{postgres=rwU/supabase_admin,anon=rwU/supabase_admin,authenticated=rwU/supabase_admin,service_role=rwU/supabase_admin}",
+        "role": "supabase_admin",
+        "schema": "public",
+        "objtype": "S"
+      },
+      {
+        "acl": "{postgres=rwU/supabase_admin,anon=rwU/supabase_admin,authenticated=rwU/supabase_admin,service_role=rwU/supabase_admin}",
+        "role": "supabase_admin",
+        "schema": "graphql",
+        "objtype": "S"
+      },
+      {
+        "acl": "{postgres=r*w*U*/supabase_admin}",
+        "role": "supabase_admin",
+        "schema": "extensions",
+        "objtype": "S"
+      },
+      {
+        "acl": "{postgres=rwU/supabase_admin,anon=rwU/supabase_admin,authenticated=rwU/supabase_admin,service_role=rwU/supabase_admin}",
+        "role": "supabase_admin",
+        "schema": "graphql_public",
+        "objtype": "S"
+      },
+      {
+        "acl": "{postgres=X/supabase_admin,anon=X/supabase_admin,authenticated=X/supabase_admin,service_role=X/supabase_admin}",
+        "role": "supabase_admin",
+        "schema": "public",
+        "objtype": "f"
+      },
+      {
+        "acl": "{postgres=X/supabase_admin,dashboard_user=X/supabase_admin}",
+        "role": "supabase_admin",
+        "schema": "realtime",
+        "objtype": "f"
+      },
+      {
+        "acl": "{postgres=X/supabase_admin,anon=X/supabase_admin,authenticated=X/supabase_admin,service_role=X/supabase_admin}",
+        "role": "supabase_admin",
+        "schema": "graphql_public",
+        "objtype": "f"
+      },
+      {
+        "acl": "{postgres=X*/supabase_admin}",
+        "role": "supabase_admin",
+        "schema": "extensions",
+        "objtype": "f"
+      },
+      {
+        "acl": "{postgres=X/supabase_admin,anon=X/supabase_admin,authenticated=X/supabase_admin,service_role=X/supabase_admin}",
+        "role": "supabase_admin",
+        "schema": "graphql",
+        "objtype": "f"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/supabase_admin,anon=arwdDxtm/supabase_admin,authenticated=arwdDxtm/supabase_admin,service_role=arwdDxtm/supabase_admin}",
+        "role": "supabase_admin",
+        "schema": "graphql_public",
+        "objtype": "r"
+      },
+      {
+        "acl": "{postgres=a*r*w*d*D*x*t*m*/supabase_admin}",
+        "role": "supabase_admin",
+        "schema": "extensions",
+        "objtype": "r"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/supabase_admin,anon=arwdDxtm/supabase_admin,authenticated=arwdDxtm/supabase_admin,service_role=arwdDxtm/supabase_admin}",
+        "role": "supabase_admin",
+        "schema": "graphql",
+        "objtype": "r"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/supabase_admin,anon=arwdDxtm/supabase_admin,authenticated=arwdDxtm/supabase_admin,service_role=arwdDxtm/supabase_admin}",
+        "role": "supabase_admin",
+        "schema": "public",
+        "objtype": "r"
+      },
+      {
+        "acl": "{postgres=a*r*wdDxtm/supabase_admin,dashboard_user=arwdDxtm/supabase_admin}",
+        "role": "supabase_admin",
+        "schema": "realtime",
+        "objtype": "r"
+      },
+      {
+        "acl": "{postgres=rwU/supabase_auth_admin,dashboard_user=rwU/supabase_auth_admin}",
+        "role": "supabase_auth_admin",
+        "schema": "auth",
+        "objtype": "S"
+      },
+      {
+        "acl": "{postgres=X/supabase_auth_admin,dashboard_user=X/supabase_auth_admin}",
+        "role": "supabase_auth_admin",
+        "schema": "auth",
+        "objtype": "f"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/supabase_auth_admin,dashboard_user=arwdDxtm/supabase_auth_admin}",
+        "role": "supabase_auth_admin",
+        "schema": "auth",
+        "objtype": "r"
+      }
+    ]
+  },
+  {
+    "section": "08_columns",
+    "data": [
+      {
+        "pos": 1,
+        "type": "uuid",
+        "table": "accounts",
+        "column": "id",
+        "default": "gen_random_uuid()",
+        "nullable": "NO"
+      },
+      {
+        "pos": 2,
+        "type": "uuid",
+        "table": "accounts",
+        "column": "user_id",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "pos": 3,
+        "type": "text",
+        "table": "accounts",
+        "column": "name",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "pos": 4,
+        "type": "text",
+        "table": "accounts",
+        "column": "type",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "pos": 5,
+        "type": "numeric",
+        "table": "accounts",
+        "column": "initial_balance",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "pos": 6,
+        "type": "jsonb",
+        "table": "accounts",
+        "column": "rules",
+        "default": "'{}'::jsonb",
+        "nullable": "NO"
+      },
+      {
+        "pos": 7,
+        "type": "timestamp with time zone",
+        "table": "accounts",
+        "column": "created_at",
+        "default": "timezone('utc'::text, now())",
+        "nullable": "NO"
+      },
+      {
+        "pos": 1,
+        "type": "uuid",
+        "table": "trades",
+        "column": "id",
+        "default": "gen_random_uuid()",
+        "nullable": "NO"
+      },
+      {
+        "pos": 2,
+        "type": "uuid",
+        "table": "trades",
+        "column": "user_id",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "pos": 3,
+        "type": "uuid",
+        "table": "trades",
+        "column": "account_id",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "pos": 4,
+        "type": "text",
+        "table": "trades",
+        "column": "asset",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "pos": 5,
+        "type": "numeric",
+        "table": "trades",
+        "column": "lot_size",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "pos": 6,
+        "type": "numeric",
+        "table": "trades",
+        "column": "pnl",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "pos": 7,
+        "type": "text",
+        "table": "trades",
+        "column": "result",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "pos": 8,
+        "type": "text",
+        "table": "trades",
+        "column": "setup",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "pos": 9,
+        "type": "text",
+        "table": "trades",
+        "column": "emotion",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "pos": 10,
+        "type": "text",
+        "table": "trades",
+        "column": "mistake",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "pos": 11,
+        "type": "text",
+        "table": "trades",
+        "column": "notes",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "pos": 12,
+        "type": "text",
+        "table": "trades",
+        "column": "screenshot_url",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "pos": 13,
+        "type": "timestamp with time zone",
+        "table": "trades",
+        "column": "date",
+        "default": "timezone('utc'::text, now())",
+        "nullable": "NO"
+      },
+      {
+        "pos": 14,
+        "type": "jsonb",
+        "table": "trades",
+        "column": "confluences",
+        "default": "'[]'::jsonb",
+        "nullable": "NO"
+      },
+      {
+        "pos": 15,
+        "type": "numeric",
+        "table": "trades",
+        "column": "risk_amount",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "pos": 16,
+        "type": "numeric",
+        "table": "trades",
+        "column": "r_multiple",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "pos": 17,
+        "type": "text",
+        "table": "trades",
+        "column": "session",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "pos": 18,
+        "type": "jsonb",
+        "table": "trades",
+        "column": "checklist_results",
+        "default": "'{}'::jsonb",
+        "nullable": "YES"
+      },
+      {
+        "pos": 1,
+        "type": "uuid",
+        "table": "user_preferences",
+        "column": "id",
+        "default": "gen_random_uuid()",
+        "nullable": "NO"
+      },
+      {
+        "pos": 2,
+        "type": "uuid",
+        "table": "user_preferences",
+        "column": "user_id",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "pos": 3,
+        "type": "jsonb",
+        "table": "user_preferences",
+        "column": "psychology_tags",
+        "default": "'[\"Calm\", \"FOMO\", \"Revenge\", \"Greedy\", \"Fearful\"]'::jsonb",
+        "nullable": "NO"
+      },
+      {
+        "pos": 4,
+        "type": "jsonb",
+        "table": "user_preferences",
+        "column": "mistake_tags",
+        "default": "'[\"None\", \"Moved SL\", \"Early Entry\", \"Late Entry\", \"Overleveraged\", \"Forced Trade\"]'::jsonb",
+        "nullable": "NO"
+      },
+      {
+        "pos": 5,
+        "type": "boolean",
+        "table": "user_preferences",
+        "column": "privacy_mode",
+        "default": "false",
+        "nullable": "NO"
+      },
+      {
+        "pos": 6,
+        "type": "text",
+        "table": "user_preferences",
+        "column": "theme",
+        "default": "'dark'::text",
+        "nullable": "NO"
+      },
+      {
+        "pos": 7,
+        "type": "timestamp with time zone",
+        "table": "user_preferences",
+        "column": "created_at",
+        "default": "timezone('utc'::text, now())",
+        "nullable": "NO"
+      },
+      {
+        "pos": 8,
+        "type": "text",
+        "table": "user_preferences",
+        "column": "base_currency",
+        "default": "'USD'::text",
+        "nullable": "NO"
+      },
+      {
+        "pos": 9,
+        "type": "text",
+        "table": "user_preferences",
+        "column": "timezone",
+        "default": "'UTC'::text",
+        "nullable": "NO"
+      },
+      {
+        "pos": 10,
+        "type": "text",
+        "table": "user_preferences",
+        "column": "display_name",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "pos": 11,
+        "type": "text",
+        "table": "user_preferences",
+        "column": "avatar_url",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "pos": 12,
+        "type": "jsonb",
+        "table": "user_preferences",
+        "column": "confluence_tags",
+        "default": "'[\"Trendline\", \"Support/Resistance\", \"Fibonacci\", \"Moving Average\", \"RSI Divergence\", \"Order Block\"]'::jsonb",
+        "nullable": "NO"
+      }
+    ]
+  },
+  {
+    "section": "09_trades_risk_500",
+    "data": {
+      "total_trades": 131,
+      "risk_amount_null": 0,
+      "risk_amount_eq_500": 104,
+      "has_risk_amount_column": true
+    }
+  },
+  {
+    "section": "10_storage_foreign_prefix",
+    "data": [
+      {
+        "bucket": "trade-screenshots",
+        "no_folder": 0,
+        "owner_null": 0,
+        "total_objects": 12,
+        "prefix_not_owner": 0
+      }
+    ]
+  }
+]
