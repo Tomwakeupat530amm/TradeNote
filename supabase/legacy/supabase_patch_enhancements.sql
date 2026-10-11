@@ -1,3 +1,4 @@
+-- LEGACY: thay bởi supabase/patches/*, chỉ để tham chiếu
 -- MIGRATION SCRIPT: TRADENOTE PRO ENHANCEMENTS
 -- Chạy script này trong Supabase Dashboard -> SQL Editor để bổ sung các cột mới cho bảng trades.
 

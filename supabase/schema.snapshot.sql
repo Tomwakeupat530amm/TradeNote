@@ -1,3 +1,7 @@
+-- ==============================================================================
+-- FRESH INSTALL SNAPSHOT: chỉ dùng để cài mới project trống. KHÔNG dùng để nâng cấp DB đang chạy.
+-- Nâng cấp DB hiện có: áp các patch đánh số trong supabase/patches/ (xem supabase/README.md).
+-- ==============================================================================
 -- CREATE TABLES
 
 -- Bảng Accounts (Quản lý tài khoản quỹ)

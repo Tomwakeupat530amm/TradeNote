@@ -1,3 +1,4 @@
+-- LEGACY: thay bởi supabase/patches/*, chỉ để tham chiếu
 -- ====================================================================
 -- TRADENOTE PRO: DATABASE INDEXES FOR 1,000+ CONCURRENT USERS (SCALE)
 -- ====================================================================

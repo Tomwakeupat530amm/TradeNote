@@ -1,3 +1,4 @@
+-- LEGACY: thay bởi supabase/patches/*, chỉ để tham chiếu
 -- ==============================================================================
 -- TRADENOTE PRO: SUPABASE EXPLICIT TABLE GRANTS (OCTOBER 30 COMPLIANCE PATCH)
 -- ==============================================================================

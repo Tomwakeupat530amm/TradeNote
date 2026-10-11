@@ -2865,8 +2865,8 @@ it("Validates i18n parity for Clipboard & Drag-Drop keys across en.json and vi.j
 // ==========================================
 console.log("\n--- SECTION 28: SUPABASE EXPLICIT TABLE GRANTS & SECURITY POLICY COMPLIANCE ---");
 
-const schemaSqlPath = path.resolve(__dirname, '../../supabase_schema.sql');
-const patchSqlPath = path.resolve(__dirname, '../../supabase_grant_permissions.sql');
+const schemaSqlPath = path.resolve(__dirname, '../supabase/schema.snapshot.sql');
+const patchSqlPath = path.resolve(__dirname, '../supabase/legacy/supabase_grant_permissions.sql');
 const coreTables = ['accounts', 'trades', 'daily_reviews', 'notifications', 'user_preferences', 'playbooks', 'periodic_reviews'];
 
 it("Validates schema SQL contains explicit GRANT commands for all 7 core TradeNote tables", () => {
