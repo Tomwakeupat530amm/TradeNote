@@ -9,6 +9,8 @@ import clsx from "clsx";
 import { useTagTranslation } from "@/hooks/useTagTranslation";
 import { useTranslations } from "next-intl";
 import { processClipboardImage } from "@/lib/imageCompressor";
+import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
+import { useSignedUrl } from "@/hooks/useSignedUrl";
 
 const RESULTS: TradeResult[] = ["Win", "Loss", "Break Even"];
 const SETUPS = ["Breakout", "Pullback", "Reversal", "Continuation", "Other"];
@@ -28,6 +30,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
   const { updateTrade } = useTradeStore();
   const { preferences } = usePreferenceStore();
   const tTag = useTagTranslation();
+  const tShot = useTranslations("Screenshots");
 
   const [saving, setSaving] = useState(false);
   const [asset, setAsset] = useState(trade.asset);
@@ -42,11 +45,17 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
   const [mistake, setMistake] = useState(trade.mistake);
   const [notes, setNotes] = useState(trade.notes);
   const [screenshot, setScreenshot] = useState<string | null>(null);
-  const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>(trade.screenshotUrl);
+  // Existing image is referenced by storage path only; the signed URL is display-only (never saved back).
+  const [screenshotPath, setScreenshotPath] = useState<string | null>(
+    trade.screenshotPath ?? pathFromLegacyUrl(trade.screenshotUrl)
+  );
   const [screenshotRemoved, setScreenshotRemoved] = useState(false);
   const [compressionRatio, setCompressionRatio] = useState<number | null>(null);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  const signedShot = useSignedUrl(screenshotRemoved ? null : screenshotPath);
+  const previewSrc = screenshot || signedShot.url;
 
   const numRisk = parseFloat(riskAmount) || 500;
   const numPnl = parseFloat(pnl) || 0;
@@ -148,8 +157,10 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
         riskAmount: numRisk,
         rMultiple: calculatedR,
         session,
-        screenshotUrl: screenshotRemoved ? undefined : screenshotUrl,
-        screenshotFile: screenshotRemoved ? null : (screenshot || undefined),
+        // Only a freshly pasted/dropped data: image is uploaded; unchanged images are not sent.
+        screenshotFile: screenshotRemoved
+          ? null
+          : (screenshot && screenshot.startsWith("data:") ? screenshot : undefined),
       });
       toast.success("Trade updated successfully!");
       onSaved();
@@ -372,17 +383,34 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
               <Loader2 className="w-5 h-5 animate-spin text-emerald-400 mb-1" />
               <span className="text-xs font-semibold">Optimizing screenshot...</span>
             </div>
-          ) : screenshot || (screenshotUrl && !screenshotRemoved) ? (
+          ) : screenshot || (screenshotPath && !screenshotRemoved) ? (
             <div 
               className="relative rounded-xl overflow-hidden ring-1 ring-white/10 h-[120px] group cursor-zoom-in" 
-              onClick={() => setZoomImageSrc(screenshot || screenshotUrl || null)}
+              onClick={() => setZoomImageSrc(previewSrc || null)}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={screenshot || screenshotUrl}
-                alt="Trade setup"
-                className="w-full h-full object-cover transition-transform group-hover:scale-105"
-              />
+              {previewSrc ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={previewSrc}
+                  alt="Trade setup"
+                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                />
+              ) : signedShot.error ? (
+                <div className="flex h-full flex-col items-center justify-center gap-1 bg-white/5 text-xs text-red-300">
+                  <span>{tShot("loadError")}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); signedShot.retry(); }}
+                    className="underline text-emerald-300"
+                  >
+                    {tShot("retry")}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex h-full items-center justify-center bg-white/5 text-xs text-gray-400 animate-pulse">
+                  {tShot("signing")}
+                </div>
+              )}
 
               {/* Floating WebP Optimization Badge */}
               <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-sm border border-emerald-500/40 text-[10px] font-mono font-bold text-emerald-300 shadow-md">
@@ -399,7 +427,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
                 onClick={(e) => {
                   e.stopPropagation();
                   setScreenshot(null);
-                  setScreenshotUrl(undefined);
+                  setScreenshotPath(null);
                   setScreenshotRemoved(true);
                   setCompressionRatio(null);
                 }}

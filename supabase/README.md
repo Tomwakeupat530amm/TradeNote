@@ -8,7 +8,7 @@ Mọi SQL của dự án nằm ở thư mục này. Repo gốc `TradeNote/` khô
 | `patches/NNN_name.sql` + `.down.sql` | Patch đánh số, idempotent, có đường lui. Đây là cách DUY NHẤT để đổi DB đang chạy. |
 | `probes/*.sql` | SQL chỉ-đọc để chạy trong SQL Editor (baseline, đếm dữ liệu bẩn). |
 | `baseline/baseline_<ngày>.md` (+ `probe_<env>_<ngày>.json`) | Kết quả probe user dán lại (không chứa secret) + dữ liệu thô. |
-| `tests/` | Dữ liệu/kỳ vọng cho kiểm thử SQL (P1/P5 thêm). |
+| `tests/` | Dữ liệu/kỳ vọng cho kiểm thử SQL. `tests/grants_matrix.expected.json` = ma trận quyền kỳ vọng sau 011 (so với probe 11). |
 | `legacy/*.sql` | 3 file SQL cũ, chỉ để tham chiếu. Không chạy lại. |
 | `seeds/mock_data.sql` | Dữ liệu mẫu (chuyển từ repo gốc). Chỉ dùng cho project TEST/local. |
 
@@ -30,7 +30,7 @@ Lùi: chạy `NNN_name.down.sql` theo thứ tự số GIẢM DẦN, rồi `delet
 - Cấm `DROP TABLE` / `DROP COLUMN` / `DELETE FROM` trong patch (ngoài `.down.sql`) trừ khi có dòng `-- DESTRUCTIVE-OK: <lý do>` và user đã đồng ý.
 - Idempotent: `IF NOT EXISTS`, `DROP POLICY IF EXISTS` trước `CREATE POLICY`, khối `DO $$ ... $$` khi cần điều kiện.
 - Không `DISABLE ROW LEVEL SECURITY` trong bất kỳ patch nào.
-- Bảng mới: snapshot có `ALTER DEFAULT PRIVILEGES` cấp quyền cho `anon`/`authenticated`, nên patch tạo bảng nội bộ phải `REVOKE` tường minh (xem 000).
+- Bảng mới: từ P1 (011) snapshot không cấp gì cho `anon`, nhưng default ACL của `supabase_admin` vẫn có thể cấp (known-gap) và `authenticated` có CRUD mặc định; patch tạo bảng nội bộ phải `REVOKE` tường minh (xem 000) và chạy lại `probes/11_p1_grants_matrix.sql`.
 - Kiểm lint: `npm run lint:sql`; tự kiểm lint: `node scripts/sql_patch_lint.mjs --self-test`.
 
 ## Thứ tự patch dự kiến
@@ -45,6 +45,20 @@ Lùi: chạy `NNN_name.down.sql` theo thứ tự số GIẢM DẦN, rồi `delet
 | 050, 051 (+052, 053 theo plan P5) | P5 | `trading_day_fn`, `user_preferences_ensure_row`, hard stop trigger |
 | 060 | P6 | `list_orphan_screenshots` (có điều kiện) |
 | 090 | P7 | `drop_screenshot_url` - DESTRUCTIVE, chỉ chạy khi user đồng ý |
+
+## Phase 01 (010-013): thứ tự áp trên PROD (chưa có project TEST -> USER GATE tường minh)
+
+| Bước | Việc | Ghi chú |
+|---|---|---|
+| 1 | Backup + chạy `probes/10_p1_pre_checks.sql` | A0 quyết định có cần 000/001; mục a/b/c/c2/e/f/g/h phải đạt trước khi đi tiếp |
+| 2 | `000` -> `001` (CHỈ nếu A0 báo chưa áp) | Trước 001: đối chiếu định nghĩa live `get_account_stats` (mục h) với `patches/001`; khác -> dừng |
+| 3 | `010_rls_with_check_and_composite_fk` | Tự VALIDATE composite FK khi mục a = 0; sau đó chạy khối (1)(2) của `probes/12_p1_manual_acceptance.sql` |
+| 4 | `011_revoke_anon_prefs_delete_default_privs` | Tự dừng nếu có hàm public ngoài danh sách cho phép; sau đó chạy `probes/11` (so `tests/grants_matrix.expected.json`) + probe 12 khối (3)(4) |
+| 5 | Chạy lại probe 10 mục g, rồi `012_screenshot_path_expand` | Tự dừng nếu path có `%`, đếm url <> path, hoặc còn policy storage lạ; sau đó probe 12 khối (5) |
+| 6 | Deploy client (signed URL, playbook D6, avatar D8) | KHÔNG deploy trước bước 5 |
+| 7 | `013_bucket_private_contract` | CHỈ khi: client bước 6 đã lên PROD, đếm ảnh 100% (trades + playbooks), user thấy request `/object/sign/` (USER GATE 4). Link public cũ chết (chủ đích); tab cũ cần tải lại |
+
+Probe 12 chạy TỪNG khối `DO $$`; mỗi khối kết thúc `RAISE EXCEPTION 'RESULT: ...'` (cố ý, để rollback dữ liệu thử). Lùi: 013 -> 012 -> 011 -> 010.
 
 ## Project TEST (cho harness 2 user)
 

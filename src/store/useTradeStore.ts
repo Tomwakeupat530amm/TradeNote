@@ -4,6 +4,7 @@ import { useAuthStore } from './useAuthStore';
 import { useAccountStore } from './useAccountStore';
 import { useNotificationStore } from './useNotificationStore';
 import { compressScreenshot } from '@/lib/imageCompressor';
+import { SCREENSHOT_BUCKET, buildScreenshotPath, pathFromLegacyUrl } from '@/lib/screenshotStorage';
 
 export type TradeResult = "Win" | "Loss" | "Break Even";
 export type SetupTag = string;
@@ -22,7 +23,10 @@ export interface Trade {
   emotion: EmotionTag;
   mistake: MistakeTag;
   notes: string;
+  /** Legacy column value (public URL). Never written with a signed URL. */
   screenshotUrl?: string;
+  /** Storage path `{userId}/...` in the private bucket; source of truth for display + GC. */
+  screenshotPath?: string;
   date: string;
   riskAmount?: number;
   rMultiple?: number;
@@ -46,7 +50,7 @@ interface TradeState {
   fetchTrades: (accountId: string) => Promise<void>;
   fetchAccountStats: (accountId: string) => Promise<void>;
   addTrade: (trade: Omit<Trade, 'id' | 'date'> & { screenshotFile?: File | Blob | string; date?: string }) => Promise<void>;
-  updateTrade: (id: string, updates: Partial<Omit<Trade, 'id'>> & { screenshotFile?: File | Blob | string | null }) => Promise<void>;
+  updateTrade: (id: string, updates: Partial<Omit<Trade, 'id' | 'screenshotUrl' | 'screenshotPath'>> & { screenshotFile?: File | Blob | string | null }) => Promise<void>;
   deleteTrade: (id: string) => Promise<void>;
 }
 
@@ -97,6 +101,7 @@ export const useTradeStore = create<TradeState>((set, get) => ({
           mistake: d.mistake,
           notes: d.notes,
           screenshotUrl: d.screenshot_url,
+          screenshotPath: d.screenshot_path ?? pathFromLegacyUrl(d.screenshot_url) ?? undefined,
           date: d.date,
           riskAmount,
           rMultiple,
@@ -133,27 +138,24 @@ export const useTradeStore = create<TradeState>((set, get) => ({
       }
     }
 
-    let finalScreenshotUrl = trade.screenshotUrl;
+    let finalScreenshotPath: string | null = null;
 
-    // Upload image to Supabase Storage with WebP compression
+    // Upload image to the private bucket with WebP compression (unique path, no upsert)
     if (trade.screenshotFile && typeof trade.screenshotFile === 'string' && trade.screenshotFile.startsWith('data:image')) {
       const compressed = await compressScreenshot(trade.screenshotFile);
-      const filename = `${user.id}/${Date.now()}.${compressed.extension}`;
+      const filename = buildScreenshotPath(user.id, compressed.extension);
 
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('trade-screenshots')
+        .from(SCREENSHOT_BUCKET)
         .upload(filename, compressed.blob, {
           contentType: compressed.contentType,
-          upsert: true
+          upsert: false
         });
 
       if (uploadError) {
         console.error('Upload error:', uploadError);
       } else if (uploadData) {
-        const { data: publicUrlData } = supabase.storage
-          .from('trade-screenshots')
-          .getPublicUrl(filename);
-        finalScreenshotUrl = publicUrlData.publicUrl;
+        finalScreenshotPath = filename;
       }
     }
 
@@ -170,7 +172,9 @@ export const useTradeStore = create<TradeState>((set, get) => ({
       emotion: trade.emotion,
       mistake: trade.mistake,
       notes: trade.notes,
-      screenshot_url: finalScreenshotUrl
+      // screenshot_url kept null for new uploads (legacy column, removed in P7)
+      screenshot_url: null,
+      screenshot_path: finalScreenshotPath
     };
 
     if (trade.riskAmount !== undefined) insertPayload.risk_amount = trade.riskAmount;
@@ -224,7 +228,8 @@ export const useTradeStore = create<TradeState>((set, get) => ({
         emotion: data.emotion as EmotionTag,
         mistake: data.mistake as MistakeTag,
         notes: data.notes,
-        screenshotUrl: data.screenshot_url,
+        screenshotUrl: data.screenshot_url ?? undefined,
+        screenshotPath: data.screenshot_path ?? pathFromLegacyUrl(data.screenshot_url) ?? undefined,
         date: data.date,
         riskAmount: trade.riskAmount || 500,
         rMultiple: calculatedRMultiple,
@@ -298,26 +303,29 @@ export const useTradeStore = create<TradeState>((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return;
 
-    let finalScreenshotUrl = updates.screenshotUrl;
+    // Image contract: only a fresh `data:` image triggers an upload; `null` removes the image;
+    // anything else (undefined, signed/public URL) leaves the image columns untouched.
+    const existingBefore = get().trades.find(t => t.id === id);
+    const previousPath = existingBefore
+      ? (existingBefore.screenshotPath ?? pathFromLegacyUrl(existingBefore.screenshotUrl))
+      : null;
+    let newScreenshotPath: string | null = null;
 
     if (updates.screenshotFile && typeof updates.screenshotFile === 'string' && updates.screenshotFile.startsWith('data:image')) {
       const compressed = await compressScreenshot(updates.screenshotFile);
-      const filename = `${user.id}/${Date.now()}.${compressed.extension}`;
+      const filename = buildScreenshotPath(user.id, compressed.extension);
 
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('trade-screenshots')
+        .from(SCREENSHOT_BUCKET)
         .upload(filename, compressed.blob, {
           contentType: compressed.contentType,
-          upsert: true
+          upsert: false
         });
 
       if (uploadError) {
         console.error('Upload error:', uploadError);
       } else if (uploadData) {
-        const { data: publicUrlData } = supabase.storage
-          .from('trade-screenshots')
-          .getPublicUrl(filename);
-        finalScreenshotUrl = publicUrlData.publicUrl;
+        newScreenshotPath = filename;
       }
     }
 
@@ -337,10 +345,13 @@ export const useTradeStore = create<TradeState>((set, get) => ({
     if (updates.session !== undefined) payload.session = updates.session;
     if (updates.checklistResults !== undefined) payload.checklist_results = updates.checklistResults;
     
-    if (updates.screenshotFile === null) {
+    const removingImage = updates.screenshotFile === null;
+    if (removingImage) {
       payload.screenshot_url = null;
-    } else if (finalScreenshotUrl !== undefined) {
-      payload.screenshot_url = finalScreenshotUrl;
+      payload.screenshot_path = null;
+    } else if (newScreenshotPath) {
+      payload.screenshot_url = null;
+      payload.screenshot_path = newScreenshotPath;
     }
 
     let { error } = await supabase
@@ -367,19 +378,32 @@ export const useTradeStore = create<TradeState>((set, get) => ({
     }
 
     const existingTrade = get().trades.find(t => t.id === id);
+    const imageChanged = Object.prototype.hasOwnProperty.call(payload, 'screenshot_path');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { screenshotFile: _ignoredFile, ...stateUpdates } = updates;
 
     set(state => ({
       trades: state.trades.map(t => 
         t.id === id 
           ? {
               ...t,
-              ...updates,
-              screenshotUrl: payload.hasOwnProperty('screenshot_url') ? (payload.screenshot_url === null ? undefined : payload.screenshot_url) : t.screenshotUrl
+              ...stateUpdates,
+              screenshotUrl: imageChanged ? undefined : t.screenshotUrl,
+              screenshotPath: imageChanged ? (payload.screenshot_path ?? undefined) : t.screenshotPath
             }
           : t
       ),
       accountStats: null
     }));
+
+    // GC (best-effort, AFTER the DB update succeeded): drop the replaced/removed file.
+    if (imageChanged && previousPath && previousPath !== payload.screenshot_path) {
+      try {
+        await supabase.storage.from(SCREENSHOT_BUCKET).remove([previousPath]);
+      } catch (storageErr) {
+        console.warn('Could not remove previous screenshot from storage:', storageErr);
+      }
+    }
 
     if (existingTrade) {
       get().fetchAccountStats(existingTrade.accountId);
@@ -390,14 +414,12 @@ export const useTradeStore = create<TradeState>((set, get) => ({
     const tradeToDelete = get().trades.find(t => t.id === id);
 
     // Storage Garbage Collection: Clean up screenshot from Supabase Storage
-    if (tradeToDelete?.screenshotUrl) {
+    const storagePath = tradeToDelete
+      ? (tradeToDelete.screenshotPath ?? pathFromLegacyUrl(tradeToDelete.screenshotUrl))
+      : null;
+    if (storagePath) {
       try {
-        const url = new URL(tradeToDelete.screenshotUrl);
-        const parts = url.pathname.split('/trade-screenshots/');
-        if (parts.length > 1) {
-          const storagePath = decodeURIComponent(parts[1]);
-          await supabase.storage.from('trade-screenshots').remove([storagePath]);
-        }
+        await supabase.storage.from(SCREENSHOT_BUCKET).remove([storagePath]);
       } catch (storageErr) {
         console.warn('Could not remove screenshot from storage:', storageErr);
       }

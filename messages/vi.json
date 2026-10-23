@@ -1334,5 +1334,14 @@
     "playbook_shortcuts_point4": "Bảng Phím Tắt Toàn Năng: Ctrl+K (Thanh tìm kiếm lệnh & chuyển trang), Ctrl+B (Thu gọn Sidebar), N (Ghi lệnh 5s), Ctrl+V (Dán ảnh biểu đồ), ESC (Đóng popup).",
     "playbook_shortcuts_tip": "Bấm Ctrl+K ở bất kỳ đâu để chuyển trang hoặc tra cứu thông tin mà không cần dùng đến chuột!",
     "playbook_shortcuts_action": "Đến Cẩm Nang Playbook"
+  },
+  "Screenshots": {
+    "loadError": "Không tải được ảnh",
+    "signing": "Đang tải ảnh bảo mật...",
+    "retry": "Thử lại",
+    "shareDownloaded": "Đã tải ảnh PNG thẻ chia sẻ",
+    "downloadPng": "Tải PNG",
+    "shareExportFailed": "Không xuất được thẻ chia sẻ",
+    "shareImageSkipped": "Không tải được ảnh chart - đã xuất thẻ không kèm ảnh"
   }
 }

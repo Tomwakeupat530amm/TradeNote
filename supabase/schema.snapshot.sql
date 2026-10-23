@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS public.accounts (
     type TEXT NOT NULL,
     initial_balance NUMERIC NOT NULL,
     rules JSONB NOT NULL DEFAULT '{}'::jsonb,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    CONSTRAINT accounts_id_user_id_key UNIQUE (id, user_id) -- P1 (patch 010): đích composite FK
 );
 
 -- Bảng Trades (Lịch sử giao dịch)
@@ -30,7 +31,11 @@ CREATE TABLE IF NOT EXISTS public.trades (
     mistake TEXT NOT NULL,
     notes TEXT,
     screenshot_url TEXT,
-    date TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    screenshot_path TEXT, -- P1 (patch 012): đường dẫn trong bucket private, nguồn đọc ưu tiên
+    date TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    -- P1 (patch 010): trade chỉ được trỏ vào account của CHÍNH user đó
+    CONSTRAINT trades_account_user_fk FOREIGN KEY (account_id, user_id)
+        REFERENCES public.accounts (id, user_id) ON DELETE CASCADE
 );
 
 -- Bảng Daily Reviews (Nhật ký hàng ngày)
@@ -61,7 +66,7 @@ DROP POLICY IF EXISTS "Users can insert their own accounts" ON public.accounts;
 CREATE POLICY "Users can insert their own accounts" ON public.accounts FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can update their own accounts" ON public.accounts;
-CREATE POLICY "Users can update their own accounts" ON public.accounts FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can update their own accounts" ON public.accounts FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can delete their own accounts" ON public.accounts;
 CREATE POLICY "Users can delete their own accounts" ON public.accounts FOR DELETE USING (auth.uid() = user_id);
@@ -73,7 +78,7 @@ DROP POLICY IF EXISTS "Users can insert their own trades" ON public.trades;
 CREATE POLICY "Users can insert their own trades" ON public.trades FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can update their own trades" ON public.trades;
-CREATE POLICY "Users can update their own trades" ON public.trades FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can update their own trades" ON public.trades FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can delete their own trades" ON public.trades;
 CREATE POLICY "Users can delete their own trades" ON public.trades FOR DELETE USING (auth.uid() = user_id);
@@ -85,42 +90,60 @@ DROP POLICY IF EXISTS "Users can insert their own daily reviews" ON public.daily
 CREATE POLICY "Users can insert their own daily reviews" ON public.daily_reviews FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can update their own daily reviews" ON public.daily_reviews;
-CREATE POLICY "Users can update their own daily reviews" ON public.daily_reviews FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can update their own daily reviews" ON public.daily_reviews FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can delete their own daily reviews" ON public.daily_reviews;
 CREATE POLICY "Users can delete their own daily reviews" ON public.daily_reviews FOR DELETE USING (auth.uid() = user_id);
 
 -- SETUP STORAGE CHO SCREENSHOTS VÀ AVATARS
+-- P1: trade-screenshots PRIVATE (patch 013; client đọc bằng signed URL), avatars public để đọc.
 INSERT INTO storage.buckets (id, name, public) VALUES 
-('trade-screenshots', 'trade-screenshots', true),
+('trade-screenshots', 'trade-screenshots', false),
 ('avatars', 'avatars', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Storage Policies: Screenshots
+-- Storage Policies: Screenshots (P1 patch 012/013) - chỉ thư mục đầu = auth.uid()
 DROP POLICY IF EXISTS "Anyone can view screenshots" ON storage.objects;
-CREATE POLICY "Anyone can view screenshots" ON storage.objects FOR SELECT USING (bucket_id = 'trade-screenshots');
-
 DROP POLICY IF EXISTS "Authenticated users can upload screenshots" ON storage.objects;
-CREATE POLICY "Authenticated users can upload screenshots" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'trade-screenshots' AND auth.role() = 'authenticated');
-
 DROP POLICY IF EXISTS "Users can update their own screenshots" ON storage.objects;
-CREATE POLICY "Users can update their own screenshots" ON storage.objects FOR UPDATE USING (bucket_id = 'trade-screenshots' AND auth.uid() = owner);
-
 DROP POLICY IF EXISTS "Users can delete their own screenshots" ON storage.objects;
-CREATE POLICY "Users can delete their own screenshots" ON storage.objects FOR DELETE USING (bucket_id = 'trade-screenshots' AND auth.uid() = owner);
 
--- Storage Policies: Avatars
+DROP POLICY IF EXISTS trade_screenshots_owner_select ON storage.objects;
+CREATE POLICY trade_screenshots_owner_select ON storage.objects FOR SELECT TO authenticated
+  USING (bucket_id = 'trade-screenshots' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS trade_screenshots_owner_insert ON storage.objects;
+CREATE POLICY trade_screenshots_owner_insert ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'trade-screenshots' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS trade_screenshots_owner_update ON storage.objects;
+CREATE POLICY trade_screenshots_owner_update ON storage.objects FOR UPDATE TO authenticated
+  USING (bucket_id = 'trade-screenshots' AND (storage.foldername(name))[1] = auth.uid()::text)
+  WITH CHECK (bucket_id = 'trade-screenshots' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS trade_screenshots_owner_delete ON storage.objects;
+CREATE POLICY trade_screenshots_owner_delete ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'trade-screenshots' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+-- Storage Policies: Avatars (đọc public; ghi theo thư mục của chính user; file cũ `${uid}-*.ext` sửa/xóa được)
 DROP POLICY IF EXISTS "Anyone can view avatars" ON storage.objects;
 CREATE POLICY "Anyone can view avatars" ON storage.objects FOR SELECT USING (bucket_id = 'avatars');
 
 DROP POLICY IF EXISTS "Authenticated users can upload avatars" ON storage.objects;
-CREATE POLICY "Authenticated users can upload avatars" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'avatars' AND auth.role() = 'authenticated');
+DROP POLICY IF EXISTS avatars_owner_insert ON storage.objects;
+CREATE POLICY avatars_owner_insert ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text);
 
 DROP POLICY IF EXISTS "Users can update their own avatars" ON storage.objects;
-CREATE POLICY "Users can update their own avatars" ON storage.objects FOR UPDATE USING (bucket_id = 'avatars' AND auth.uid() = owner);
+DROP POLICY IF EXISTS avatars_owner_update ON storage.objects;
+CREATE POLICY avatars_owner_update ON storage.objects FOR UPDATE TO authenticated
+  USING (bucket_id = 'avatars' AND ((storage.foldername(name))[1] = auth.uid()::text OR name LIKE auth.uid()::text || '-%'))
+  WITH CHECK (bucket_id = 'avatars' AND ((storage.foldername(name))[1] = auth.uid()::text OR name LIKE auth.uid()::text || '-%'));
 
 DROP POLICY IF EXISTS "Users can delete their own avatars" ON storage.objects;
-CREATE POLICY "Users can delete their own avatars" ON storage.objects FOR DELETE USING (bucket_id = 'avatars' AND auth.uid() = owner);
+DROP POLICY IF EXISTS avatars_owner_delete ON storage.objects;
+CREATE POLICY avatars_owner_delete ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'avatars' AND ((storage.foldername(name))[1] = auth.uid()::text OR name LIKE auth.uid()::text || '-%'));
 
 -- Bảng Notifications (Thông báo cho người dùng)
 CREATE TABLE IF NOT EXISTS public.notifications (
@@ -142,7 +165,7 @@ DROP POLICY IF EXISTS "Users can insert their own notifications" ON public.notif
 CREATE POLICY "Users can insert their own notifications" ON public.notifications FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can update their own notifications" ON public.notifications;
-CREATE POLICY "Users can update their own notifications" ON public.notifications FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can update their own notifications" ON public.notifications FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can delete their own notifications" ON public.notifications;
 CREATE POLICY "Users can delete their own notifications" ON public.notifications FOR DELETE USING (auth.uid() = user_id);
@@ -172,7 +195,10 @@ DROP POLICY IF EXISTS "Users can insert their own preferences" ON public.user_pr
 CREATE POLICY "Users can insert their own preferences" ON public.user_preferences FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can update their own preferences" ON public.user_preferences;
-CREATE POLICY "Users can update their own preferences" ON public.user_preferences FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can update their own preferences" ON public.user_preferences FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete their own preferences" ON public.user_preferences;
+CREATE POLICY "Users can delete their own preferences" ON public.user_preferences FOR DELETE USING (auth.uid() = user_id);
 
 -- Bảng Playbooks (Sổ tay chiến lược)
 CREATE TABLE IF NOT EXISTS public.playbooks (
@@ -194,7 +220,7 @@ DROP POLICY IF EXISTS "Users can insert their own playbooks" ON public.playbooks
 CREATE POLICY "Users can insert their own playbooks" ON public.playbooks FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can update their own playbooks" ON public.playbooks;
-CREATE POLICY "Users can update their own playbooks" ON public.playbooks FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can update their own playbooks" ON public.playbooks FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can delete their own playbooks" ON public.playbooks;
 CREATE POLICY "Users can delete their own playbooks" ON public.playbooks FOR DELETE USING (auth.uid() = user_id);
@@ -224,26 +250,39 @@ DROP POLICY IF EXISTS "Users can insert their own periodic reviews" ON public.pe
 CREATE POLICY "Users can insert their own periodic reviews" ON public.periodic_reviews FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can update their own periodic reviews" ON public.periodic_reviews;
-CREATE POLICY "Users can update their own periodic reviews" ON public.periodic_reviews FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can update their own periodic reviews" ON public.periodic_reviews FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can delete their own periodic reviews" ON public.periodic_reviews;
 CREATE POLICY "Users can delete their own periodic reviews" ON public.periodic_reviews FOR DELETE USING (auth.uid() = user_id);
 
 -- ====================================================================
 -- EXPLICIT TABLE GRANTS (Required by Supabase PostgREST Data API from Oct 30)
+-- P1 (patch 011): least privilege - role anon KHÔNG có quyền nào trên bảng/sequence/hàm schema public.
 -- ====================================================================
--- 1. Cấp quyền cho các bảng cốt lõi hiện có
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
+-- 0. Thu hồi mặc định nền tảng (Supabase cấp sẵn toàn quyền cho anon)
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon;
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC, anon;
+
+-- 1. Cấp quyền cho các bảng cốt lõi hiện có (authenticated: đúng CRUD, RLS quyết định dòng)
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO service_role;
+REVOKE TRUNCATE, TRIGGER, REFERENCES ON ALL TABLES IN SCHEMA public FROM authenticated;
 
 -- Cấp quyền sử dụng cho chuỗi sequence (nếu có trường auto-increment)
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated, service_role;
 
 -- 2. Tự động cấp quyền cho mọi bảng & sequence tạo mới trong tương lai
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO anon;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE TRUNCATE, TRIGGER, REFERENCES ON TABLES FROM authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM anon;
+-- EXECUTE cho PUBLIC là default toàn cục (IN SCHEMA là no-op) -> revoke toàn cục cho role postgres.
+-- Patch tạo hàm mới vẫn phải tự REVOKE EXECUTE ON FUNCTION ... FROM PUBLIC, anon.
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO service_role;
 
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO authenticated, service_role;
 
+-- Ghi chú: hàm public.get_account_stats (nếu cài, xem patches/001 + 011) chỉ GRANT EXECUTE cho authenticated.

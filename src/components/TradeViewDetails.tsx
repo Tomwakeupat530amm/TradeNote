@@ -9,6 +9,8 @@ import { useTranslations } from "next-intl";
 import { ShareTradeModal } from "./ShareTradeModal";
 import { VisualRRBox } from "./VisualRRBox";
 import { TradingViewMiniChart } from "./TradingViewMiniChart";
+import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
+import { useSignedUrl } from "@/hooks/useSignedUrl";
 
 interface TradeViewDetailsProps {
   trade: Trade;
@@ -21,6 +23,9 @@ interface TradeViewDetailsProps {
 export function TradeViewDetails({ trade, onEdit, onDelete, onClose, setZoomImageSrc }: TradeViewDetailsProps) {
   const t = useTranslations("TradeDetailsModal");
   const tVisual = useTranslations("VisualRR");
+  const tShot = useTranslations("Screenshots");
+  const screenshotPath = trade.screenshotPath ?? pathFromLegacyUrl(trade.screenshotUrl);
+  const signedShot = useSignedUrl(screenshotPath);
   const tTag = useTagTranslation();
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [mediaTab, setMediaTab] = useState<"screenshot" | "chart">("screenshot");
@@ -179,18 +184,31 @@ export function TradeViewDetails({ trade, onEdit, onDelete, onClose, setZoomImag
           </div>
 
           {mediaTab === "screenshot" ? (
-            trade.screenshotUrl ? (
+            screenshotPath && !signedShot.url ? (
+              <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-gray-800 aspect-video bg-black text-sm text-gray-400">
+                {signedShot.error ? (
+                  <>
+                    <span className="text-rose-300">{tShot("loadError")}</span>
+                    <button type="button" onClick={signedShot.retry} className="underline text-emerald-300 text-xs">
+                      {tShot("retry")}
+                    </button>
+                  </>
+                ) : (
+                  <span className="animate-pulse">{tShot("signing")}</span>
+                )}
+              </div>
+            ) : screenshotPath && signedShot.url ? (
               <div className="relative group rounded-xl overflow-hidden border border-gray-800 aspect-video bg-black flex items-center justify-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={trade.screenshotUrl}
+                  src={signedShot.url}
                   alt="Trade setup"
                   className="w-full h-full object-contain cursor-zoom-in"
-                  onClick={() => setZoomImageSrc(trade.screenshotUrl || null)}
+                  onClick={() => setZoomImageSrc(signedShot.url)}
                 />
                 <button
                   type="button"
-                  onClick={() => setZoomImageSrc(trade.screenshotUrl || null)}
+                  onClick={() => setZoomImageSrc(signedShot.url)}
                   className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-sm text-white hover:bg-black/80 transition-colors p-2 rounded-lg text-xs font-bold flex items-center gap-1 group-hover:opacity-100 opacity-0 cursor-pointer"
                 >
                   <ZoomIn className="w-3.5 h-3.5" /> {t("zoom_in")}

@@ -21,6 +21,8 @@ import { calculateAccount1RRisk } from "@/lib/riskEngine";
 import { useTagTranslation } from "@/hooks/useTagTranslation";
 import { playSuccessChime } from "@/lib/soundEngine";
 import { processClipboardImage } from "@/lib/imageCompressor";
+import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
+import { useSignedUrl } from "@/hooks/useSignedUrl";
 
 interface TradeSlideOverDrawerProps {
   isOpen: boolean;
@@ -73,6 +75,12 @@ export function TradeSlideOverDrawer({
   const [notes, setNotes] = useState("");
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [screenshotRemoved, setScreenshotRemoved] = useState(false);
+  // Existing stored image (edit mode): storage path only. `screenshot` holds only new data: images.
+  const [existingScreenshotPath, setExistingScreenshotPath] = useState<string | null>(null);
+  const tShot = useTranslations("Screenshots");
+  const signedShot = useSignedUrl(screenshotRemoved || screenshot ? null : existingScreenshotPath);
+  const previewSrc = screenshot || signedShot.url;
+  const hasImage = Boolean(screenshot || existingScreenshotPath) && !screenshotRemoved;
   const [compressionRatio, setCompressionRatio] = useState<number | null>(null);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -167,7 +175,8 @@ export function TradeSlideOverDrawer({
         setEmotion(tradeToEdit.emotion || "Calm");
         setMistake(tradeToEdit.mistake || "None");
         setNotes(tradeToEdit.notes || "");
-        setScreenshot(tradeToEdit.screenshotUrl || null);
+        setScreenshot(null);
+        setExistingScreenshotPath(tradeToEdit.screenshotPath ?? pathFromLegacyUrl(tradeToEdit.screenshotUrl));
         setScreenshotRemoved(false);
         setActiveTab("execution");
       } else {
@@ -225,6 +234,7 @@ export function TradeSlideOverDrawer({
           setNotes("");
           setScreenshot(null);
         }
+        setExistingScreenshotPath(null);
         setScreenshotRemoved(false);
         setActiveTab("execution");
       }
@@ -468,7 +478,7 @@ export function TradeSlideOverDrawer({
           rMultiple: liveRMultiple,
           session,
           checklistResults,
-          screenshotFile: screenshot || undefined,
+          screenshotFile: screenshot && screenshot.startsWith("data:") ? screenshot : undefined,
         });
 
         // Clear local draft upon successful save
@@ -626,7 +636,7 @@ export function TradeSlideOverDrawer({
               >
                 <Star className={clsx("w-3.5 h-3.5", isAplusSetup ? "text-amber-400 fill-amber-400" : "")} />
                 <span>{t("tab_psychology")}</span>
-                {screenshot && !screenshotRemoved && (
+                {hasImage && (
                   <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono border border-emerald-500/40 flex items-center gap-1">
                     📷 {t("has_image_badge")}
                   </span>
@@ -957,13 +967,26 @@ export function TradeSlideOverDrawer({
                         <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
                         <span>{t("processing_image")}</span>
                       </div>
-                    ) : screenshot && !screenshotRemoved ? (
+                    ) : hasImage ? (
                       <div className="relative rounded-xl border border-white/10 overflow-hidden bg-black/40 group max-h-52">
-                        <img
-                          src={screenshot}
-                          alt="Trade chart"
-                          className="w-full h-auto object-cover max-h-52"
-                        />
+                        {previewSrc ? (
+                          <img
+                            src={previewSrc}
+                            alt="Trade chart"
+                            className="w-full h-auto object-cover max-h-52"
+                          />
+                        ) : signedShot.error ? (
+                          <div className="flex h-32 flex-col items-center justify-center gap-1 text-xs text-rose-300">
+                            <span>{tShot("loadError")}</span>
+                            <button type="button" onClick={signedShot.retry} className="underline text-emerald-300">
+                              {tShot("retry")}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex h-32 items-center justify-center text-xs text-gray-400 animate-pulse">
+                            {tShot("signing")}
+                          </div>
+                        )}
 
                         {/* Floating Optimization Badge */}
                         <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md border border-emerald-500/40 text-[11px] font-mono font-bold text-emerald-300 shadow-lg">
@@ -988,6 +1011,7 @@ export function TradeSlideOverDrawer({
                             type="button"
                             onClick={() => {
                               setScreenshot(null);
+                              setExistingScreenshotPath(null);
                               setScreenshotRemoved(true);
                               setCompressionRatio(null);
                             }}

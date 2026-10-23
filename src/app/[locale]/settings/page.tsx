@@ -166,8 +166,10 @@ export default function SettingsPage() {
     
     setIsUploadingAvatar(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${user.id}-${Math.random()}.${fileExt}`;
+      const rawExt = (file.name.split('.').pop() || '').toLowerCase();
+      const fileExt = /^[a-z0-9]{1,5}$/.test(rawExt) ? rawExt : 'png';
+      // Owner-folder layout required by storage policy: `${user.id}/${uuid}.${ext}`
+      const filePath = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
       
       const { error: uploadError } = await supabase.storage
         .from('avatars')

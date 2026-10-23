@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import clsx from "clsx";
 import { useTranslations } from "next-intl";
 import { useTagTranslation } from "@/hooks/useTagTranslation";
+import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
 
 const SETUPS: SetupTag[] = ["Breakout", "Pullback", "Reversal", "Continuation", "Other"];
 const SESSIONS: TradingSession[] = ["Asian", "London", "London-NY Overlap", "New York"];
@@ -39,7 +40,9 @@ function JournalContent() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterSetup, setFilterSetup] = useState("All");
-  const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
+  // Giữ id (không giữ snapshot) để modal luôn đọc bản mới nhất từ store: sau khi sửa ảnh,
+  // snapshot cũ trỏ tới file đã bị GC xóa (P1 EVL F1).
+  const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
   const [tradeToEdit, setTradeToEdit] = useState<Trade | null>(null);
   const [tradeToShare, setTradeToShare] = useState<Trade | null>(null);
   const [initialTradeData, setInitialTradeData] = useState<Partial<Trade> | undefined>(undefined);
@@ -83,6 +86,9 @@ function JournalContent() {
 
   const activeAccount = accounts.find(a => a.id === activeAccountId);
   const accountTrades = trades.filter(t => t.accountId === activeAccountId);
+  const selectedTrade: Trade | null = selectedTradeId
+    ? trades.find(t => t.id === selectedTradeId) ?? null
+    : null;
 
   // Today's Realized Loss Calculation for Daily Loss Warning / Hard Stop
   const todayPnL = useMemo(() => {
@@ -537,14 +543,14 @@ function JournalContent() {
                 selectedCalendarDate={selectedCalendarDate}
                 setSelectedCalendarDate={setSelectedCalendarDate}
                 trades={accountTrades}
-                onSelectTrade={(trade) => setSelectedTrade(trade)}
+                onSelectTrade={(trade) => setSelectedTradeId(trade.id)}
                 onSwitchToTable={() => setViewMode("table")}
               />
             ) : layoutMode === "cards" ? (
               /* Visual Cards Grid Mode (All Screen Sizes) */
               <TradeCardsView
                 trades={paginatedTrades}
-                onSelectTrade={(trade) => setSelectedTrade(trade)}
+                onSelectTrade={(trade) => setSelectedTradeId(trade.id)}
                 onEditTrade={(trade) => {
                   setTradeToEdit(trade);
                   setIsAdding(true);
@@ -575,7 +581,7 @@ function JournalContent() {
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, x: -20 }}
-                            onClick={() => setSelectedTrade(trade)}
+                            onClick={() => setSelectedTradeId(trade.id)}
                             className="border-b border-white/[0.06] hover:bg-white/[0.04] transition-colors group cursor-pointer"
                           >
                           {/* 1. Thời Gian & Phiên (16%) */}
@@ -623,7 +629,7 @@ function JournalContent() {
                                     ⭐ A+
                                   </span>
                                 )}
-                                {trade.screenshotUrl && (
+                                {(trade.screenshotPath ?? pathFromLegacyUrl(trade.screenshotUrl)) && (
                                   <span title={t('has_screenshot')} className="inline-flex items-center gap-0.5 rounded-md bg-sky-500/15 border border-sky-500/30 px-1.5 py-0.5 text-[10px] font-medium text-sky-300">
                                     <ImageIcon className="w-3 h-3" />
                                   </span>
@@ -727,7 +733,7 @@ function JournalContent() {
                 <div className="md:hidden">
                   <TradeCardsView
                     trades={paginatedTrades}
-                    onSelectTrade={(trade) => setSelectedTrade(trade)}
+                    onSelectTrade={(trade) => setSelectedTradeId(trade.id)}
                     onEditTrade={(trade) => {
                       setTradeToEdit(trade);
                       setIsAdding(true);
@@ -777,7 +783,7 @@ function JournalContent() {
 
       <TradeDetailsModal
         isOpen={selectedTrade !== null}
-        onClose={() => setSelectedTrade(null)}
+        onClose={() => setSelectedTradeId(null)}
         trade={selectedTrade}
       />
 

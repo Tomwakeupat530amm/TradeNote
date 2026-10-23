@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from './useAuthStore';
 import { compressScreenshot } from '@/lib/imageCompressor';
+import { pathFromLegacyUrl } from '@/lib/screenshotStorage';
 
 export interface Playbook {
   id: string;
@@ -9,7 +10,10 @@ export interface Playbook {
   title: string;
   description: string;
   rules: string[];
+  /** Stored value of playbooks.image_url (legacy public-URL format; kept for rollback compatibility). */
   imageUrl?: string;
+  /** Storage path derived from imageUrl (client-side only; no DB column). Display uses a signed URL. */
+  imagePath?: string;
   createdAt: string;
 }
 
@@ -46,6 +50,7 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
         description: d.description || '',
         rules: d.rules || [],
         imageUrl: d.image_url,
+        imagePath: pathFromLegacyUrl(d.image_url) ?? undefined,
         createdAt: d.created_at,
       }));
       set({ playbooks: formattedPlaybooks });
@@ -105,6 +110,7 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
         description: data.description || '',
         rules: data.rules || [],
         imageUrl: data.image_url,
+        imagePath: pathFromLegacyUrl(data.image_url) ?? undefined,
         createdAt: data.created_at,
       };
       
@@ -167,7 +173,8 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
           ? {
               ...p,
               ...updates,
-              imageUrl: payload.hasOwnProperty('image_url') ? (payload.image_url === null ? undefined : payload.image_url) : p.imageUrl
+              imageUrl: payload.hasOwnProperty('image_url') ? (payload.image_url === null ? undefined : payload.image_url) : p.imageUrl,
+              imagePath: payload.hasOwnProperty('image_url') ? (pathFromLegacyUrl(payload.image_url) ?? undefined) : p.imagePath
             }
           : p
       )
@@ -176,14 +183,12 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
 
   deletePlaybook: async (id) => {
     const playbookToDelete = get().playbooks.find(p => p.id === id);
-    if (playbookToDelete?.imageUrl) {
+    const storagePath = playbookToDelete
+      ? (playbookToDelete.imagePath ?? pathFromLegacyUrl(playbookToDelete.imageUrl))
+      : null;
+    if (storagePath) {
       try {
-        const url = new URL(playbookToDelete.imageUrl);
-        const parts = url.pathname.split('/trade-screenshots/');
-        if (parts.length > 1) {
-          const storagePath = decodeURIComponent(parts[1]);
-          await supabase.storage.from('trade-screenshots').remove([storagePath]);
-        }
+        await supabase.storage.from('trade-screenshots').remove([storagePath]);
       } catch (storageErr) {
         console.warn('Could not remove playbook image from storage:', storageErr);
       }

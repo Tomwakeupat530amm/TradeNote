@@ -1,0 +1,169 @@
+{
+  "_doc": "Ma trận quyền KỲ VỌNG sau patch 011 (Phase 01, E18). So với kết quả probe supabase/probes/11_p1_grants_matrix.sql (cùng cấu trúc). service_role: giữ như hiện trạng baseline 11-10-26 (đủ 7 quyền). Danh sách quyền sắp xếp A-Z.",
+  "version": "p1-after-011",
+  "tables": {
+    "accounts": {
+      "anon": [],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "SELECT",
+        "UPDATE"
+      ],
+      "service_role": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "daily_reviews": {
+      "anon": [],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "SELECT",
+        "UPDATE"
+      ],
+      "service_role": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "notifications": {
+      "anon": [],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "SELECT",
+        "UPDATE"
+      ],
+      "service_role": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "periodic_reviews": {
+      "anon": [],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "SELECT",
+        "UPDATE"
+      ],
+      "service_role": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "playbooks": {
+      "anon": [],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "SELECT",
+        "UPDATE"
+      ],
+      "service_role": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "trades": {
+      "anon": [],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "SELECT",
+        "UPDATE"
+      ],
+      "service_role": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "user_preferences": {
+      "anon": [],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "SELECT",
+        "UPDATE"
+      ],
+      "service_role": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "schema_migrations": {
+      "anon": [],
+      "authenticated": [],
+      "service_role": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    }
+  },
+  "functions": {
+    "get_account_stats(uuid)": {
+      "PUBLIC": false,
+      "anon": false,
+      "authenticated": true
+    }
+  },
+  "policies": {
+    "user_preferences": [
+      "DELETE",
+      "INSERT",
+      "SELECT",
+      "UPDATE"
+    ],
+    "update_policies_with_check": [
+      "accounts",
+      "daily_reviews",
+      "notifications",
+      "periodic_reviews",
+      "playbooks",
+      "trades",
+      "user_preferences"
+    ]
+  }
+}

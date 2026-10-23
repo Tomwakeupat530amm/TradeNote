@@ -2888,9 +2888,10 @@ it("Validates schema SQL contains explicit GRANT commands for all 7 core TradeNo
   }
 
   // Verify schemaContent has explicit bulk GRANT for schema public
+  // P1 (E2b): snapshot is least-privilege now - anon must NOT receive any GRANT (REVOKE ... FROM anon allowed)
   assert.ok(
-    /GRANT\s+SELECT\s+ON\s+ALL\s+TABLES\s+IN\s+SCHEMA\s+public\s+TO\s+anon/i.test(schemaContent),
-    "supabase_schema.sql must grant SELECT on all tables to anon"
+    !/GRANT\s+[^;]*?\bTO\s+[^;]*\banon\b/i.test(schemaContent),
+    "schema.snapshot.sql must not GRANT anything to anon (P1 patch 011)"
   );
   assert.ok(
     /GRANT\s+SELECT,\s*INSERT,\s*UPDATE,\s*DELETE\s+ON\s+ALL\s+TABLES\s+IN\s+SCHEMA\s+public\s+TO\s+authenticated/i.test(schemaContent),
@@ -2916,11 +2917,25 @@ it("Validates Future-Proofing ALTER DEFAULT PRIVILEGES is declared for tables an
   const patchContent = fs.readFileSync(patchSqlPath, 'utf8');
   const schemaContent = fs.readFileSync(schemaSqlPath, 'utf8');
 
+  // P1 (E19): legacy patch file keeps its anon default privileges; snapshot must not grant anon by default.
+  assert.ok(
+    /ALTER\s+DEFAULT\s+PRIVILEGES\s+IN\s+SCHEMA\s+public\s+GRANT\s+SELECT\s+ON\s+TABLES\s+TO\s+anon/i.test(patchContent),
+    "Legacy patch must alter default privileges for anon"
+  );
+  assert.ok(
+    !/ALTER\s+DEFAULT\s+PRIVILEGES\s+IN\s+SCHEMA\s+public\s+GRANT\s+[^;]*?\bTO\s+[^;]*\banon\b/i.test(schemaContent),
+    "Snapshot must not alter default privileges to grant anon"
+  );
+  assert.ok(
+    /ALTER\s+DEFAULT\s+PRIVILEGES\s+IN\s+SCHEMA\s+public\s+GRANT\s+USAGE,\s*SELECT\s+ON\s+SEQUENCES\s+TO\s+anon,\s*authenticated,\s*service_role/i.test(patchContent),
+    "Legacy patch must alter default privileges for sequences"
+  );
+  assert.ok(
+    /ALTER\s+DEFAULT\s+PRIVILEGES\s+IN\s+SCHEMA\s+public\s+GRANT\s+USAGE,\s*SELECT\s+ON\s+SEQUENCES\s+TO\s+authenticated,\s*service_role\s*;/i.test(schemaContent),
+    "Snapshot must alter default privileges for sequences to authenticated, service_role (no anon)"
+  );
+
   for (const content of [patchContent, schemaContent]) {
-    assert.ok(
-      /ALTER\s+DEFAULT\s+PRIVILEGES\s+IN\s+SCHEMA\s+public\s+GRANT\s+SELECT\s+ON\s+TABLES\s+TO\s+anon/i.test(content),
-      "Must alter default privileges for anon"
-    );
     assert.ok(
       /ALTER\s+DEFAULT\s+PRIVILEGES\s+IN\s+SCHEMA\s+public\s+GRANT\s+SELECT,\s*INSERT,\s*UPDATE,\s*DELETE\s+ON\s+TABLES\s+TO\s+authenticated/i.test(content),
       "Must alter default privileges for authenticated"
@@ -2928,10 +2943,6 @@ it("Validates Future-Proofing ALTER DEFAULT PRIVILEGES is declared for tables an
     assert.ok(
       /ALTER\s+DEFAULT\s+PRIVILEGES\s+IN\s+SCHEMA\s+public\s+GRANT\s+SELECT,\s*INSERT,\s*UPDATE,\s*DELETE\s+ON\s+TABLES\s+TO\s+service_role/i.test(content),
       "Must alter default privileges for service_role"
-    );
-    assert.ok(
-      /ALTER\s+DEFAULT\s+PRIVILEGES\s+IN\s+SCHEMA\s+public\s+GRANT\s+USAGE,\s*SELECT\s+ON\s+SEQUENCES\s+TO\s+anon,\s*authenticated,\s*service_role/i.test(content),
-      "Must alter default privileges for sequences"
     );
   }
 });
@@ -2942,7 +2953,9 @@ it("Validates sequence USAGE privileges granted for auto-increment integrity", (
 
   const seqRegex = /GRANT\s+USAGE,\s*SELECT\s+ON\s+ALL\s+SEQUENCES\s+IN\s+SCHEMA\s+public\s+TO\s+anon,\s*authenticated,\s*service_role/i;
   assert.ok(seqRegex.test(patchContent), "Patch must grant sequence usage");
-  assert.ok(seqRegex.test(schemaContent), "Schema must grant sequence usage");
+  // P1 (E2b): snapshot grants sequences to authenticated, service_role only (no anon)
+  const schemaSeqRegex = /GRANT\s+USAGE,\s*SELECT\s+ON\s+ALL\s+SEQUENCES\s+IN\s+SCHEMA\s+public\s+TO\s+authenticated,\s*service_role\s*;/i;
+  assert.ok(schemaSeqRegex.test(schemaContent), "Schema must grant sequence usage to authenticated, service_role (no anon)");
 });
 
 it("Validates patch script safety & idempotency (syntax validation without destructiveness)", () => {
@@ -2955,6 +2968,55 @@ it("Validates patch script safety & idempotency (syntax validation without destr
 
   // Must contain completion notice
   assert.ok(patchContent.includes("RAISE NOTICE"), "Patch script should have completion notice for DB admin");
+});
+
+// ==========================================
+// SECTION 28b: P1 SCHEMA SNAPSHOT STATIC GATES (RLS WITH CHECK, NO ANON GRANTS, PRIVATE SCREENSHOTS)
+// ==========================================
+console.log("\n--- SECTION 28b: P1 SCHEMA SNAPSHOT STATIC GATES ---");
+
+function p1SnapshotStatements() {
+  const raw = fs.readFileSync(schemaSqlPath, 'utf8');
+  const code = raw.split('\n').map((l) => l.replace(/--.*$/, '')).join('\n');
+  return code.split(';').map((st) => st.replace(/\s+/g, ' ').trim()).filter(Boolean);
+}
+
+it("P1 snapshot: every UPDATE policy (public tables + storage.objects) has WITH CHECK", () => {
+  const stmts = p1SnapshotStatements();
+  const updates = stmts.filter((st) => /^CREATE POLICY\b.*\bFOR UPDATE\b/i.test(st));
+  assert.ok(updates.length >= 9, `expected >= 9 UPDATE policies (7 tables + 2 storage), got ${updates.length}`);
+  for (const st of updates) {
+    assert.ok(/\bWITH CHECK\b/i.test(st), `UPDATE policy without WITH CHECK: ${st.slice(0, 120)}`);
+  }
+  for (const table of coreTables) {
+    const hit = updates.find((st) => new RegExp(`\\bON public\\.${table}\\b`, 'i').test(st));
+    assert.ok(hit, `missing UPDATE policy for ${table}`);
+    assert.ok(/WITH CHECK \(auth\.uid\(\) = user_id\)/i.test(hit), `${table} UPDATE policy must WITH CHECK (auth.uid() = user_id)`);
+  }
+});
+
+it("P1 snapshot: no GRANT statement (incl. ALTER DEFAULT PRIVILEGES, sequences) contains anon; REVOKE ... FROM anon present", () => {
+  const stmts = p1SnapshotStatements();
+  const grants = stmts.filter((st) => /\bGRANT\b/i.test(st));
+  assert.ok(grants.length > 0, "snapshot must still contain GRANT statements");
+  for (const st of grants) {
+    assert.ok(!/\banon\b/i.test(st), `GRANT containing anon: ${st}`);
+  }
+  assert.ok(stmts.some((st) => /^REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon$/i.test(st)), "must REVOKE ALL tables FROM anon");
+  assert.ok(stmts.some((st) => /^REVOKE TRUNCATE, TRIGGER, REFERENCES ON ALL TABLES IN SCHEMA public FROM authenticated$/i.test(st)), "must REVOKE TRUNCATE/TRIGGER/REFERENCES FROM authenticated");
+  assert.ok(stmts.some((st) => /^REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC, anon$/i.test(st)), "must REVOKE EXECUTE functions FROM PUBLIC, anon");
+});
+
+it("P1 snapshot: DELETE policy on user_preferences, composite FK, screenshot_path and private trade-screenshots bucket", () => {
+  const stmts = p1SnapshotStatements();
+  assert.ok(stmts.some((st) => /^CREATE POLICY .* ON public\.user_preferences FOR DELETE USING \(auth\.uid\(\) = user_id\)$/i.test(st)), "user_preferences DELETE policy missing");
+  const all = stmts.join(';\n');
+  assert.ok(/CONSTRAINT accounts_id_user_id_key UNIQUE \(id, user_id\)/i.test(all), "accounts UNIQUE (id, user_id) missing");
+  assert.ok(/CONSTRAINT trades_account_user_fk FOREIGN KEY \(account_id, user_id\) REFERENCES public\.accounts \(id, user_id\)/i.test(all), "trades composite FK missing");
+  assert.ok(/\bscreenshot_path TEXT\b/i.test(all), "trades.screenshot_path missing");
+  assert.ok(/\('trade-screenshots', 'trade-screenshots', false\)/.test(all), "trade-screenshots bucket must be private");
+  assert.ok(!/"Anyone can view screenshots" ON storage\.objects FOR SELECT/i.test(all), "public SELECT policy on screenshots must be gone");
+  assert.ok(/CREATE POLICY trade_screenshots_owner_select ON storage\.objects FOR SELECT TO authenticated USING \(bucket_id = 'trade-screenshots' AND \(storage\.foldername\(name\)\)\[1\] = auth\.uid\(\)::text\)/i.test(all), "owner-prefix SELECT policy missing");
 });
 
 // ==========================================
@@ -3260,6 +3322,165 @@ it("Validates formatSafeText prevents crash on object/array inputs and AICoachMo
   assert.ok(fs.existsSync(errorBoundaryPath), "App Router must include [locale]/error.tsx");
   const errorCode = fs.readFileSync(errorBoundaryPath, 'utf8');
   assert.ok(errorCode.includes("ErrorBoundary"), "error.tsx must export ErrorBoundary component");
+});
+
+console.log("\n34. P1 Hardening: Private Screenshot Storage & Signed URL Client Contracts:");
+
+// E17: Node v24 type-stripping imports the real TS module (no build step, no package.json "type").
+// N7: if this Node cannot import .ts, report a clear gap in Section 34 tests and keep other sections running.
+let shotLib;
+try {
+  shotLib = await import('../src/lib/screenshotStorage.ts');
+} catch (importErr) {
+  const reason = `GAP: cannot import src/lib/screenshotStorage.ts on Node ${process.version} (needs TS type-stripping, Node >= 22.6/24): ${importErr && importErr.message}`;
+  console.log(`  ${reason}`);
+  shotLib = new Proxy({}, { get(_t, prop) { if (prop === 'then') return undefined; throw new Error(reason); } });
+}
+const { execSync: shotExecSync } = await import('node:child_process');
+const readSrc = (rel) => fs.readFileSync(path.resolve(__dirname, '..', rel), 'utf8');
+
+it("E1b: pathFromLegacyUrl converts legacy public URL to path (drops query, matches 012 backfill)", () => {
+  const { pathFromLegacyUrl } = shotLib;
+  const base = 'https://abc.supabase.co/storage/v1/object/public/trade-screenshots/';
+  assert.strictEqual(pathFromLegacyUrl(base + 'u-1/1700000000000.webp'), 'u-1/1700000000000.webp');
+  assert.strictEqual(pathFromLegacyUrl(base + 'u-1/1700000000000.webp?t=123'), 'u-1/1700000000000.webp');
+  assert.strictEqual(pathFromLegacyUrl(base + 'u-1/playbook_17.webp#x'), 'u-1/playbook_17.webp');
+  // Encoded chars are NOT decoded (client mirrors SQL backfill; SQL asserts no '%').
+  assert.strictEqual(pathFromLegacyUrl(base + 'u-1/a%20b.webp'), 'u-1/a%20b.webp');
+  // Signed URL form also maps to its path (never stored, but GC/guards stay robust).
+  assert.strictEqual(pathFromLegacyUrl('https://abc.supabase.co/storage/v1/object/sign/trade-screenshots/u-1/x.webp?token=abc'), 'u-1/x.webp');
+});
+
+it("E1b: pathFromLegacyUrl is idempotent for bare paths and returns null for foreign/empty/data inputs", () => {
+  const { pathFromLegacyUrl } = shotLib;
+  const p = 'u-1/1700000000000-ab12cd34.webp';
+  assert.strictEqual(pathFromLegacyUrl(p), p);
+  assert.strictEqual(pathFromLegacyUrl(pathFromLegacyUrl(p)), p);
+  assert.strictEqual(pathFromLegacyUrl(null), null);
+  assert.strictEqual(pathFromLegacyUrl(undefined), null);
+  assert.strictEqual(pathFromLegacyUrl(''), null);
+  assert.strictEqual(pathFromLegacyUrl('   '), null);
+  assert.strictEqual(pathFromLegacyUrl('https://abc.supabase.co/storage/v1/object/public/avatars/u-1/a.png'), null);
+  assert.strictEqual(pathFromLegacyUrl('https://example.com/trade.png'), null);
+  assert.strictEqual(pathFromLegacyUrl('https://abc.supabase.co/storage/v1/object/public/trade-screenshots/'), null);
+  assert.strictEqual(pathFromLegacyUrl('data:image/png;base64,AAAA'), null);
+  assert.strictEqual(pathFromLegacyUrl('blob:http://localhost/123'), null);
+  assert.strictEqual(pathFromLegacyUrl('no-folder.webp'), null);
+  assert.strictEqual(pathFromLegacyUrl('u-1/../u-2/x.webp'), null);
+});
+
+it("E1b: buildScreenshotPath yields {userId}/{nonce}.{ext} and {userId}/{ts}-{hex}.{ext} when auto-generated", () => {
+  const { buildScreenshotPath, SCREENSHOT_BUCKET } = shotLib;
+  const uid = '3f1c2b9a-0000-4000-8000-123456789abc';
+  assert.strictEqual(SCREENSHOT_BUCKET, 'trade-screenshots');
+  assert.strictEqual(buildScreenshotPath(uid, 'webp', '1700000000000-deadbeef'), `${uid}/1700000000000-deadbeef.webp`);
+  assert.match(buildScreenshotPath(uid, 'webp', 'fixed'), new RegExp(`^${uid}/fixed\\.webp$`));
+  const auto = buildScreenshotPath(uid, 'webp');
+  assert.match(auto, new RegExp(`^${uid}/\\d+-[0-9a-f]+\\.webp$`));
+  assert.match(auto, /^[0-9A-Za-z\-/._]+$/);
+  assert.notStrictEqual(buildScreenshotPath(uid, 'webp'), buildScreenshotPath(uid, 'webp'));
+  assert.strictEqual(shotLib.pathFromLegacyUrl(auto), auto);
+  assert.throws(() => buildScreenshotPath('', 'webp'));
+  assert.throws(() => buildScreenshotPath('a/b', 'webp'));
+  assert.throws(() => buildScreenshotPath(uid, 'we/bp'));
+});
+
+it("E1b: needsSignedUrlRefresh refreshes when < 10 minutes remain (TTL 1h)", () => {
+  const { needsSignedUrlRefresh, SIGNED_URL_TTL_SECONDS } = shotLib;
+  const now = 1_000_000;
+  assert.strictEqual(SIGNED_URL_TTL_SECONDS, 3600);
+  assert.strictEqual(needsSignedUrlRefresh(undefined, now), true);
+  assert.strictEqual(needsSignedUrlRefresh(now + 3600 * 1000, now), false);
+  assert.strictEqual(needsSignedUrlRefresh(now + 11 * 60 * 1000, now), false);
+  assert.strictEqual(needsSignedUrlRefresh(now + 9 * 60 * 1000, now), true);
+});
+
+it("E21(i): useSignedUrl batches via createSignedUrls with in-memory cache only (no localStorage/sessionStorage)", () => {
+  const code = readSrc('src/hooks/useSignedUrl.ts');
+  assert.ok(!/localStorage|sessionStorage/.test(code), "useSignedUrl must not touch web storage");
+  assert.ok(code.includes('createSignedUrls('), "must batch with createSignedUrls");
+  assert.ok(code.includes('SIGNED_URL_TTL_SECONDS'), "must use 1h TTL constant");
+  assert.ok(code.includes('new Map'), "must cache in memory");
+  assert.ok(code.includes('export function prefetchSignedUrls'), "must export prefetchSignedUrls");
+});
+
+it("E21(ii): stores no longer split '/trade-screenshots/' and GC by screenshotPath ?? pathFromLegacyUrl", () => {
+  const tradeStore = readSrc('src/store/useTradeStore.ts');
+  const playbookStore = readSrc('src/store/usePlaybookStore.ts');
+  for (const code of [tradeStore, playbookStore]) {
+    assert.ok(!code.includes("split('/trade-screenshots/')"), "legacy URL split must be gone");
+    assert.ok(code.includes('pathFromLegacyUrl('), "must derive path via pathFromLegacyUrl");
+  }
+  assert.ok(tradeStore.includes('screenshotPath ?? pathFromLegacyUrl('), "deleteTrade/updateTrade GC must prefer screenshotPath");
+  assert.ok(tradeStore.includes('screenshot_path: finalScreenshotPath'), "addTrade must write screenshot_path");
+  assert.ok(tradeStore.includes('payload.screenshot_path = null'), "removing an image must null screenshot_path");
+  assert.ok(!/getPublicUrl/.test(tradeStore), "trade store must not build public URLs anymore");
+  assert.ok(!/payload\.screenshot_url\s*=\s*(updates|final)/.test(tradeStore), "must never write a client-supplied URL to screenshot_url");
+  assert.ok(playbookStore.includes('getPublicUrl'), "playbook keeps writing public-URL format to image_url (D6 decision)");
+});
+
+it("E21(iii): D4 render files no longer guard or render on trade.screenshotUrl", () => {
+  const files = [
+    'src/components/TradeCardsView.tsx',
+    'src/components/TradeViewDetails.tsx',
+    'src/components/ShareTradeModal.tsx',
+    'src/components/TradeSlideOverDrawer.tsx',
+    'src/components/TradeEditForm.tsx',
+    'src/app/[locale]/journal/page.tsx',
+    'src/app/[locale]/playbook/page.tsx',
+  ];
+  for (const f of files) {
+    const code = readSrc(f);
+    assert.ok(!/trade\.screenshotUrl\s*(&&|\?)/.test(code), `${f}: guard on trade.screenshotUrl`);
+    assert.ok(!/src=\{\s*(trade|tradeToEdit)\.screenshotUrl/.test(code), `${f}: renders trade.screenshotUrl`);
+    assert.ok(!/src=\{\s*(playbook|viewingPlaybook)\.imageUrl/.test(code), `${f}: renders playbook.imageUrl`);
+    assert.ok(!/setScreenshot\(\s*tradeToEdit\.screenshotUrl/.test(code), `${f}: seeds editable screenshot with stored URL`);
+  }
+  assert.ok(!readSrc('src/components/TradeEditForm.tsx').includes('screenshotUrl:'), "TradeEditForm must not send screenshotUrl back (P1-AC7)");
+});
+
+it("E21(iv): ShareTradeModal exports PNG via plain Canvas 2D, no DOM-to-image deps, package.json unchanged", () => {
+  const code = readSrc('src/components/ShareTradeModal.tsx');
+  assert.ok(!/html2canvas|html-to-image|dom-to-image/.test(code), "no DOM-to-image library");
+  assert.ok(code.includes("getContext(\"2d\")"), "uses Canvas 2D");
+  assert.ok(code.includes('createImageBitmap('), "decodes chart from blob (untainted canvas)");
+  assert.ok(code.includes('toBlob('), "exports via canvas.toBlob");
+  assert.ok(!/getPublicUrl|share link|shareUrl/i.test(code), "no public URL / share link");
+  const pkg = JSON.parse(readSrc('package.json'));
+  const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+  for (const banned of ['html2canvas', 'html-to-image', 'dom-to-image']) {
+    assert.ok(!(banned in deps), `package.json must not add ${banned}`);
+  }
+  let diff;
+  try {
+    diff = shotExecSync('git diff HEAD -- package.json', { cwd: path.resolve(__dirname, '..'), encoding: 'utf8' });
+  } catch (gitErr) {
+    // N7: never pass vacuously when git is unavailable.
+    throw new Error(`SKIPPED-AS-FAIL: cannot verify package.json vs HEAD (git diff failed: ${gitErr && gitErr.message})`);
+  }
+  assert.strictEqual(diff.trim(), '', "package.json must be unchanged vs HEAD");
+});
+
+it("F1: Journal keeps selected trade by id and renders the latest store copy (no stale screenshot snapshot)", () => {
+  const journal = readSrc('src/app/[locale]/journal/page.tsx');
+  assert.ok(journal.includes('useState<string | null>(null)') && journal.includes('setSelectedTradeId'), "selection state must be an id");
+  assert.ok(/trades\.find\(t => t\.id === selectedTradeId\)/.test(journal), "selected trade must be looked up from useTradeStore.trades");
+  assert.ok(!/useState<Trade \| null>\(null\);\s*$/m.test(journal.split('selectedTradeId')[0].slice(-200)), "no Trade snapshot state for the details modal");
+  const share = readSrc('src/components/ShareTradeModal.tsx');
+  assert.ok(/finally \{\s*chart\?\.close\(\);/.test(share), "ShareTradeModal must close the chart bitmap in finally (N6a)");
+});
+
+it("D7/D8: Screenshots i18n namespace has EN/VI parity and avatar uploads use ${user.id}/ folder", () => {
+  const en = JSON.parse(readSrc('messages/en.json')).Screenshots;
+  const vi = JSON.parse(readSrc('messages/vi.json')).Screenshots;
+  assert.ok(en && vi, "Screenshots namespace in both locales");
+  for (const k of ['loadError', 'signing', 'retry', 'shareDownloaded']) {
+    assert.ok(en[k] && vi[k], `missing key ${k}`);
+  }
+  assert.deepStrictEqual(Object.keys(en).sort(), Object.keys(vi).sort());
+  const settings = readSrc('src/app/[locale]/settings/page.tsx');
+  assert.ok(settings.includes('`${user.id}/${crypto.randomUUID()}.${fileExt}`'), "avatar path must be ${user.id}/${uuid}.${ext}");
+  assert.ok(!settings.includes('`${user.id}-${Math.random()}'), "legacy flat avatar path removed");
 });
 
 console.log("\n-------------------------------------------------------");

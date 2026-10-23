@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { 
   Maximize2, Eye, Edit3, Trash2, Share2, Star, X
@@ -14,6 +14,56 @@ import { Trade } from "@/store/useTradeStore";
 import { detectSession } from "@/lib/sessionUtils";
 import { useTagTranslation } from "@/hooks/useTagTranslation";
 import { getAssetBadgeStyle } from "@/lib/assetColors";
+import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
+import { prefetchSignedUrls, useSignedUrl } from "@/hooks/useSignedUrl";
+
+function screenshotPathOf(trade: Trade): string | null {
+  return trade.screenshotPath ?? pathFromLegacyUrl(trade.screenshotUrl);
+}
+
+function CardScreenshotThumb({ path, zoomLabel, onZoom }: { path: string; zoomLabel: string; onZoom: (src: string) => void }) {
+  const tShot = useTranslations("Screenshots");
+  const { url, error, retry } = useSignedUrl(path);
+  return (
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        if (url) onZoom(url);
+      }}
+      className="relative w-full h-32 rounded-xl overflow-hidden border border-white/10 bg-black/50 group/thumb transition-all"
+    >
+      {url ? (
+        <>
+          <img
+            src={url}
+            alt="Trade Chart"
+            className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
+            loading="lazy"
+          />
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center gap-1 text-white text-xs font-medium">
+            <Maximize2 className="w-3.5 h-3.5" />
+            <span>{zoomLabel}</span>
+          </div>
+        </>
+      ) : error ? (
+        <div className="flex h-full flex-col items-center justify-center gap-1 text-xs text-rose-300">
+          <span>{tShot("loadError")}</span>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); retry(); }}
+            className="underline text-emerald-300"
+          >
+            {tShot("retry")}
+          </button>
+        </div>
+      ) : (
+        <div className="flex h-full items-center justify-center text-xs text-gray-500 animate-pulse">
+          {tShot("signing")}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface TradeCardsViewProps {
   trades: Trade[];
@@ -50,6 +100,11 @@ export function TradeCardsView({
 
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [tradeToDeleteId, setTradeToDeleteId] = useState<string | null>(null);
+
+  // One batched createSignedUrls call for every visible card.
+  useEffect(() => {
+    prefetchSignedUrls((trades || []).map(screenshotPathOf));
+  }, [trades]);
 
   if (!trades || trades.length === 0) {
     return null;
@@ -174,25 +229,12 @@ export function TradeCardsView({
                 </div>
 
                 {/* 4. Chart Screenshot Thumbnail (if present) */}
-                {trade.screenshotUrl ? (
-                  <div 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setLightboxSrc(trade.screenshotUrl || null);
-                    }}
-                    className="relative w-full h-32 rounded-xl overflow-hidden border border-white/10 bg-black/50 group/thumb transition-all"
-                  >
-                    <img
-                      src={trade.screenshotUrl}
-                      alt="Trade Chart"
-                      className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center gap-1 text-white text-xs font-medium">
-                      <Maximize2 className="w-3.5 h-3.5" />
-                      <span>{t("click_to_zoom")}</span>
-                    </div>
-                  </div>
+                {screenshotPathOf(trade) ? (
+                  <CardScreenshotThumb
+                    path={screenshotPathOf(trade) as string}
+                    zoomLabel={t("click_to_zoom")}
+                    onZoom={setLightboxSrc}
+                  />
                 ) : trade.notes ? (
                   <p className="text-xs text-gray-400 line-clamp-2 italic bg-white/[0.02] p-2.5 rounded-xl border border-white/5">
                     &ldquo;{trade.notes}&rdquo;

@@ -13,6 +13,11 @@
 //   --expect-red   chế độ baseline: kịch bản PASS khi in VULNERABLE (chứng minh lỗ hổng còn tồn tại)
 //                  mặc định (không cờ): kịch bản PASS khi in OK (sau khi vá)
 //   --out <path>   ghi kết quả (đã che secret) ra file; đường dẫn tương đối tính theo thư mục hiện tại
+//   --stage <s>    giai đoạn patch trên project TEST (Phase 01): pre-012 | after-012 | after-013 (mặc định).
+//                  Kỳ vọng theo giai đoạn: storage-public-read và avatar-foreign-prefix-write là VULNERABLE
+//                  CHỦ ĐÍCH trước 013 (bucket còn public / INSERT avatars chưa siết); kịch bản gắn
+//                  "-after-012"/"-after-013" chỉ chạy từ giai đoạn đó (ngược lại in NOT-RUN, không tính pass).
+//                  --expect-red bỏ qua --stage (baseline DB cũ) và không chạy kịch bản gắn giai đoạn.
 //
 // Mỗi kịch bản in một dòng: PASS|FAIL <tên> - VULNERABLE|OK|INCONCLUSIVE (<chi tiết>).
 // Exit: 0 nếu mọi kịch bản PASS (hoặc SKIPPED), 1 nếu có FAIL, 2 nếu bị từ chối (URL production).
@@ -29,6 +34,14 @@ const args = process.argv.slice(2);
 const EXPECT_RED = args.includes('--expect-red');
 const outIdx = args.indexOf('--out');
 const OUT_PATH = outIdx >= 0 && args[outIdx + 1] ? path.resolve(args[outIdx + 1]) : null;
+const STAGES = ['pre-012', 'after-012', 'after-013'];
+const stageIdx = args.indexOf('--stage');
+const STAGE = stageIdx >= 0 && args[stageIdx + 1] ? args[stageIdx + 1] : 'after-013';
+if (!STAGES.includes(STAGE)) {
+  console.error(`--stage không hợp lệ: ${STAGE} (cần ${STAGES.join(' | ')})`);
+  process.exit(2);
+}
+const stageAtLeast = (s) => !EXPECT_RED && STAGES.indexOf(STAGE) >= STAGES.indexOf(s);
 
 const REQUIRED = [
   'TEST_SUPABASE_URL',
@@ -113,7 +126,13 @@ function errText(error) {
 
 const results = [];
 
-async function scenario(name, fn) {
+// opts.want: trạng thái mong đợi riêng (ghi đè mặc định); opts.minStage: chỉ chạy từ giai đoạn này.
+async function scenario(name, fn, opts = {}) {
+  if (opts.minStage && !stageAtLeast(opts.minStage)) {
+    results.push({ name, status: 'NOT-RUN', pass: false, notRun: true });
+    log(`NOT-RUN ${name} - cần --stage ${opts.minStage} trở lên (không tính pass)`);
+    return;
+  }
   let status;
   let detail;
   try {
@@ -122,7 +141,7 @@ async function scenario(name, fn) {
     status = 'INCONCLUSIVE';
     detail = `lỗi khi chạy: ${e && e.message ? e.message : String(e)}`;
   }
-  const want = EXPECT_RED ? 'VULNERABLE' : 'OK';
+  const want = EXPECT_RED ? 'VULNERABLE' : opts.want || 'OK';
   const pass = status === want;
   results.push({ name, status, pass });
   log(`${pass ? 'PASS' : 'FAIL'} ${name} - ${status}${detail ? ` (${detail})` : ''}`);
@@ -182,7 +201,7 @@ const cleanup = []; // { label, fn }
 
 async function main() {
   log(`# rls_two_user_harness - ${new Date().toISOString()}`);
-  log(`# mode: ${EXPECT_RED ? '--expect-red (baseline: PASS = VULNERABLE)' : 'default (PASS = OK)'}`);
+  log(`# mode: ${EXPECT_RED ? '--expect-red (baseline: PASS = VULNERABLE)' : `default (PASS = OK), stage ${STAGE}`}`);
 
   const missing = REQUIRED.filter((k) => !env[k]);
   if (missing.length > 0) {
@@ -277,7 +296,13 @@ async function main() {
       await A.from('trades').delete().eq('id', data.id);
       return { status: 'VULNERABLE', detail: 'A ghi được trade vào account của B' };
     }
-    return { status: 'OK', detail: `bị từ chối: ${errText(error)}` };
+    // Nhánh UPDATE: trade hợp lệ của A, đổi account_id sang account của B.
+    const upd = await A.from('trades').update({ account_id: ctxB.accountId }).eq('id', ctxA.tradeId).select('id');
+    if (!upd.error && upd.data && upd.data.length > 0) {
+      await A.from('trades').update({ account_id: ctxA.accountId }).eq('id', ctxA.tradeId);
+      return { status: 'VULNERABLE', detail: 'insert bị chặn nhưng A đổi được account_id sang account của B' };
+    }
+    return { status: 'OK', detail: `insert bị từ chối: ${errText(error)}; update: ${errText(upd.error) || '0 dòng'}` };
   });
 
   // 3. storage-foreign-prefix-write: A upload vào thư mục của B.
@@ -312,7 +337,111 @@ async function main() {
       const rm = await A.storage.from('trade-screenshots').remove([objPath]);
       if (rm.error) log(`# CLEANUP-WARN storage ${objPath}: ${errText(rm.error)}`);
     }
+  }, { want: STAGE === 'after-013' ? 'OK' : 'VULNERABLE' }); // trước 013 bucket còn public: VULNERABLE là chủ đích
+
+  // 4b. storage-foreign-authenticated-read: B (đã đăng nhập) tải trực tiếp object của A (bị từ chối từ 012).
+  await scenario('storage-foreign-authenticated-read-after-012', async () => {
+    const objPath = `${aId}/${RUN_TAG}-private.png`;
+    const up = await A.storage.from('trade-screenshots').upload(objPath, PNG_1X1, { contentType: 'image/png', upsert: false });
+    if (up.error) return { status: 'INCONCLUSIVE', detail: `A không upload được: ${errText(up.error)}` };
+    try {
+      const dl = await B.storage.from('trade-screenshots').download(objPath);
+      if (!dl.error && dl.data) return { status: 'VULNERABLE', detail: 'B tải được object của A qua API có xác thực' };
+      return { status: 'OK', detail: `bị từ chối: ${errText(dl.error)}` };
+    } finally {
+      const rm = await A.storage.from('trade-screenshots').remove([objPath]);
+      if (rm.error) log(`# CLEANUP-WARN storage ${objPath}: ${errText(rm.error)}`);
+    }
+  }, { minStage: 'after-012' });
+
+  // 4c. signed-url-create-own-after-012: A ký được file của mình; B ký file của A bị từ chối.
+  await scenario('signed-url-create-own-after-012', async () => {
+    const objPath = `${aId}/${RUN_TAG}-sign.png`;
+    const up = await A.storage.from('trade-screenshots').upload(objPath, PNG_1X1, { contentType: 'image/png', upsert: false });
+    if (up.error) return { status: 'INCONCLUSIVE', detail: `A không upload được: ${errText(up.error)}` };
+    try {
+      const own = await A.storage.from('trade-screenshots').createSignedUrls([objPath], 60);
+      const ownUrl = own.data && own.data[0] && own.data[0].signedUrl;
+      if (own.error || !ownUrl) return { status: 'VULNERABLE', detail: `A không ký được file của mình: ${errText(own.error) || (own.data && own.data[0] && own.data[0].error)}` };
+      const ownRes = await fetch(ownUrl);
+      if (!ownRes.ok) return { status: 'VULNERABLE', detail: `signed URL của A trả HTTP ${ownRes.status}` };
+      const foreign = await B.storage.from('trade-screenshots').createSignedUrl(objPath, 60);
+      if (!foreign.error && foreign.data && foreign.data.signedUrl) {
+        return { status: 'VULNERABLE', detail: 'B tạo được signed URL cho file của A' };
+      }
+      return { status: 'OK', detail: `A ký OK (HTTP ${ownRes.status}); B bị từ chối: ${errText(foreign.error)}` };
+    } finally {
+      const rm = await A.storage.from('trade-screenshots').remove([objPath]);
+      if (rm.error) log(`# CLEANUP-WARN storage ${objPath}: ${errText(rm.error)}`);
+    }
+  }, { minStage: 'after-012' });
+
+  // 4d. signed-url-expiry: URL TTL 2 giây không dùng được sau khi hết hạn.
+  await scenario('signed-url-expiry', async () => {
+    const objPath = `${aId}/${RUN_TAG}-expiry.png`;
+    const up = await A.storage.from('trade-screenshots').upload(objPath, PNG_1X1, { contentType: 'image/png', upsert: false });
+    if (up.error) return { status: 'INCONCLUSIVE', detail: `A không upload được: ${errText(up.error)}` };
+    try {
+      const signed = await A.storage.from('trade-screenshots').createSignedUrl(objPath, 2);
+      if (signed.error || !signed.data) return { status: 'INCONCLUSIVE', detail: `không ký được: ${errText(signed.error)}` };
+      await new Promise((r) => setTimeout(r, 4000));
+      const res = await fetch(signed.data.signedUrl);
+      if (res.ok) return { status: 'VULNERABLE', detail: `signed URL còn dùng được sau khi hết hạn (HTTP ${res.status})` };
+      return { status: 'OK', detail: `hết hạn -> HTTP ${res.status}` };
+    } finally {
+      const rm = await A.storage.from('trade-screenshots').remove([objPath]);
+      if (rm.error) log(`# CLEANUP-WARN storage ${objPath}: ${errText(rm.error)}`);
+    }
+  }, { minStage: 'after-012' });
+
+  // 4e. upload-upsert-own-after-013: upload upsert:true 2 lần vào thư mục của chính A (cần SELECT+UPDATE owner).
+  await scenario('upload-upsert-own-after-013', async () => {
+    const objPath = `${aId}/${RUN_TAG}-upsert.png`;
+    try {
+      for (const round of [1, 2]) {
+        const up = await A.storage.from('trade-screenshots').upload(objPath, PNG_1X1, { contentType: 'image/png', upsert: true });
+        if (up.error) return { status: 'VULNERABLE', detail: `upsert lần ${round} lỗi: ${errText(up.error)}` };
+      }
+      return { status: 'OK', detail: 'upsert 2 lần OK trên bucket private' };
+    } finally {
+      const rm = await A.storage.from('trade-screenshots').remove([objPath]);
+      if (rm.error) log(`# CLEANUP-WARN storage ${objPath}: ${errText(rm.error)}`);
+    }
+  }, { minStage: 'after-013' });
+
+  // 4f. avatar-upload-own-prefix: A upload avatar vào `${aId}/...`.
+  await scenario('avatar-upload-own-prefix', async () => {
+    const objPath = `${aId}/${RUN_TAG}-avatar.png`;
+    const up = await A.storage.from('avatars').upload(objPath, PNG_1X1, { contentType: 'image/png', upsert: false });
+    if (up.error) return { status: 'VULNERABLE', detail: `A không upload được avatar vào thư mục của mình: ${errText(up.error)}` };
+    const rm = await A.storage.from('avatars').remove([objPath]);
+    if (rm.error) log(`# CLEANUP-WARN avatars ${objPath}: ${errText(rm.error)}`);
+    return { status: 'OK', detail: 'upload + xóa avatar của chính A OK' };
   });
+
+  // 4g. avatar-foreign-prefix-write: A upload vào thư mục avatar của B (bị chặn từ 013).
+  await scenario('avatar-foreign-prefix-write', async () => {
+    const objPath = `${bId}/${RUN_TAG}-avatar-foreign.png`;
+    const up = await A.storage.from('avatars').upload(objPath, PNG_1X1, { contentType: 'image/png', upsert: false });
+    if (!up.error) {
+      const rm = await A.storage.from('avatars').remove([objPath]);
+      if (rm.error) log(`# CLEANUP-WARN avatars ${objPath}: ${errText(rm.error)}`);
+      return { status: 'VULNERABLE', detail: 'A upload được vào thư mục avatar của B' };
+    }
+    return { status: 'OK', detail: `bị từ chối: ${errText(up.error)}` };
+  }, { want: STAGE === 'after-013' ? 'OK' : 'VULNERABLE' }); // INSERT avatars chỉ siết ở 013
+
+  // 4h. avatar-insert-new-prefix-after-013: chỉ dạng thư mục mới; dạng gốc cũ `${id}-x.png` bị từ chối.
+  await scenario('avatar-insert-new-prefix-after-013', async () => {
+    const legacy = `${aId}-${RUN_TAG}.png`;
+    const up = await A.storage.from('avatars').upload(legacy, PNG_1X1, { contentType: 'image/png', upsert: false });
+    if (!up.error) {
+      const rm = await A.storage.from('avatars').remove([legacy]);
+      if (rm.error) log(`# CLEANUP-WARN avatars ${legacy}: ${errText(rm.error)}`);
+      return { status: 'VULNERABLE', detail: 'INSERT avatar dạng gốc cũ vẫn được chấp nhận' };
+    }
+    return { status: 'OK', detail: `dạng cũ bị từ chối: ${errText(up.error)}` };
+  }, { minStage: 'after-013' });
 
   // 5. anon-no-access: client chưa đăng nhập đọc từng bảng.
   await scenario('anon-no-access', async () => {
@@ -329,7 +458,45 @@ async function main() {
     if (granted.length > 0) {
       return { status: 'VULNERABLE', detail: `anon có quyền SELECT (0 dòng do RLS): ${granted.join(', ')}` };
     }
-    return { status: 'OK', detail: 'anon bị từ chối trên cả 7 bảng' };
+    const wrote = [];
+    for (const table of TABLES) {
+      const row = table === 'user_preferences' ? { user_id: aId } : rowFor(table, aId, ctxA, 9);
+      const { data, error } = await anon.from(table).insert(row).select('id');
+      if (!error && data && data.length > 0) {
+        wrote.push(table);
+        await A.from(table).delete().eq('id', data[0].id);
+      }
+    }
+    if (wrote.length > 0) return { status: 'VULNERABLE', detail: `anon GHI ĐƯỢC: ${wrote.join(', ')}` };
+    return { status: 'OK', detail: 'anon bị từ chối đọc và ghi trên cả 7 bảng' };
+  });
+
+  // 5b. rpc-anon-denied: anon gọi get_account_stats.
+  await scenario('rpc-anon-denied', async () => {
+    const { error } = await anon.rpc('get_account_stats', { p_account_id: ctxA.accountId });
+    if (!error) return { status: 'VULNERABLE', detail: 'anon gọi được get_account_stats' };
+    return { status: 'OK', detail: `bị từ chối: ${errText(error)}` };
+  });
+
+  // 5c. rpc-foreign-account: B gọi với account của A -> rỗng (0 trade) hoặc lỗi.
+  await scenario('rpc-foreign-account', async () => {
+    const { data, error } = await B.rpc('get_account_stats', { p_account_id: ctxA.accountId });
+    if (error) return { status: 'OK', detail: `bị từ chối: ${errText(error)}` };
+    const n = data && typeof data === 'object' ? Number(data.total_trades || 0) : 0;
+    if (n > 0) return { status: 'VULNERABLE', detail: `B thấy ${n} trade của A qua RPC` };
+    return { status: 'OK', detail: 'B nhận 0 trade' };
+  });
+
+  // 5d. preferences-delete-foreign: A xóa preferences của B -> 0 dòng.
+  await scenario('preferences-delete-foreign', async () => {
+    const { error: upErr } = await B.from('user_preferences').upsert({ user_id: bId }, { onConflict: 'user_id' });
+    if (upErr) return { status: 'INCONCLUSIVE', detail: `không tạo được preferences của B: ${errText(upErr)}` };
+    const { data, error } = await A.from('user_preferences').delete().eq('user_id', bId).select('id');
+    if (!error && data && data.length > 0) {
+      await B.from('user_preferences').upsert({ user_id: bId }, { onConflict: 'user_id' });
+      return { status: 'VULNERABLE', detail: 'A xóa được preferences của B' };
+    }
+    return { status: 'OK', detail: error ? `bị từ chối: ${errText(error)}` : '0 dòng' };
   });
 
   // 6. preferences-delete-own (kịch bản bổ sung, không thuộc 5 kịch bản AC4): A xóa được preferences của mình?
@@ -368,10 +535,12 @@ try {
 }
 if (results.length > 0) {
   await runCleanup();
-  const passed = results.filter((r) => r.pass).length;
-  const vulnerable = results.filter((r) => r.status === 'VULNERABLE').length;
-  log(`TOTAL: ${results.length} | PASS: ${passed} | FAIL: ${results.length - passed} | VULNERABLE: ${vulnerable}`);
-  if (passed !== results.length) code = 1;
+  const ran = results.filter((r) => !r.notRun);
+  const passed = ran.filter((r) => r.pass).length;
+  const vulnerable = ran.filter((r) => r.status === 'VULNERABLE').length;
+  const notRun = results.length - ran.length;
+  log(`TOTAL: ${ran.length} | PASS: ${passed} | FAIL: ${ran.length - passed} | VULNERABLE: ${vulnerable} | NOT-RUN: ${notRun}`);
+  if (passed !== ran.length) code = 1;
   flush();
 } else if (code === 1) {
   await runCleanup();

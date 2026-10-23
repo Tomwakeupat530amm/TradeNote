@@ -11,6 +11,36 @@ import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import clsx from "clsx";
+import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
+import { useSignedUrl } from "@/hooks/useSignedUrl";
+
+function playbookImagePath(playbook: Playbook): string | null {
+  return playbook.imagePath ?? pathFromLegacyUrl(playbook.imageUrl);
+}
+
+/** Renders a playbook image: data: previews directly, stored images through a signed URL. */
+function PlaybookImage({ source, alt, className }: { source: string; alt: string; className: string }) {
+  const tShot = useTranslations("Screenshots");
+  const isData = source.startsWith("data:");
+  const { url, error, retry } = useSignedUrl(isData ? null : source);
+  const src = isData ? source : url;
+  if (src) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt={alt} className={className} />;
+  }
+  if (error) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); retry(); }}
+        className="p-4 text-xs text-rose-300 underline"
+      >
+        {tShot("loadError")} · {tShot("retry")}
+      </button>
+    );
+  }
+  return <div className="p-4 text-xs text-gray-500 animate-pulse">{tShot("signing")}</div>;
+}
 
 export default function PlaybookPage() {
   const t = useTranslations("Playbook");
@@ -68,7 +98,8 @@ export default function PlaybookPage() {
     setTitle(playbook.title);
     setDescription(playbook.description);
     setRules(playbook.rules.length > 0 ? playbook.rules : [""]);
-    setImageFile(playbook.imageUrl || null);
+    // Existing image is tracked by storage path; only a new data: image is uploaded.
+    setImageFile(playbookImagePath(playbook));
     setIsModalOpen(true);
   };
 
@@ -123,7 +154,7 @@ export default function PlaybookPage() {
           title,
           description,
           rules: cleanRules,
-          imageFile: imageFile !== editingPlaybook.imageUrl ? imageFile : undefined
+          imageFile: imageFile !== playbookImagePath(editingPlaybook) ? imageFile : undefined
         });
         toast.success(t('playbook_updated', { defaultMessage: "Playbook updated successfully" }));
       } else {
@@ -234,10 +265,9 @@ export default function PlaybookPage() {
                   className="bg-gray-900/60 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden cursor-pointer hover:border-indigo-500/50 hover:shadow-2xl hover:shadow-indigo-500/10 transition-all group"
                 >
                   <div className="h-48 bg-gray-800 relative w-full border-b border-white/5 flex items-center justify-center overflow-hidden">
-                    {playbook.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img 
-                        src={playbook.imageUrl} 
+                    {playbookImagePath(playbook) ? (
+                      <PlaybookImage
+                        source={playbookImagePath(playbook) as string}
                         alt={playbook.title}
                         className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
                       />
@@ -408,12 +438,11 @@ export default function PlaybookPage() {
                     </div>
                   )}
                 </div>
-                {viewingPlaybook.imageUrl && (
+                {playbookImagePath(viewingPlaybook) && (
                   <div className="lg:w-1/2 shrink-0">
                     <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-2">{t('example_chart')}</h4>
                     <div className="rounded-2xl overflow-hidden border border-white/10 bg-black">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={viewingPlaybook.imageUrl} alt="Chart" className="w-full h-auto" />
+                      <PlaybookImage source={playbookImagePath(viewingPlaybook) as string} alt="Chart" className="w-full h-auto" />
                     </div>
                   </div>
                 )}
@@ -508,8 +537,7 @@ export default function PlaybookPage() {
                     <label className="block text-sm font-medium text-gray-400 mb-2">{t('paste_image')}</label>
                     {imageFile ? (
                       <div className="relative group rounded-xl overflow-hidden border border-white/10">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={imageFile} alt="Pasted" className="w-full h-auto object-cover max-h-[300px]" />
+                        <PlaybookImage source={imageFile} alt="Pasted" className="w-full h-auto object-cover max-h-[300px]" />
                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-sm">
                           <button
                             type="button"

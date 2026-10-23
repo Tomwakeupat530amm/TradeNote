@@ -1334,5 +1334,14 @@
     "playbook_shortcuts_point4": "Master Shortcuts: Ctrl+K (Command Palette & trade search), Ctrl+B (Toggle Sidebar), N (Quick Log), Ctrl+V (Paste Chart), ESC (Close modal).",
     "playbook_shortcuts_tip": "Press Ctrl+K anywhere to jump across pages or search past trades without touching the mouse!",
     "playbook_shortcuts_action": "Go To Playbook Hub"
+  },
+  "Screenshots": {
+    "loadError": "Could not load image",
+    "signing": "Loading secure image...",
+    "retry": "Retry",
+    "shareDownloaded": "Share card PNG downloaded",
+    "downloadPng": "Download PNG",
+    "shareExportFailed": "Could not export the share card",
+    "shareImageSkipped": "Chart image unavailable - exported card without it"
   }
 }
