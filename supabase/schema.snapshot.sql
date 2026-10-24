@@ -286,3 +286,75 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE O
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO authenticated, service_role;
 
 -- Ghi chú: hàm public.get_account_stats (nếu cài, xem patches/001 + 011) chỉ GRANT EXECUTE cho authenticated.
+
+-- ====================================================================
+-- AI COACH QUOTA (patch 020, Phase 02) - bảng thứ 8 + RPC nguyên tử.
+-- Đặt SAU khối GRANT ở trên để REVOKE tường minh có hiệu lực trên bản cài mới.
+-- Chỉ hàm SECURITY DEFINER consume_ai_quota đọc/ghi bảng; EXECUTE chỉ cho authenticated.
+-- ====================================================================
+CREATE TABLE IF NOT EXISTS public.ai_coach_usage (
+    user_id      uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    window_start timestamptz NOT NULL,
+    count        integer     NOT NULL DEFAULT 0 CHECK (count >= 0),
+    PRIMARY KEY (user_id, window_start)
+);
+
+ALTER TABLE public.ai_coach_usage ENABLE ROW LEVEL SECURITY;
+
+-- Default privileges cấp CRUD cho authenticated (và có thể anon qua supabase_admin, known-gap)
+-- trên mọi bảng mới -> thu hồi tường minh. Không tạo policy nào: truy cập trực tiếp bị chặn.
+REVOKE ALL ON public.ai_coach_usage FROM anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.consume_ai_quota(p_limit integer, p_window_seconds integer)
+RETURNS TABLE (allowed boolean, retry_after integer)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+#variable_conflict use_column
+DECLARE
+  v_uid          uuid := auth.uid();
+  v_window_start timestamptz;
+  v_count        integer;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'consume_ai_quota: not authenticated' USING ERRCODE = '42501';
+  END IF;
+  IF p_limit IS NULL OR p_limit < 1 OR p_limit > 100 THEN
+    RAISE EXCEPTION 'consume_ai_quota: p_limit out of range' USING ERRCODE = '22023';
+  END IF;
+  IF p_window_seconds IS NULL OR p_window_seconds < 1 OR p_window_seconds > 86400 THEN
+    RAISE EXCEPTION 'consume_ai_quota: p_window_seconds out of range' USING ERRCODE = '22023';
+  END IF;
+
+  v_window_start := to_timestamp(floor(extract(epoch FROM now()) / p_window_seconds) * p_window_seconds);
+
+  -- DESTRUCTIVE-OK: bounded cleanup of the caller's own expired quota rows inside consume_ai_quota
+  DELETE FROM public.ai_coach_usage
+  WHERE user_id = v_uid
+    AND window_start < now() - interval '1 day';
+
+  -- Một câu nguyên tử: dòng mới -> count = 1; dòng có sẵn -> +1 chỉ khi còn dưới hạn mức.
+  INSERT INTO public.ai_coach_usage AS u (user_id, window_start, count)
+  VALUES (v_uid, v_window_start, 1)
+  ON CONFLICT (user_id, window_start)
+  DO UPDATE SET count = u.count + 1
+  WHERE u.count < p_limit
+  RETURNING u.count INTO v_count;
+
+  IF v_count IS NOT NULL THEN
+    allowed := true;
+    retry_after := 0;
+  ELSE
+    allowed := false;
+    retry_after := greatest(
+      1,
+      ceil(extract(epoch FROM (v_window_start + make_interval(secs => p_window_seconds) - now())))::integer
+    );
+  END IF;
+  RETURN NEXT;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.consume_ai_quota(integer, integer) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.consume_ai_quota(integer, integer) TO authenticated;

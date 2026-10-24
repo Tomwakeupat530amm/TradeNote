@@ -3439,7 +3439,7 @@ it("E21(iii): D4 render files no longer guard or render on trade.screenshotUrl",
   assert.ok(!readSrc('src/components/TradeEditForm.tsx').includes('screenshotUrl:'), "TradeEditForm must not send screenshotUrl back (P1-AC7)");
 });
 
-it("E21(iv): ShareTradeModal exports PNG via plain Canvas 2D, no DOM-to-image deps, package.json unchanged", () => {
+it("E21(iv): ShareTradeModal exports PNG via plain Canvas 2D, no DOM-to-image deps, package.json only adds allow-listed deps", () => {
   const code = readSrc('src/components/ShareTradeModal.tsx');
   assert.ok(!/html2canvas|html-to-image|dom-to-image/.test(code), "no DOM-to-image library");
   assert.ok(code.includes("getContext(\"2d\")"), "uses Canvas 2D");
@@ -3458,7 +3458,31 @@ it("E21(iv): ShareTradeModal exports PNG via plain Canvas 2D, no DOM-to-image de
     // N7: never pass vacuously when git is unavailable.
     throw new Error(`SKIPPED-AS-FAIL: cannot verify package.json vs HEAD (git diff failed: ${gitErr && gitErr.message})`);
   }
-  assert.strictEqual(diff.trim(), '', "package.json must be unchanged vs HEAD");
+  // LOCKED EXCEPTION (P2 merge step M, GAP6 / E-M2, plan answer 4): the gate is intent-based.
+  // The package.json diff vs HEAD may ONLY add dependency lines whose names are allow-listed below
+  // (a removed line is tolerated only when it is re-added verbatim apart from a trailing comma).
+  //   P2: zod (AI Coach payload schema) | P3: vitest | P4: @testing-library/* + jsdom (component tests)
+  // Any other added, removed or changed line in package.json fails this gate.
+  const E21_ALLOWED_DEPS = new Set([
+    'zod',
+    'vitest',
+    '@testing-library/react', '@testing-library/dom', '@testing-library/jest-dom', '@testing-library/user-event',
+    'jsdom',
+  ]);
+  const diffLines = diff.split(/\r?\n/).filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l));
+  const norm = (l) => l.slice(1).trim().replace(/,$/, '');
+  const added = diffLines.filter((l) => l.startsWith('+')).map(norm);
+  const removed = diffLines.filter((l) => l.startsWith('-')).map(norm);
+  const addedRest = [...added];
+  for (const line of removed) {
+    const idx = addedRest.indexOf(line);
+    assert.ok(idx !== -1, `package.json must not remove or change: ${line}`);
+    addedRest.splice(idx, 1);
+  }
+  for (const line of addedRest) {
+    const m = /^"([^"]+)"\s*:\s*"[^"]+"$/.exec(line);
+    assert.ok(m && E21_ALLOWED_DEPS.has(m[1]), `package.json may only add allow-listed dependencies (got: ${line})`);
+  }
 });
 
 it("F1: Journal keeps selected trade by id and renders the latest store copy (no stale screenshot snapshot)", () => {
@@ -3482,6 +3506,287 @@ it("D7/D8: Screenshots i18n namespace has EN/VI parity and avatar uploads use ${
   assert.ok(settings.includes('`${user.id}/${crypto.randomUUID()}.${fileExt}`'), "avatar path must be ${user.id}/${uuid}.${ext}");
   assert.ok(!settings.includes('`${user.id}-${Math.random()}'), "legacy flat avatar path removed");
 });
+
+// ============================================================================================
+// DRAFT for merge step M (Phase 02, Agent A): runner Section 35 - AI Coach hardening.
+// Paste this block into trade-note-app/scripts/test_enhancements_runner.mjs AFTER Section 34
+// (before the final TOTAL lines). It relies only on the runner's existing `it`, `assert`, `fs`,
+// `path`, `__dirname` (top-level await is already used by Section 34).
+// S35_SRC_ROOT (env, optional) points the section at another source tree; used only for the
+// D0b red-then-green proof against `git show HEAD:<path>` copies. Default = the app root.
+// ============================================================================================
+
+console.log("\n35. P2 Hardening: AI Coach payload schema, route order, fail-closed quota, generic errors:");
+
+const s35Root = process.env.S35_SRC_ROOT ? path.resolve(process.env.S35_SRC_ROOT) : path.resolve(__dirname, '..');
+const s35Read = (rel) => fs.readFileSync(path.resolve(s35Root, rel), 'utf8');
+const s35Exists = (rel) => fs.existsSync(path.resolve(s35Root, rel));
+const S35_CODES = ['UNAUTHORIZED', 'INVALID_INPUT', 'RATE_LIMITED', 'AI_UNAVAILABLE'];
+
+// Runtime-imports the REAL schema module (Node type-stripping; it imports only zod at runtime).
+let s35Schema;
+let s35ImportError = null;
+try {
+  s35Schema = await import(new URL(`file:///${path.resolve(s35Root, 'src/lib/aiCoachSchema.ts').replace(/\\/g, '/')}`).href);
+} catch (importErr) {
+  s35ImportError = `GAP: cannot import src/lib/aiCoachSchema.ts: ${importErr && importErr.message}`;
+  console.log(`  ${s35ImportError}`);
+}
+const s35Lib = () => {
+  if (s35ImportError) throw new Error(s35ImportError);
+  return s35Schema;
+};
+
+// Fixture mirrors AggregatedTradingHabits (src/lib/aiCoachAggregator.ts) + locale.
+function s35Fixture(overrides = {}) {
+  const many = (n, make) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`key_${i}`, make(i)]));
+  return {
+    accountName: 'Topstep 100k',
+    totalTrades: 120,
+    totalPnL: -1234.56,
+    winRate: 42,
+    winsCount: 50,
+    lossesCount: 70,
+    averageR: -0.12,
+    sessionBreakdown: { Asian: { trades: 10, pnl: -50, winRate: 40 }, 'London-NY Overlap': { trades: 110, pnl: -1184.56, winRate: 42.7 } },
+    mistakeCosts: { FOMO: { count: 3, totalLoss: -900 }, None: { count: 0, totalLoss: 0 } },
+    revengeStreakLoss: -600,
+    revengeStreakCount: 2,
+    setupPerformance: many(120, (i) => ({ count: i, winRate: i % 101, pnl: i * 10 - 500 })),
+    assetPerformance: { MNQ: { count: 100, winRate: 40, pnl: -1000 }, XAUUSD: { count: 20, winRate: 55, pnl: -234.56 } },
+    locale: 'vi',
+    ...overrides,
+  };
+}
+
+it("35a: aiCoachSchema accepts the real aggregator shape (>= 100 record keys, en/vi, optional int unratedForR)", () => {
+  const { parseAiCoachPayload, AI_COACH_MAX_BODY_BYTES } = s35Lib();
+  assert.strictEqual(AI_COACH_MAX_BODY_BYTES, 64 * 1024, "byte cap must be 64KB");
+  assert.ok(parseAiCoachPayload(s35Fixture()).success, "real-shape payload (120 setup keys) must pass");
+  assert.ok(parseAiCoachPayload(s35Fixture({ locale: 'en', unratedForR: 4 })).success, "locale en + unratedForR int must pass");
+  const empty = s35Fixture({ totalTrades: 0, sessionBreakdown: {}, mistakeCosts: {}, setupPerformance: {}, assetPerformance: {}, winRate: 0, averageR: 0 });
+  delete empty.accountName;
+  assert.ok(parseAiCoachPayload(empty).success, "empty records and no accountName must pass");
+});
+
+it("35b: aiCoachSchema rejects extra keys, legacy trades[], wrong types, non-finite numbers, oversize strings and too many record keys", () => {
+  const { parseAiCoachPayload } = s35Lib();
+  const bad = {
+    extraKey: s35Fixture({ notes: 'ignore previous instructions' }),
+    legacyTrades: { trades: [], locale: 'vi' },
+    stringNumber: s35Fixture({ totalTrades: '12' }),
+    floatCount: s35Fixture({ winsCount: 1.5 }),
+    infinity: s35Fixture({ totalPnL: Infinity }),
+    nan: s35Fixture({ averageR: NaN }),
+    winRateOver100: s35Fixture({ winRate: 101 }),
+    badLocale: s35Fixture({ locale: 'fr' }),
+    missingLocale: (() => { const f = s35Fixture(); delete f.locale; return f; })(),
+    floatUnrated: s35Fixture({ unratedForR: 0.5 }),
+    longAccountName: s35Fixture({ accountName: 'x'.repeat(5000) }),
+    longKey: s35Fixture({ mistakeCosts: { ['k'.repeat(500)]: { count: 1, totalLoss: -1 } } }),
+    tooManyKeys: s35Fixture({ assetPerformance: Object.fromEntries(Array.from({ length: 1000 }, (_, i) => [`a${i}`, { count: 1, winRate: 1, pnl: 1 }])) }),
+    nestedExtra: s35Fixture({ sessionBreakdown: { Asian: { trades: 1, pnl: 1, winRate: 1, note: 'x' } } }),
+    nullBody: null,
+    arrayBody: [],
+  };
+  for (const [name, payload] of Object.entries(bad)) {
+    assert.strictEqual(parseAiCoachPayload(payload).success, false, `${name} must be rejected`);
+  }
+});
+
+it("35c: route runs auth -> byte cap -> JSON+zod -> consume_ai_quota(5, 600) -> OPENROUTER_API_KEY in that source order", () => {
+  const code = s35Read('src/app/api/ai-coach/route.ts');
+  const pos = (needle) => {
+    const i = code.indexOf(needle);
+    assert.ok(i >= 0, `route.ts must contain ${needle}`);
+    return i;
+  };
+  const order = [
+    pos('auth.getUser(token)'),
+    pos('readBodyWithCap(req, AI_COACH_MAX_BODY_BYTES)'),
+    pos('parseAiCoachPayload(json)'),
+    pos('rpc("consume_ai_quota"'),
+    pos('process.env.OPENROUTER_API_KEY'),
+  ];
+  for (let i = 1; i < order.length; i++) assert.ok(order[i - 1] < order[i], `step ${i} out of order`);
+  assert.ok(/content-length/i.test(code) && code.indexOf('content-length') < order[2], "declared Content-Length checked before parsing");
+  assert.ok(/p_limit:\s*QUOTA_LIMIT/.test(code) && /QUOTA_LIMIT\s*=\s*5\b/.test(code) && /QUOTA_WINDOW_SECONDS\s*=\s*600\b/.test(code), "quota is 5 per 600 s");
+  assert.strictEqual((code.match(/process\.env\.OPENROUTER_API_KEY/g) || []).length, 1, "upstream key read exactly once, after the quota");
+});
+
+it("35d: quota fails CLOSED and reads the table result as data?.[0]; user-JWT client only", () => {
+  const code = s35Read('src/app/api/ai-coach/route.ts');
+  assert.ok(code.includes('data?.[0]'), "RPC returns table -> read data?.[0]");
+  assert.ok(/if \(quotaError\) \{[\s\S]{0,200}errorResponse\("AI_UNAVAILABLE", 503\)/.test(code), "RPC error -> AI_UNAVAILABLE 503");
+  assert.ok(/if \(!quota \|\| typeof quota\.allowed !== "boolean"\) \{[\s\S]{0,200}errorResponse\("AI_UNAVAILABLE", 503\)/.test(code), "missing/odd RPC result -> AI_UNAVAILABLE 503");
+  assert.ok(/errorResponse\("RATE_LIMITED", 429, \{ "Retry-After"/.test(code), "blocked -> 429 with Retry-After");
+  assert.ok(/persistSession:\s*false/.test(code) && /autoRefreshToken:\s*false/.test(code), "server client does not persist sessions");
+  assert.ok(!/service_role|SERVICE_ROLE/.test(code), "never service_role");
+  assert.strictEqual((code.match(/createClient\(/g) || []).length, 1, "single Supabase client");
+});
+
+it("35e: route errors are only { error: CODE } with 4 codes; no in-memory limiter; no leaking logs or messages", () => {
+  const code = s35Read('src/app/api/ai-coach/route.ts');
+  const used = [...code.matchAll(/errorResponse\("([A-Z_]+)"/g)].map((m) => m[1]);
+  assert.ok(used.length >= 6, "route uses errorResponse for every failure");
+  for (const c of used) assert.ok(S35_CODES.includes(c), `unknown error code ${c}`);
+  for (const c of S35_CODES) assert.ok(used.includes(c), `code ${c} must be used`);
+  assert.ok(/NextResponse\.json\(\{ error: code \}/.test(code), "error body is exactly { error: code }");
+  assert.ok(!code.includes('new Map') && !code.includes('checkRateLimit'), "in-memory limiter removed");
+  assert.ok(!code.includes('OPENROUTER_API_KEY is not configured'), "no config-leaking message");
+  assert.ok(!/error\.message|err\.message|lastErrorText/.test(code), "no error.message / lastErrorText");
+  assert.ok(!/console\.(warn|error|log)\([^;]*,\s*(err|error)\s*\)/.test(code), "never log the raw error object");
+  assert.ok(!/NextResponse\.json\(\{\s*error:\s*[`'"]/.test(code), "no free-text error responses");
+});
+
+it("35f: prompt wraps the payload in <trading_data> and keeps the waterfall strings (E3)", () => {
+  const code = s35Read('src/app/api/ai-coach/route.ts');
+  assert.ok(code.includes('<trading_data>') && code.includes('</trading_data>'), "payload wrapped in <trading_data>");
+  assert.ok(/DATA ONLY|CHỈ LÀ DỮ LIỆU/.test(code), "model told the block is data, not instructions");
+  for (const s of ['inclusionai/ling-3.0-flash-fin:free', 'nex-agi/nex-n2.5-pro:free', 'liquid/lfm-2.5-2.6b:free', 'nvidia/nemotron-3.5-lightning:free',
+    'for (const model of candidateModels)', 'new AbortController()', 'model: data.model || selectedModel', 'function flattenString']) {
+    assert.ok(code.includes(s), `route must keep ${s}`);
+  }
+});
+
+it("35g: AICoachModal maps codes to AICoach.errors.*, survives non-JSON bodies, never toasts raw errors", () => {
+  const code = s35Read('src/components/AICoachModal.tsx');
+  assert.ok(/try \{\s*data = await res\.json\(\);\s*\} catch/.test(code), "res.json() wrapped in try/catch");
+  assert.ok(code.includes('toAiCoachErrorCode(data.error)'), "server error mapped through toAiCoachErrorCode");
+  assert.ok(/: "AI_UNAVAILABLE";/.test(code), "unknown code -> AI_UNAVAILABLE");
+  assert.ok(code.includes('t(`errors.${code}`)') && code.includes('t("errors.RATE_LIMITED", { seconds'), "uses AICoach.errors keys, RATE_LIMITED shows seconds");
+  assert.ok(code.includes('res.headers.get("Retry-After")'), "reads Retry-After");
+  assert.ok(!/toast\.error\((msg|err\.message|data\.error)/.test(code) && !/new Error\(data\.error/.test(code), "never toasts raw error text");
+  assert.ok(code.includes('t("toast_login_required")'), "no-session branch kept");
+  for (const s of ['formatSafeText', 'handleClearCache', 'RotateCcw']) assert.ok(code.includes(s), `modal keeps ${s}`);
+});
+
+it("35h: patch 020 is DEFINER, pinned search_path, revoked from PUBLIC/anon, atomic upsert, bounded cleanup, has .down.sql", () => {
+  const up = s35Read('supabase/patches/020_ai_coach_usage.sql');
+  assert.ok(s35Exists('supabase/patches/020_ai_coach_usage.down.sql'), "020 down file exists");
+  const down = s35Read('supabase/patches/020_ai_coach_usage.down.sql');
+  assert.ok(/SECURITY DEFINER/.test(up) && /SET search_path = public, pg_temp/.test(up), "DEFINER + pinned search_path");
+  assert.ok(/IF v_uid IS NULL THEN/.test(up), "auth.uid() NULL rejected");
+  assert.ok(/p_limit < 1 OR p_limit > 100/.test(up) && /p_window_seconds < 1 OR p_window_seconds > 86400/.test(up), "parameter clamps");
+  assert.ok(/REVOKE ALL ON public\.ai_coach_usage FROM anon, authenticated;/.test(up), "table revoked from anon/authenticated");
+  assert.ok(/REVOKE ALL ON FUNCTION public\.consume_ai_quota\(integer, integer\) FROM PUBLIC, anon;/.test(up), "function revoked from PUBLIC, anon");
+  assert.ok(/GRANT EXECUTE ON FUNCTION public\.consume_ai_quota\(integer, integer\) TO authenticated;/.test(up), "EXECUTE for authenticated");
+  assert.ok(/ON CONFLICT \(user_id, window_start\)\s*DO UPDATE SET count = u\.count \+ 1\s*WHERE u\.count < p_limit/.test(up), "single-statement atomic upsert");
+  assert.ok(/-- DESTRUCTIVE-OK:[^\n]*\n\s*DELETE FROM public\.ai_coach_usage\s*WHERE user_id = v_uid/.test(up), "cleanup scoped to the caller with DESTRUCTIVE-OK");
+  assert.ok(/ON DELETE CASCADE/.test(up) && /ENABLE ROW LEVEL SECURITY/.test(up), "FK cascade + RLS");
+  assert.ok(/VALUES \('020', 'ai_coach_usage'\)/.test(up), "records schema_migrations 020");
+  assert.ok(down.indexOf('DROP FUNCTION') >= 0 && down.indexOf('DROP FUNCTION') < down.indexOf('DROP TABLE'), "down drops function then table");
+});
+
+it("35i: grants probe, expected matrix and snapshot all know ai_coach_usage and consume_ai_quota", () => {
+  const probe = s35Read('supabase/probes/11_p1_grants_matrix.sql');
+  const expected = JSON.parse(s35Read('supabase/tests/grants_matrix.expected.json'));
+  const snapshot = s35Read('supabase/schema.snapshot.sql');
+  assert.ok(probe.includes("'ai_coach_usage'"), "probe 11 lists ai_coach_usage");
+  assert.strictEqual(expected.version, 'p2-after-020');
+  assert.ok(probe.includes(`'version', '${expected.version}'`), "probe version matches expected");
+  assert.deepStrictEqual(expected.tables.ai_coach_usage.anon, []);
+  assert.deepStrictEqual(expected.tables.ai_coach_usage.authenticated, []);
+  assert.deepStrictEqual(expected.functions['consume_ai_quota(integer,integer)'], { PUBLIC: false, anon: false, authenticated: true });
+  assert.ok(/CREATE TABLE IF NOT EXISTS public\.ai_coach_usage/.test(snapshot) && /FUNCTION public\.consume_ai_quota/.test(snapshot), "snapshot has table + function");
+  assert.ok(snapshot.indexOf('REVOKE ALL ON public.ai_coach_usage') > snapshot.indexOf('ON ALL TABLES IN SCHEMA public TO authenticated'), "snapshot revokes after the bulk grant");
+});
+
+it("35j: AICoach.errors has the 4 codes in EN and VI (RATE_LIMITED uses {seconds}); zod is an explicit ^4 dependency", () => {
+  const en = JSON.parse(s35Read('messages/en.json')).AICoach;
+  const vi = JSON.parse(s35Read('messages/vi.json')).AICoach;
+  assert.ok(en && en.errors && vi && vi.errors, "AICoach.errors in both locales");
+  assert.deepStrictEqual(Object.keys(en.errors).sort(), [...S35_CODES].sort());
+  assert.deepStrictEqual(Object.keys(vi.errors).sort(), [...S35_CODES].sort());
+  assert.ok(en.errors.RATE_LIMITED.includes('{seconds}') && vi.errors.RATE_LIMITED.includes('{seconds}'), "RATE_LIMITED has {seconds}");
+  const pkg = JSON.parse(s35Read('package.json'));
+  assert.ok(/^\^4\./.test((pkg.dependencies || {}).zod || ''), "package.json dependencies.zod is ^4");
+});
+
+// ===== BEGIN Section 36 (workstream B fragment; merge step M pastes this before the TOTAL summary) =====
+// Root override lets the red-then-green proof (D0b) point the checks at pre-P2 `git show HEAD:` copies.
+console.log("\n36. P2 Hardening: Auth i18n, Public Auth Paths & Option F Contracts:");
+const S36_ROOT = process.env.S36_ROOT || path.resolve(__dirname, '..');
+const s36Read = (rel) => fs.readFileSync(path.resolve(S36_ROOT, rel), 'utf8');
+const s36Exists = (rel) => fs.existsSync(path.resolve(S36_ROOT, rel));
+const s36Keys = (obj, prefix = '') => Object.entries(obj || {}).flatMap(([k, v]) =>
+  v && typeof v === 'object' ? s36Keys(v, `${prefix}${k}.`) : [`${prefix}${k}`]);
+const S36_AUTH_KEYS = [
+  'brand', 'subtitleLogin', 'subtitleSignup', 'welcomeBack', 'accountCreated', 'emailLabel', 'emailPlaceholder',
+  'passwordLabel', 'forgotPassword', 'forgotNeedEmail', 'forgotSent', 'processing', 'signIn', 'createAccount',
+  'notMember', 'haveAccount', 'switchToSignup', 'switchToLogin', 'checkEmailTitle', 'checkEmailBody', 'resend',
+  'resendDone', 'backToLogin', 'errors.invalidCredentials', 'errors.emailNotConfirmed', 'errors.rateLimited',
+  'errors.weakPassword', 'errors.generic', 'reset.title', 'reset.newPassword', 'reset.confirmPassword',
+  'reset.submit', 'reset.tooShort', 'reset.mismatch', 'reset.failed', 'reset.success', 'reset.expired',
+];
+
+it("B2/P2-AC7: Auth.* namespace has every used key and 100% EN/VI parity; AICoach.errors has EN/VI parity", () => {
+  const en = JSON.parse(s36Read('messages/en.json'));
+  const vi = JSON.parse(s36Read('messages/vi.json'));
+  assert.ok(en.Auth && vi.Auth, "Auth namespace must exist in en.json and vi.json");
+  const enKeys = s36Keys(en.Auth).sort();
+  const viKeys = s36Keys(vi.Auth).sort();
+  assert.deepStrictEqual(enKeys, viKeys, "Auth.* keys must match between EN and VI");
+  for (const k of S36_AUTH_KEYS) assert.ok(enKeys.includes(k), `Auth.${k} missing`);
+  assert.ok(en.AICoach && en.AICoach.errors && vi.AICoach && vi.AICoach.errors, "AICoach.errors must exist in EN and VI");
+  assert.deepStrictEqual(s36Keys(en.AICoach.errors).sort(), s36Keys(vi.AICoach.errors).sort(), "AICoach.errors EN/VI parity");
+});
+
+it("B2/S7: auth page uses useTranslations('Auth') + @/i18n/routing, no raw Supabase error text, no hard-coded English JSX", () => {
+  const src = s36Read('src/app/[locale]/auth/page.tsx');
+  assert.ok(/useTranslations\(["']Auth["']\)/.test(src), "auth page must use useTranslations('Auth')");
+  assert.ok(/from ["']@\/i18n\/routing["']/.test(src), "auth page must import navigation from @/i18n/routing");
+  assert.ok(!/from ["']next\/navigation["']/.test(src), "auth page must not import next/navigation");
+  assert.ok(!/err(or)?\.message/.test(src), "auth page must not surface error.message");
+  for (const lit of ['Sign in to your journal', 'Email address', 'Create Account', 'Not a member', 'Account created successfully', 'Processing...']) {
+    assert.ok(!src.includes(lit), `hard-coded English literal left in auth page: "${lit}"`);
+  }
+});
+
+it("B3/B4: signup sends emailRedirectTo + check-email state with resend; forgot password redirects to /{locale}/auth/reset", () => {
+  const src = s36Read('src/app/[locale]/auth/page.tsx');
+  assert.ok(/signUp\(\{[\s\S]*?emailRedirectTo/.test(src), "signUp must pass options.emailRedirectTo");
+  assert.ok(/auth\.resend\(\{[\s\S]*?type:\s*["']signup["']/.test(src), "check-email state must offer auth.resend({ type: 'signup' })");
+  assert.ok(/data\.session/.test(src), "signup must branch on data.session (confirmation required)");
+  assert.ok(/resetPasswordForEmail\([\s\S]*?\/auth\/reset/.test(src), "forgot password must redirect to /{locale}/auth/reset");
+  assert.ok(/user_already_exists|email_exists/.test(src), "existing-account signup must map to the neutral check-email path");
+});
+
+it("B4: reset page exists, uses PASSWORD_RECOVERY flag or getSession, updateUser, then signOut + /auth", () => {
+  assert.ok(s36Exists('src/app/[locale]/auth/reset/page.tsx'), "src/app/[locale]/auth/reset/page.tsx must exist");
+  const src = s36Read('src/app/[locale]/auth/reset/page.tsx');
+  assert.ok(/passwordRecovery/.test(src) && /getSession\(\)/.test(src), "reset page must check passwordRecovery flag OR getSession()");
+  assert.ok(/updateUser\(\{\s*password\s*\}\)/.test(src), "reset page must call updateUser({ password })");
+  assert.ok(/signOut\(\)[\s\S]*?push\(["']\/auth["']\)/.test(src), "reset page must signOut then push('/auth')");
+  assert.ok(/from ["']@\/i18n\/routing["']/.test(src) && !/from ["']next\/navigation["']/.test(src), "reset page must use @/i18n/routing");
+  const store = s36Read('src/store/useAuthStore.ts');
+  assert.ok(/PASSWORD_RECOVERY/.test(store) && /passwordRecovery:\s*true/.test(store), "useAuthStore must set passwordRecovery on PASSWORD_RECOVERY");
+});
+
+it("B5/S7: AuthProvider uses ONE public-path list [/auth, /auth/reset] for render-null AND redirect; AppShell bypass after hooks", () => {
+  const ap = s36Read('src/components/AuthProvider.tsx');
+  assert.ok(/PUBLIC_AUTH_PATHS[^=]*=\s*\[\s*["']\/auth["']\s*,\s*["']\/auth\/reset["']\s*\]/.test(ap), "one shared list [/auth, /auth/reset]");
+  assert.ok(!/pathname\s*!==\s*["']\/auth["']/.test(ap), "no per-site pathname !== '/auth' checks (use the shared list)");
+  assert.ok(/!user\s*&&\s*!isPublic\)\s*\{\s*router\.push\(["']\/auth["']\)/.test(ap), "redirect effect must use the shared list");
+  assert.ok(/if\s*\(!user\s*&&\s*!isPublic\)\s*\{\s*return null;/.test(ap), "render-null check must use the shared list");
+  assert.ok(/user\s*&&\s*pathname\s*===\s*["']\/auth["']\)\s*\{[\s\S]*?router\.push\(["']\/["']\)/.test(ap), "signed-in on /auth -> '/'; /auth/reset stays");
+  const shell = s36Read('src/components/AppShell.tsx');
+  const hookIdx = shell.indexOf('usePathname()');
+  const bypassIdx = shell.search(/if\s*\(isPublicAuthPath\(pathname\)\)\s*\{\s*return <>\{children\}<\/>;/);
+  assert.ok(hookIdx > 0 && bypassIdx > hookIdx, "AppShell must call usePathname() before the auth-page early return");
+  const lastEffect = shell.lastIndexOf('useEffect(');
+  assert.ok(lastEffect > 0 && lastEffect < bypassIdx, "AppShell early return must come after all hooks");
+});
+
+it("B5/E-B3: option F - no @supabase/ssr anywhere in package.json or auth sources", () => {
+  const pkg = JSON.parse(s36Read('package.json'));
+  const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+  assert.ok(!('@supabase/ssr' in deps), "@supabase/ssr must not be added (option F)");
+  for (const f of ['src/components/AuthProvider.tsx', 'src/store/useAuthStore.ts', 'src/app/[locale]/auth/page.tsx']) {
+    assert.ok(!s36Read(f).includes('@supabase/ssr'), `${f} must not import @supabase/ssr`);
+  }
+});
+// ===== END Section 36 =====
 
 console.log("\n-------------------------------------------------------");
 console.log(`TOTAL: ${total} | PASSED: ${passed} | FAILED: ${total - passed}`);

@@ -1067,7 +1067,13 @@
     "toast_no_trades": "Bạn chưa có lệnh nào trong tài khoản này để AI phân tích!",
     "toast_login_required": "Vui lòng đăng nhập để sử dụng tính năng AI Coach!",
     "toast_success": "AI đã hoàn tất khám bệnh tâm lý & bóc tách lỗ hổng!",
-    "toast_copied": "Đã copy quy tắc vào clipboard!"
+    "toast_copied": "Đã copy quy tắc vào clipboard!",
+    "errors": {
+      "UNAUTHORIZED": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để dùng AI Coach.",
+      "INVALID_INPUT": "Không gửi được dữ liệu nhật ký để phân tích. Vui lòng tải lại trang và thử lại.",
+      "RATE_LIMITED": "Bạn đã dùng hết lượt chẩn đoán AI. Vui lòng thử lại sau {seconds} giây.",
+      "AI_UNAVAILABLE": "AI Coach tạm thời không khả dụng. Vui lòng thử lại sau ít phút."
+    }
   },
   "ShareModal": {
     "title": "Chia Sẻ Thẻ Lệnh",
@@ -1343,5 +1349,48 @@
     "downloadPng": "Tải PNG",
     "shareExportFailed": "Không xuất được thẻ chia sẻ",
     "shareImageSkipped": "Không tải được ảnh chart - đã xuất thẻ không kèm ảnh"
+  },
+  "Auth": {
+    "brand": "TradeNote",
+    "subtitleLogin": "Đăng nhập vào nhật ký của bạn",
+    "subtitleSignup": "Bắt đầu hành trình giao dịch",
+    "welcomeBack": "Chào mừng trở lại TradeNote!",
+    "accountCreated": "Đã tạo tài khoản. Chào mừng đến với TradeNote!",
+    "emailLabel": "Địa chỉ email",
+    "emailPlaceholder": "trader@example.com",
+    "passwordLabel": "Mật khẩu",
+    "forgotPassword": "Quên mật khẩu?",
+    "forgotNeedEmail": "Hãy nhập email trước, rồi bấm \"Quên mật khẩu?\".",
+    "forgotSent": "Nếu email này có tài khoản, liên kết đặt lại mật khẩu đã được gửi.",
+    "processing": "Đang xử lý...",
+    "signIn": "Đăng nhập",
+    "createAccount": "Tạo tài khoản",
+    "notMember": "Chưa có tài khoản?",
+    "haveAccount": "Đã có tài khoản?",
+    "switchToSignup": "Đăng ký miễn phí",
+    "switchToLogin": "Đăng nhập vào tài khoản",
+    "checkEmailTitle": "Kiểm tra email của bạn",
+    "checkEmailBody": "Nếu {email} có thể đăng ký, chúng tôi đã gửi liên kết xác nhận tới địa chỉ này. Mở liên kết để kích hoạt tài khoản.",
+    "resend": "Gửi lại email xác nhận",
+    "resendDone": "Nếu địa chỉ đang chờ xác nhận, một email mới đã được gửi.",
+    "backToLogin": "Quay lại đăng nhập",
+    "errors": {
+      "invalidCredentials": "Đăng nhập thất bại. Hãy kiểm tra email và mật khẩu.",
+      "emailNotConfirmed": "Vui lòng xác nhận email trước khi đăng nhập.",
+      "rateLimited": "Quá nhiều lần thử. Vui lòng đợi một lúc rồi thử lại.",
+      "weakPassword": "Mật khẩu quá yếu. Hãy chọn mật khẩu dài và mạnh hơn.",
+      "generic": "Đã có lỗi xảy ra. Vui lòng thử lại."
+    },
+    "reset": {
+      "title": "Đặt mật khẩu mới",
+      "newPassword": "Mật khẩu mới",
+      "confirmPassword": "Xác nhận mật khẩu mới",
+      "submit": "Cập nhật mật khẩu",
+      "tooShort": "Mật khẩu phải có ít nhất {min} ký tự.",
+      "mismatch": "Mật khẩu không khớp.",
+      "failed": "Không thể cập nhật mật khẩu. Vui lòng yêu cầu liên kết đặt lại mới.",
+      "success": "Đã cập nhật mật khẩu. Vui lòng đăng nhập bằng mật khẩu mới.",
+      "expired": "Liên kết đặt lại không hợp lệ hoặc đã hết hạn. Hãy yêu cầu liên kết mới từ trang đăng nhập."
+    }
   }
 }

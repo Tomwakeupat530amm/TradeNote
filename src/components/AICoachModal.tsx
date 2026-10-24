@@ -10,6 +10,7 @@ import { useTradeStore } from "@/store/useTradeStore";
 import { useAccountStore } from "@/store/useAccountStore";
 import { useTranslations, useLocale } from "next-intl";
 import { aggregateTradingHabits } from "@/lib/aiCoachAggregator";
+import type { AiCoachPayload } from "@/lib/aiCoachSchema";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import clsx from "clsx";
@@ -45,6 +46,16 @@ export function formatSafeText(val: unknown): string {
     return values || JSON.stringify(val);
   }
   return String(val);
+}
+
+const AI_COACH_ERROR_CODES = ["UNAUTHORIZED", "INVALID_INPUT", "RATE_LIMITED", "AI_UNAVAILABLE"] as const;
+type AiCoachErrorCode = (typeof AI_COACH_ERROR_CODES)[number];
+
+/** Maps any server `error` value to one of the 4 known codes (unknown -> AI_UNAVAILABLE). */
+export function toAiCoachErrorCode(value: unknown): AiCoachErrorCode {
+  return typeof value === "string" && (AI_COACH_ERROR_CODES as readonly string[]).includes(value)
+    ? (value as AiCoachErrorCode)
+    : "AI_UNAVAILABLE";
 }
 
 export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
@@ -115,6 +126,8 @@ export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
       // 1. Level 1 Local Aggregation
       const aggregatedData = aggregateTradingHabits(accountTrades, activeAccount?.name);
 
+      const requestBody: AiCoachPayload = { ...aggregatedData, locale: locale === "en" ? "en" : "vi" };
+
       // 2. Call Next.js Server API with Supabase JWT & locale
       const res = await fetch("/api/ai-coach", {
         method: "POST",
@@ -122,13 +135,26 @@ export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({ ...aggregatedData, locale })
+        body: JSON.stringify(requestBody)
       });
 
-      const data = await res.json();
+      // Non-JSON bodies (e.g. a proxy 413/502 page) map to AI_UNAVAILABLE.
+      let data: { error?: unknown; analysis?: Record<string, unknown> } = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = {};
+      }
 
       if (!res.ok) {
-        throw new Error(data.error || "AI Coach error");
+        const code = toAiCoachErrorCode(data.error);
+        if (code === "RATE_LIMITED") {
+          const seconds = Number(res.headers.get("Retry-After"));
+          toast.error(t("errors.RATE_LIMITED", { seconds: Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : 600 }));
+        } else {
+          toast.error(t(`errors.${code}`));
+        }
+        return;
       }
 
       const rawAnalysis = (data.analysis && typeof data.analysis === 'object') ? data.analysis : {};
@@ -150,9 +176,9 @@ export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
       }
 
       toast.success(t("toast_success"));
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Error";
-      toast.error(msg);
+    } catch {
+      // Network failure or unexpected shape: never show raw error text.
+      toast.error(t("errors.AI_UNAVAILABLE"));
     } finally {
       setLoading(false);
     }

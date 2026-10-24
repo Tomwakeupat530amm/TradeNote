@@ -20,8 +20,11 @@ Starts a Next.js production server after `npm run build`.
 ### `npm run lint`
 Runs ESLint across the codebase using `eslint.config.mjs`.
 
+### `npm run test:api` / `npm run test:rls` / `npm run lint:sql`
+AI Coach route contract (live cases need a dev server and a throwaway-user token, else SKIPPED), RLS two-user harness (SKIPPED without a TEST project), and SQL patch lint.
+
 ### `node scripts/test_enhancements_runner.mjs`
-Runs the comprehensive 108-test unit testing suite across 29 dedicated sections:
+Runs the comprehensive unit testing suite (see `process/context/tests/all-tests.md` for measured totals):
 - Prop firm risk engine & 1R bullet calculations
 - Multi-asset position sizing (Futures point values, Forex pips, Crypto)
 - High Water Mark trailing drawdown calculation
@@ -36,7 +39,7 @@ Runs the comprehensive 108-test unit testing suite across 29 dedicated sections:
 - `src/components/` — Modular React components (Drawers, Modals, Heatmaps, Visual R:R Box, User Guide, Dropzones)
 - `src/store/` — Zustand stores (`useAccountStore`, `useTradeStore`, `useAuthStore`, `useReviewStore`, `useSoundStore`, `useGuideStore`, `useLayoutStore`)
 - `src/lib/` — Pure logic engines (`imageCompressor.ts`, `soundEngine.ts`, `supabase.ts`)
-- `supabase/` — PostgreSQL schemas (`supabase_schema.sql`, `supabase_grant_permissions.sql`, `supabase_scale_indexes.sql`)
+- `supabase/` — SQL home: `schema.snapshot.sql` (fresh install only), `patches/` (numbered upgrades + `.down.sql`), `probes/`, `legacy/`, `README.md`
 - `messages/` — Bilingual localization dictionaries (`en.json`, `vi.json`)
 - `scripts/` — Automated test runners and verification scripts
 

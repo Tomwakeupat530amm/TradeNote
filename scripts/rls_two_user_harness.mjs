@@ -499,6 +499,18 @@ async function main() {
     return { status: 'OK', detail: error ? `bị từ chối: ${errText(error)}` : '0 dòng' };
   });
 
+  // 7. ai-quota-atomic (P2, patch 020): 2 phiên song song của A gọi consume_ai_quota vượt hạn mức;
+  //    đúng `limit` lần allowed=true, lần bị chặn có retry_after > 0. Không chạy ở --expect-red (DB cũ chưa có RPC).
+  await scenario('ai-quota-atomic', async () => {
+    const A2 = mk();
+    const s2 = await A2.auth.signInWithPassword({ email: env.TEST_USER_A_EMAIL, password: env.TEST_USER_A_PASSWORD });
+    if (s2.error) return { status: 'INCONCLUSIVE', detail: `không mở được phiên thứ 2 của A: ${errText(s2.error)}` };
+    return quotaAtomicCheck([A, A2]);
+  }, { minStage: 'pre-012' });
+
+  // 8. ai-quota-foreign (P2): truy cập trực tiếp bảng ai_coach_usage bị từ chối (A, B), anon gọi RPC bị từ chối.
+  await scenario('ai-quota-foreign', async () => quotaForeignCheck({ A, B, anon, aId }), { minStage: 'pre-012' });
+
   // 6. preferences-delete-own (kịch bản bổ sung, không thuộc 5 kịch bản AC4): A xóa được preferences của mình?
   await scenario('preferences-delete-own', async () => {
     const { data, error } = await A.from('user_preferences').delete().eq('user_id', aId).select('id');
@@ -513,6 +525,71 @@ async function main() {
   });
 
   return 0;
+}
+
+// ---------------------------------------------------------------- AI quota (P2, patch 020)
+// Cùng logic với scripts/ai_quota_prod_check.mjs (giữ đồng bộ nếu sửa).
+
+const QUOTA_TEST_LIMIT = 3;
+const QUOTA_TEST_CALLS = 8;
+
+// Chọn cửa sổ lạ (giây) để không đụng bộ đếm của lần chạy trước; còn >= 120 s trong cửa sổ.
+function pickQuotaWindow() {
+  for (let i = 0; i < 50; i++) {
+    const w = 3600 + Math.floor(Math.random() * (86400 - 3600));
+    const now = Date.now() / 1000;
+    const remaining = Math.floor(now / w) * w + w - now;
+    if (remaining >= 120) return w;
+  }
+  return 86400;
+}
+
+async function quotaAtomicCheck(clients) {
+  const w = pickQuotaWindow();
+  const calls = [];
+  for (let i = 0; i < QUOTA_TEST_CALLS; i++) {
+    const c = clients[i % clients.length];
+    calls.push(c.rpc('consume_ai_quota', { p_limit: QUOTA_TEST_LIMIT, p_window_seconds: w }));
+  }
+  const res = await Promise.all(calls);
+  const errs = res.filter((r) => r.error);
+  if (errs.length > 0) {
+    return { status: 'INCONCLUSIVE', detail: `${errs.length} lần gọi RPC lỗi (020 đã áp?): ${errText(errs[0].error)}` };
+  }
+  const rows = res.map((r) => (Array.isArray(r.data) ? r.data[0] : undefined));
+  if (rows.some((row) => !row || typeof row.allowed !== 'boolean')) {
+    return { status: 'INCONCLUSIVE', detail: 'RPC trả kết quả không đúng dạng table(allowed, retry_after)' };
+  }
+  const allowed = rows.filter((row) => row.allowed).length;
+  const blocked = rows.filter((row) => !row.allowed);
+  const badRetry = blocked.filter((row) => !(Number(row.retry_after) > 0)).length;
+  const detail = `window ${w}s, ${QUOTA_TEST_CALLS} lần gọi song song trên ${clients.length} phiên, limit ${QUOTA_TEST_LIMIT}: allowed=${allowed}, blocked=${blocked.length}, retry_after<=0: ${badRetry}`;
+  if (allowed > QUOTA_TEST_LIMIT) return { status: 'VULNERABLE', detail: `vượt hạn mức - ${detail}` };
+  if (allowed < QUOTA_TEST_LIMIT) return { status: 'INCONCLUSIVE', detail: `ít hơn hạn mức (cửa sổ đã có bộ đếm cũ?) - ${detail}` };
+  if (badRetry > 0) return { status: 'VULNERABLE', detail: `lần bị chặn thiếu retry_after - ${detail}` };
+  return { status: 'OK', detail };
+}
+
+async function quotaForeignCheck({ A, B, anon, aId }) {
+  const problems = [];
+  for (const [label, client] of [['A', A], ['B', B], ['anon', anon]]) {
+    const { data, error } = await client.from('ai_coach_usage').select('*').limit(1);
+    if (!error) problems.push(`${label} SELECT trực tiếp được (${data ? data.length : 0} dòng)`);
+  }
+  {
+    const { error } = await B.from('ai_coach_usage').insert({ user_id: aId, window_start: new Date().toISOString(), count: 0 });
+    if (!error) problems.push('B INSERT trực tiếp được dòng của A');
+  }
+  {
+    const { error } = await A.from('ai_coach_usage').update({ count: 0 }).eq('user_id', aId).select('user_id');
+    if (!error) problems.push('A UPDATE trực tiếp được (đặt lại bộ đếm)');
+  }
+  {
+    const { error } = await anon.rpc('consume_ai_quota', { p_limit: 5, p_window_seconds: 600 });
+    if (!error) problems.push('anon gọi được consume_ai_quota');
+  }
+  if (problems.length > 0) return { status: 'VULNERABLE', detail: problems.join('; ') };
+  return { status: 'OK', detail: 'bảng ai_coach_usage bị từ chối truy cập trực tiếp (A, B, anon); anon gọi RPC bị từ chối' };
 }
 
 async function runCleanup() {

@@ -1067,7 +1067,13 @@
     "toast_no_trades": "No trades found in this account for AI analysis!",
     "toast_login_required": "Please log in to use AI Coach!",
     "toast_success": "AI diagnostic completed successfully!",
-    "toast_copied": "Action rule copied to clipboard!"
+    "toast_copied": "Action rule copied to clipboard!",
+    "errors": {
+      "UNAUTHORIZED": "Your session has expired. Please sign in again to use AI Coach.",
+      "INVALID_INPUT": "Your journal data could not be sent for analysis. Please reload the page and try again.",
+      "RATE_LIMITED": "You have used all AI diagnostics for now. Please try again in {seconds} seconds.",
+      "AI_UNAVAILABLE": "AI Coach is temporarily unavailable. Please try again in a few minutes."
+    }
   },
   "ShareModal": {
     "title": "Share Trade Card",
@@ -1343,5 +1349,48 @@
     "downloadPng": "Download PNG",
     "shareExportFailed": "Could not export the share card",
     "shareImageSkipped": "Chart image unavailable - exported card without it"
+  },
+  "Auth": {
+    "brand": "TradeNote",
+    "subtitleLogin": "Sign in to your journal",
+    "subtitleSignup": "Start your trading journey",
+    "welcomeBack": "Welcome back to TradeNote!",
+    "accountCreated": "Account created. Welcome to TradeNote!",
+    "emailLabel": "Email address",
+    "emailPlaceholder": "trader@example.com",
+    "passwordLabel": "Password",
+    "forgotPassword": "Forgot password?",
+    "forgotNeedEmail": "Enter your email address first, then click \"Forgot password?\".",
+    "forgotSent": "If an account exists for this email, a password reset link has been sent.",
+    "processing": "Processing...",
+    "signIn": "Sign in",
+    "createAccount": "Create Account",
+    "notMember": "Not a member?",
+    "haveAccount": "Already have an account?",
+    "switchToSignup": "Sign up for free",
+    "switchToLogin": "Log in to your account",
+    "checkEmailTitle": "Check your email",
+    "checkEmailBody": "If {email} can be registered, we sent a confirmation link to it. Open the link to activate your account.",
+    "resend": "Resend confirmation email",
+    "resendDone": "If the address is pending confirmation, a new email has been sent.",
+    "backToLogin": "Back to sign in",
+    "errors": {
+      "invalidCredentials": "Sign-in failed. Check your email and password.",
+      "emailNotConfirmed": "Please confirm your email address before signing in.",
+      "rateLimited": "Too many attempts. Please wait a while and try again.",
+      "weakPassword": "This password is too weak. Choose a longer, stronger password.",
+      "generic": "Something went wrong. Please try again."
+    },
+    "reset": {
+      "title": "Set a new password",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm new password",
+      "submit": "Update password",
+      "tooShort": "Password must be at least {min} characters.",
+      "mismatch": "Passwords do not match.",
+      "failed": "Could not update the password. Please request a new reset link.",
+      "success": "Password updated. Please sign in with your new password.",
+      "expired": "This reset link is invalid or has expired. Request a new one from the sign-in page."
+    }
   }
 }

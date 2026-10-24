@@ -60,6 +60,21 @@ Lùi: chạy `NNN_name.down.sql` theo thứ tự số GIẢM DẦN, rồi `delet
 
 Probe 12 chạy TỪNG khối `DO $$`; mỗi khối kết thúc `RAISE EXCEPTION 'RESULT: ...'` (cố ý, để rollback dữ liệu thử). Lùi: 013 -> 012 -> 011 -> 010.
 
+## Phase 02 (020): hạn mức AI Coach trong DB
+
+- Bảng thứ 8 `public.ai_coach_usage (user_id, window_start, count)`: RLS bật, KHÔNG policy, `REVOKE ALL` từ `anon`/`authenticated`; chỉ hàm `SECURITY DEFINER` `public.consume_ai_quota(p_limit int, p_window_seconds int) returns table(allowed boolean, retry_after int)` đọc/ghi (EXECUTE chỉ cho `authenticated`, `search_path` cố định, `auth.uid()` NULL -> từ chối, kẹp `p_limit` 1..100, `p_window_seconds` 1..86400).
+- Cửa sổ CỐ ĐỊNH: `window_start = floor(epoch(now()) / window) * window`; upsert nguyên tử một câu `INSERT ... ON CONFLICT DO UPDATE ... WHERE count < p_limit`. Ở ranh giới cửa sổ có thể dùng tới 2 x limit (known-gap chấp nhận). Mỗi lần gọi dọn dòng > 1 ngày của chính user đó.
+- Route `/api/ai-coach` gọi `consume_ai_quota(5, 600)` bằng JWT của user và FAIL CLOSED (lỗi/thiếu hàm -> `AI_UNAVAILABLE`).
+
+| Bước | Việc | Ghi chú |
+|---|---|---|
+| 1 | Backup + áp `020_ai_coach_usage.sql` trên PROD (pg client ngoài app, credential từ env) | TRƯỚC khi deploy route mới |
+| 2 | `probes/11_p1_grants_matrix.sql` so `tests/grants_matrix.expected.json` (version `p2-after-020`, bỏ `_doc`) | Lệch -> chạy `020_ai_coach_usage.down.sql` |
+| 3 | `node scripts/ai_quota_prod_check.mjs --confirm-prod` (env `PROD_DB_URL`, `PG_MODULE_PATH`) | 2 user throwaway, tự xóa; kịch bản `ai-quota-atomic`, `ai-quota-foreign`, `ai-quota-cleanup` |
+| 4 | Deploy route | Sau bước 1-3 |
+
+Lùi (route fail closed, nên thứ tự quan trọng): (1) revert route (git) và deploy, (2) `020_ai_coach_usage.down.sql`, (3) `delete from public.schema_migrations where version = '020';`.
+
 ## Project TEST (cho harness 2 user)
 
 1. Tạo một Supabase project MỚI (không phải production).

@@ -4,12 +4,13 @@
 -- Probe 11 - Ma trận quyền thực tế (Phase 01, grants-matrix-audit, AC-A5 / P1-AC9)
 --
 -- Chạy SAU 011 (và lại sau mỗi lần tạo bảng mới - bù known-gap default privileges supabase_admin).
+-- P2 (020): thêm bảng ai_coach_usage + hàm consume_ai_quota(integer,integer); version = p2-after-020.
 -- Cách chạy: SQL Editor -> dán toàn bộ -> Run. Kết quả: MỘT ô `matrix` (jsonb). Copy ô đó, so với
 -- supabase/tests/grants_matrix.expected.json (bỏ qua khóa "_doc"); dán cả hai vào phase report.
 --
 -- Cấu trúc JSON xuất ra (giống file expected):
 -- {
---   "version": "p1-after-011",
+--   "version": "p2-after-020",
 --   "tables": { "<bảng>": { "anon": [..], "authenticated": [..], "service_role": [..] } },
 --        // mỗi mảng = quyền có thật, sắp A-Z, trong {DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE}
 --   "functions": { "<chữ ký>": { "PUBLIC": bool, "anon": bool, "authenticated": bool } },
@@ -24,7 +25,8 @@
 
 WITH tbl AS (
   SELECT unnest(ARRAY['accounts', 'daily_reviews', 'notifications', 'periodic_reviews',
-                      'playbooks', 'trades', 'user_preferences', 'schema_migrations']) AS t
+                      'playbooks', 'trades', 'user_preferences', 'schema_migrations',
+                      'ai_coach_usage']) AS t
 ),
 rl AS (
   SELECT unnest(ARRAY['anon', 'authenticated', 'service_role']) AS r
@@ -85,7 +87,7 @@ upd_json AS (
   ) u
 )
 SELECT jsonb_build_object(
-         'version', 'p1-after-011',
+         'version', 'p2-after-020',
          'tables', (SELECT j FROM tables_json),
          'functions', (SELECT j FROM functions_json),
          'policies', jsonb_build_object(

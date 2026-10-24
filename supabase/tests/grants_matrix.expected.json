@@ -1,6 +1,6 @@
 {
-  "_doc": "Ma trận quyền KỲ VỌNG sau patch 011 (Phase 01, E18). So với kết quả probe supabase/probes/11_p1_grants_matrix.sql (cùng cấu trúc). service_role: giữ như hiện trạng baseline 11-10-26 (đủ 7 quyền). Danh sách quyền sắp xếp A-Z.",
-  "version": "p1-after-011",
+  "_doc": "Ma trận quyền KỲ VỌNG sau patch 011 (Phase 01, E18). So với kết quả probe supabase/probes/11_p1_grants_matrix.sql (cùng cấu trúc). service_role: giữ như hiện trạng baseline 11-10-26 (đủ 7 quyền). Danh sách quyền sắp xếp A-Z. P2 (patch 020, 24-10-26): thêm bảng ai_coach_usage (anon/authenticated không có quyền nào; service_role như các bảng khác - XÁC NHẬN bằng probe sau khi áp) và hàm consume_ai_quota(integer,integer) EXECUTE chỉ cho authenticated; version p2-after-020.",
+  "version": "p2-after-020",
   "tables": {
     "accounts": {
       "anon": [],
@@ -140,10 +140,28 @@
         "TRUNCATE",
         "UPDATE"
       ]
+    },
+    "ai_coach_usage": {
+      "anon": [],
+      "authenticated": [],
+      "service_role": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
     }
   },
   "functions": {
     "get_account_stats(uuid)": {
+      "PUBLIC": false,
+      "anon": false,
+      "authenticated": true
+    },
+    "consume_ai_quota(integer,integer)": {
       "PUBLIC": false,
       "anon": false,
       "authenticated": true

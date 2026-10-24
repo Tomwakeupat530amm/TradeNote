@@ -6,6 +6,8 @@ import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { MobileBottomNav } from "./MobileBottomNav";
 import clsx from "clsx";
+import { usePathname } from "@/i18n/routing";
+import { isPublicAuthPath } from "./AuthProvider";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -13,6 +15,8 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const { isCollapsed, toggleSidebar } = useSidebarStore();
+  // Called before any early return so hook order stays stable.
+  const pathname = usePathname();
 
   // Initialize state once client-side (safe from SSR hydration mismatch)
   useEffect(() => {
@@ -38,6 +42,11 @@ export function AppShell({ children }: AppShellProps) {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [toggleSidebar]);
+
+  // Auth pages (/auth, /auth/reset) render without Sidebar/Header/MobileBottomNav.
+  if (isPublicAuthPath(pathname)) {
+    return <>{children}</>;
+  }
 
   return (
     <>
