@@ -13,11 +13,11 @@ import { toast } from "sonner";
 import clsx from "clsx";
 import { useTranslations } from "next-intl";
 
-import { useTradeStore, Trade, TradeResult, SetupTag, EmotionTag, MistakeTag } from "@/store/useTradeStore";
+import { useTradeStore, Trade, TradeResult, SetupTag, EmotionTag, MistakeTag, SaveTradeError } from "@/store/useTradeStore";
+import { classifyRiskInput, formRMultiple, suggestedRiskInput, toPositiveNumber, finiteOrZero } from "@/lib/risk";
 import { useAccountStore } from "@/store/useAccountStore";
 import { usePlaybookStore } from "@/store/usePlaybookStore";
 import { detectSession, TradingSession, SESSIONS } from "@/lib/sessionUtils";
-import { calculateAccount1RRisk } from "@/lib/riskEngine";
 import { useTagTranslation } from "@/hooks/useTagTranslation";
 import { playSuccessChime } from "@/lib/soundEngine";
 import { processClipboardImage } from "@/lib/imageCompressor";
@@ -47,6 +47,8 @@ export function TradeSlideOverDrawer({
 }: TradeSlideOverDrawerProps) {
   const t = useTranslations("SlideOverDrawer");
   const c = useTranslations("Common");
+  const tRisk = useTranslations("Risk");
+  const tTrade = useTranslations("Trade");
   const tTag = useTagTranslation();
 
   const { accounts, activeAccountId } = useAccountStore();
@@ -54,7 +56,8 @@ export function TradeSlideOverDrawer({
   const { playbooks, fetchPlaybooks } = usePlaybookStore();
 
   const activeAccount = accounts.find((a) => a.id === activeAccountId) || accounts[0];
-  const account1R = useMemo(() => calculateAccount1RRisk(activeAccount), [activeAccount]);
+  // P3 D3: the account 1R is only a SUGGESTION for the input ("" when the account has no risk configured).
+  const riskSuggestion = useMemo(() => suggestedRiskInput(activeAccount), [activeAccount]);
 
   // Tab State
   const [activeTab, setActiveTab] = useState<"execution" | "psychology">("execution");
@@ -64,7 +67,8 @@ export function TradeSlideOverDrawer({
   const [lotSize, setLotSize] = useState("1");
   const [pnl, setPnl] = useState("0");
   const [pnlSign, setPnlSign] = useState<"+" | "-">("+");
-  const [riskAmount, setRiskAmount] = useState(() => account1R.riskDollar.toString());
+  const [riskAmount, setRiskAmount] = useState(() => riskSuggestion);
+  const [riskBadInput, setRiskBadInput] = useState(false);
   const [tradeDate, setTradeDate] = useState(() => format(new Date(), "yyyy-MM-dd'T'HH:mm"));
   const [session, setSession] = useState<TradingSession>("New York");
   const [setup, setSetup] = useState<string>("Breakout");
@@ -166,7 +170,8 @@ export function TradeSlideOverDrawer({
         setLotSize(tradeToEdit.lotSize.toString());
         setPnl(Math.abs(tradeToEdit.pnl).toString());
         setPnlSign(tradeToEdit.pnl < 0 ? "-" : "+");
-        setRiskAmount((tradeToEdit.riskAmount ?? account1R.riskDollar).toString());
+        setRiskAmount(tradeToEdit.riskAmount != null ? tradeToEdit.riskAmount.toString() : "");
+        setRiskBadInput(false);
         setTradeDate(format(new Date(tradeToEdit.date), "yyyy-MM-dd'T'HH:mm"));
         setSession((tradeToEdit.session as TradingSession) || detectSession(new Date(tradeToEdit.date)));
         setSetup(tradeToEdit.setup);
@@ -191,7 +196,7 @@ export function TradeSlideOverDrawer({
               if (draft.lotSize) setLotSize(draft.lotSize);
               if (draft.pnl) setPnl(draft.pnl);
               if (draft.pnlSign) setPnlSign(draft.pnlSign);
-              if (draft.riskAmount) setRiskAmount(draft.riskAmount);
+              if (draft.riskAmount) { setRiskAmount(draft.riskAmount); setRiskBadInput(false); }
               if (draft.setup) setSetup(draft.setup);
               if (draft.emotion) setEmotion(draft.emotion);
               if (draft.mistake) setMistake(draft.mistake);
@@ -213,7 +218,7 @@ export function TradeSlideOverDrawer({
             setPnl(Math.abs(initialData.pnl).toString());
             setPnlSign(initialData.pnl < 0 ? "-" : "+");
           }
-          if (initialData.riskAmount) setRiskAmount(initialData.riskAmount.toString());
+          if (initialData.riskAmount) { setRiskAmount(initialData.riskAmount.toString()); setRiskBadInput(false); }
           if (initialData.setup) setSetup(initialData.setup);
           if (initialData.notes) setNotes(initialData.notes);
         } else if (!draftFound) {
@@ -222,7 +227,8 @@ export function TradeSlideOverDrawer({
           setLotSize("1");
           setPnl("0");
           setPnlSign("+");
-          setRiskAmount(account1R.riskDollar.toString());
+          setRiskAmount(riskSuggestion);
+          setRiskBadInput(false);
           const now = new Date();
           setTradeDate(format(now, "yyyy-MM-dd'T'HH:mm"));
           setSession(detectSession(now));
@@ -241,7 +247,7 @@ export function TradeSlideOverDrawer({
     }, 0);
 
     return () => clearTimeout(timer);
-  }, [isOpen, tradeToEdit, initialData, account1R, draftKey]);
+  }, [isOpen, tradeToEdit, initialData, riskSuggestion, draftKey]);
 
   // Draft Autosave (debounced 400ms, only in Create Mode)
   useEffect(() => {
@@ -279,13 +285,14 @@ export function TradeSlideOverDrawer({
     setLotSize("1");
     setPnl("0");
     setPnlSign("+");
-    setRiskAmount(account1R.riskDollar.toString());
+    setRiskAmount(riskSuggestion);
+    setRiskBadInput(false);
     setNotes("");
     setConfluences([]);
     setEmotion("Calm");
     setMistake("None");
     toast.info(t("toast_draft_cleared"));
-  }, [draftKey, account1R, t]);
+  }, [draftKey, riskSuggestion, t]);
 
   // Date Change with auto-session detection
   const handleDateChange = (val: string) => {
@@ -300,15 +307,12 @@ export function TradeSlideOverDrawer({
 
   // Live PnL & R calculation
   const numericPnl = useMemo(() => {
-    const raw = Math.abs(parseFloat(pnl) || 0);
+    const raw = Math.abs(finiteOrZero(parseFloat(pnl)));
     return pnlSign === "-" ? -raw : raw;
   }, [pnl, pnlSign]);
 
-  const liveRMultiple = useMemo(() => {
-    const risk = parseFloat(riskAmount) || account1R.riskDollar;
-    if (risk <= 0) return 0;
-    return Number((numericPnl / risk).toFixed(2));
-  }, [numericPnl, riskAmount, account1R]);
+  // null = no risk set (blank input); the suggestion is never saved implicitly
+  const liveRMultiple = useMemo(() => formRMultiple(numericPnl, riskAmount), [numericPnl, riskAmount]);
 
   // Derived trade result based on PnL
   const result: TradeResult = useMemo(() => {
@@ -436,7 +440,11 @@ export function TradeSlideOverDrawer({
       return;
     }
 
-    const parsedRisk = parseFloat(riskAmount) || account1R.riskDollar;
+    if (classifyRiskInput(riskAmount, riskBadInput) === "invalid") {
+      toast.warning(tRisk("invalidInput"));
+      return;
+    }
+    const parsedRisk = toPositiveNumber(riskAmount);
     setIsSubmitting(true);
 
     try {
@@ -454,7 +462,6 @@ export function TradeSlideOverDrawer({
           notes,
           date: new Date(tradeDate).toISOString(),
           riskAmount: parsedRisk,
-          rMultiple: liveRMultiple,
           session,
           checklistResults,
           screenshotFile: screenshotRemoved ? null : (screenshot && screenshot.startsWith("data:") ? screenshot : undefined),
@@ -475,7 +482,6 @@ export function TradeSlideOverDrawer({
           notes,
           date: new Date(tradeDate).toISOString(),
           riskAmount: parsedRisk,
-          rMultiple: liveRMultiple,
           session,
           checklistResults,
           screenshotFile: screenshot && screenshot.startsWith("data:") ? screenshot : undefined,
@@ -491,8 +497,13 @@ export function TradeSlideOverDrawer({
       onSaved();
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Error saving trade.";
-      toast.error(msg);
+      // Save failed: keep the drawer open with every entered value (and the draft).
+      if (err instanceof SaveTradeError) {
+        toast.error(tTrade("saveError.failed", { detail: err.detail }));
+      } else {
+        const msg = err instanceof Error ? err.message : "Error saving trade.";
+        toast.error(msg);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -746,9 +757,11 @@ export function TradeSlideOverDrawer({
                       </div>
                       <input
                         type="number"
-                        required
+                        step="any"
+                        min="0"
                         value={riskAmount}
-                        onChange={(e) => setRiskAmount(e.target.value)}
+                        placeholder={tRisk("noRiskSet")}
+                        onChange={(e) => { setRiskAmount(e.target.value); setRiskBadInput(e.target.validity.badInput); }}
                         className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2 text-sm text-white font-mono font-bold focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all tabular-nums"
                       />
                     </div>
@@ -759,11 +772,11 @@ export function TradeSlideOverDrawer({
                       </label>
                       <div className={clsx(
                         "h-[38px] rounded-xl border px-3.5 flex items-center justify-between font-mono font-bold text-sm tabular-nums transition-all",
-                        liveRMultiple > 0 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
-                        liveRMultiple < 0 ? "bg-rose-500/10 border-rose-500/30 text-rose-400" :
+                        liveRMultiple != null && liveRMultiple > 0 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
+                        liveRMultiple != null && liveRMultiple < 0 ? "bg-rose-500/10 border-rose-500/30 text-rose-400" :
                         "bg-white/5 border-white/10 text-gray-400"
                       )}>
-                        <span>{liveRMultiple > 0 ? `+${liveRMultiple}R` : `${liveRMultiple}R`}</span>
+                        <span>{liveRMultiple == null ? tRisk("noRiskSet") : liveRMultiple > 0 ? `+${liveRMultiple}R` : `${liveRMultiple}R`}</span>
                         <span className="text-[10px] uppercase font-semibold text-gray-400">{result}</span>
                       </div>
                     </div>

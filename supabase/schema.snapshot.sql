@@ -33,6 +33,12 @@ CREATE TABLE IF NOT EXISTS public.trades (
     screenshot_url TEXT,
     screenshot_path TEXT, -- P1 (patch 012): đường dẫn trong bucket private, nguồn đọc ưu tiên
     date TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    -- P3 (patch 030): cột rủi ro nullable, KHÔNG default 500; không có created_at (khớp PROD)
+    risk_amount NUMERIC,
+    r_multiple NUMERIC,
+    session TEXT,
+    checklist_results JSONB DEFAULT '{}'::jsonb,
+    risk_is_estimated BOOLEAN, -- NULL = chưa phân loại; true = 500 cũ (031); false = rủi ro thật
     -- P1 (patch 010): trade chỉ được trỏ vào account của CHÍNH user đó
     CONSTRAINT trades_account_user_fk FOREIGN KEY (account_id, user_id)
         REFERENCES public.accounts (id, user_id) ON DELETE CASCADE

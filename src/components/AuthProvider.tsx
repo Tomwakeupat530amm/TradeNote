@@ -50,7 +50,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (activeAccountId) {
       useTradeStore.getState().fetchTrades(activeAccountId);
-      useTradeStore.getState().fetchAccountStats(activeAccountId);
     }
   }, [activeAccountId]);
 

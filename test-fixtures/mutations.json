@@ -1,0 +1,237 @@
+{
+  "description": "Hardening P3 F2 manual mutants. Each `find` must match EXACTLY once in `file` (else NOT_APPLIED = FAIL). Each mutant must make `vitest run <test>` fail. Run: node scripts/mutation_check.mjs",
+  "mutants": [
+    {
+      "id": "M01-tradingday-ge-to-gt",
+      "description": "tradingDay: `>=` -> `>` at the reset boundary (a trade exactly at reset lands on the previous day)",
+      "file": "src/lib/tradingDay.ts",
+      "find": "if (hour * 60 + minute >= resetMinutes) {",
+      "replace": "if (hour * 60 + minute > resetMinutes) {",
+      "test": "src/lib/__tests__/tradingDay.test.ts"
+    },
+    {
+      "id": "M02-reset-compare-flipped",
+      "description": "tradingDay: reset-time comparison sign flipped (`>=` -> `<`)",
+      "file": "src/lib/tradingDay.ts",
+      "find": "if (hour * 60 + minute >= resetMinutes) {",
+      "replace": "if (hour * 60 + minute < resetMinutes) {",
+      "test": "src/lib/__tests__/tradingDay.test.ts"
+    },
+    {
+      "id": "M03-tz-browser-local",
+      "description": "tradingDay: key computed in the runtime (browser-local) zone instead of the user/override zone",
+      "file": "src/lib/tradingDay.ts",
+      "find": "const zone = resolveZone(resetOverride?.resetTz, userTz);",
+      "replace": "const zone = resolveZone(resetOverride?.resetTz, Intl.DateTimeFormat().resolvedOptions().timeZone);",
+      "test": "src/lib/__tests__/tradingDay.test.ts"
+    },
+    {
+      "id": "M04-override-tz-ignored",
+      "description": "tradingDay: a valid per-account override tz is ignored (user tz always used)",
+      "file": "src/lib/tradingDay.ts",
+      "find": "    if (isValidTimeZone(overrideTz)) return overrideTz;\n",
+      "replace": "",
+      "test": "src/lib/__tests__/tradingDay.test.ts"
+    },
+    {
+      "id": "M05-override-leak-across-accounts",
+      "description": "propRisk: trades of other accounts leak into this account (account filter removed)",
+      "file": "src/lib/propRisk.ts",
+      "find": "return trades.filter((t) => t.accountId === account.id);",
+      "replace": "return [...trades];",
+      "test": "src/lib/__tests__/propRisk.test.ts"
+    },
+    {
+      "id": "M06-break-stable-ordering",
+      "description": "propRisk: equal timestamps no longer keep input order (input reversed before the stable sort)",
+      "file": "src/lib/propRisk.ts",
+      "find": "return [...trades].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());",
+      "replace": "return [...trades].reverse().sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());",
+      "test": "src/lib/__tests__/propRisk-intraday-characterization.test.ts"
+    },
+    {
+      "id": "M07-flip-intraday-ratchet-sign",
+      "description": "propRisk: Intraday HWM ratchet sign flipped (`>` -> `<`)",
+      "file": "src/lib/propRisk.ts",
+      "find": "if (runningIntradayBalance > highWaterMark) {",
+      "replace": "if (runningIntradayBalance < highWaterMark) {",
+      "test": "src/lib/__tests__/propRisk.test.ts"
+    },
+    {
+      "id": "M08-swap-intraday-eod",
+      "description": "propRisk: Intraday and EOD branches swapped",
+      "file": "src/lib/propRisk.ts",
+      "find": "if (mode === \"End of Day\") {",
+      "replace": "if (mode !== \"End of Day\") {",
+      "test": "src/lib/__tests__/propRisk.test.ts"
+    },
+    {
+      "id": "M09-eod-ratchets-open-day",
+      "description": "propRisk: EOD HWM also ratchets on the still-open trading day",
+      "file": "src/lib/propRisk.ts",
+      "find": "if (dayKey !== todayKey && runningEodBalance > highWaterMark) {",
+      "replace": "if (runningEodBalance > highWaterMark) {",
+      "test": "src/lib/__tests__/propRisk.test.ts"
+    },
+    {
+      "id": "M10-default-drawdown-eod",
+      "description": "propRisk: DEFAULT_DRAWDOWN_MODE changed to End of Day",
+      "file": "src/lib/propRisk.ts",
+      "find": "export const DEFAULT_DRAWDOWN_MODE: DrawdownMode = \"Intraday\";",
+      "replace": "export const DEFAULT_DRAWDOWN_MODE: DrawdownMode = \"End of Day\";",
+      "test": "src/lib/__tests__/propRisk.test.ts"
+    },
+    {
+      "id": "M11-consistency-browser-date",
+      "description": "propRisk: consistency groups by the raw ISO date (UTC) instead of the user-tz trading day",
+      "file": "src/lib/propRisk.ts",
+      "find": "const key = tradingDayKey(trade.date, tz, ov);",
+      "replace": "const key = trade.date.slice(0, 10);",
+      "test": "src/lib/__tests__/propRisk.test.ts"
+    },
+    {
+      "id": "M12-winrate-counts-be",
+      "description": "stats: win rate counts break-even trades in the denominator",
+      "file": "src/lib/stats.ts",
+      "find": "    else if (t.pnl < 0) losses++;\n",
+      "replace": "    else losses++;\n",
+      "test": "src/lib/__tests__/stats.test.ts"
+    },
+    {
+      "id": "M13-avgr-null-as-0r",
+      "description": "stats: unrated trades (null R) treated as 0R in avgR",
+      "file": "src/lib/stats.ts",
+      "find": "    if (!isRatedForR(t)) continue;\n    const r = rMultiple(t.pnl, t.riskAmount);\n    if (r === null) continue;\n",
+      "replace": "    const r = rMultiple(t.pnl, t.riskAmount) ?? 0;\n",
+      "test": "src/lib/__tests__/stats.test.ts"
+    },
+    {
+      "id": "M14-drop-9999-cap",
+      "description": "stats: profit factor 99.99 cap removed (returns gross profit)",
+      "file": "src/lib/stats.ts",
+      "find": "if (grossLoss === 0) return grossProfit > 0 ? 99.99 : 0;",
+      "replace": "if (grossLoss === 0) return grossProfit > 0 ? grossProfit : 0;",
+      "test": "src/lib/__tests__/stats.test.ts"
+    },
+    {
+      "id": "M15-resolverisk-fallback-500",
+      "description": "risk: blank trade risk resolves to a $500 fallback instead of none",
+      "file": "src/lib/risk.ts",
+      "find": "  return { amount: null, source: \"none\" };\n}",
+      "replace": "  return { amount: 500, source: \"account\" };\n}",
+      "test": "src/lib/__tests__/risk.test.ts"
+    },
+    {
+      "id": "M16-rmultiple-500-when-missing",
+      "description": "risk: rMultiple divides by 500 when risk is missing",
+      "file": "src/lib/risk.ts",
+      "find": "if (risk === null || risk === undefined || !Number.isFinite(risk) || risk <= 0) return null;",
+      "replace": "if (risk === null || risk === undefined || !Number.isFinite(risk) || risk <= 0) return pnl / 500;",
+      "test": "src/lib/__tests__/risk.test.ts"
+    },
+    {
+      "id": "M17-remove-savetradeerror",
+      "description": "store: insert failure is swallowed (SaveTradeError not thrown, silent drop)",
+      "file": "src/store/useTradeStore.ts",
+      "find": "      throw toSaveTradeError(insertError);",
+      "replace": "      return;",
+      "test": "src/store/__tests__/useTradeStore.test.ts"
+    },
+    {
+      "id": "M18-estimated-not-cleared-on-edit",
+      "description": "store: editing riskAmount to a new value does not clear risk_is_estimated",
+      "file": "src/store/useTradeStore.ts",
+      "find": "          payload.risk_is_estimated = false;\n",
+      "replace": "",
+      "test": "src/store/__tests__/useTradeStore.test.ts"
+    },
+    {
+      "id": "M19-insert-flag-null",
+      "description": "store: new insert sends risk_is_estimated null instead of false",
+      "file": "src/store/useTradeStore.ts",
+      "find": "insertPayload.risk_is_estimated = false;",
+      "replace": "insertPayload.risk_is_estimated = null;",
+      "test": "src/store/__tests__/useTradeStore.test.ts"
+    },
+    {
+      "id": "M20-mapper-null-as-true",
+      "description": "store: flag mapper treats NULL as estimated (breaks COALESCE(risk_is_estimated, false))",
+      "file": "src/store/useTradeStore.ts",
+      "find": "  return value === true;\n}",
+      "replace": "  return value !== false;\n}",
+      "test": "src/store/__tests__/useTradeStore.test.ts"
+    },
+    {
+      "id": "M21-fetch-no-pagination",
+      "description": "F-3: fetchTrades stops after the first page (silent truncation)",
+      "file": "src/store/useTradeStore.ts",
+      "find": "      if (rows.length < TRADES_PAGE_SIZE) break;",
+      "replace": "      break;",
+      "test": "src/store/__tests__/useTradeStore.test.ts"
+    },
+    {
+      "id": "M22-fetch-unstable-order",
+      "description": "F-3: secondary order by id dropped (unstable page boundaries)",
+      "file": "src/store/useTradeStore.ts",
+      "find": "        .order('id', { ascending: false })\n",
+      "replace": "",
+      "test": "src/store/__tests__/useTradeStore.test.ts"
+    },
+    {
+      "id": "M23-rmultiple-without-risk",
+      "description": "F-6: stored r_multiple surfaced when risk_amount is null",
+      "file": "src/store/useTradeStore.ts",
+      "find": "    : null;\n  return { riskAmount, rMultiple,",
+      "replace": "    : (d.r_multiple != null ? Number(d.r_multiple) : null);\n  return { riskAmount, rMultiple,",
+      "test": "src/store/__tests__/useTradeStore.test.ts"
+    },
+    {
+      "id": "M24-stale-rmultiple-on-missing-trade",
+      "description": "F-7: risk edit on an unknown trade leaves r_multiple untouched",
+      "file": "src/store/useTradeStore.ts",
+      "find": "        payload.r_multiple = null;\n        stateRisk.rMultiple = null;",
+      "replace": "        stateRisk.rMultiple = null;",
+      "test": "src/store/__tests__/useTradeStore.test.ts"
+    },
+    {
+      "id": "M25-blank-risk-perfect-score",
+      "description": "F-4: unrated risk pillar scored 100 again",
+      "file": "src/lib/disciplineScore.ts",
+      "find": "sRisk = ratedLossCount > 0 ? Math.round(riskScoreSum / ratedLossCount) : null;",
+      "replace": "sRisk = ratedLossCount > 0 ? Math.round(riskScoreSum / ratedLossCount) : 100;",
+      "test": "src/lib/__tests__/review-fixes-leg6.test.ts"
+    },
+    {
+      "id": "M26-expectancy-fabricated-1r",
+      "description": "F-5: expectancyR falls back to -1R-based value when nothing is rated",
+      "file": "src/lib/matrixAnalytics.ts",
+      "find": "const expectancyR = expectancyRValue != null ? Number(expectancyRValue.toFixed(2)) : null;",
+      "replace": "const expectancyR = expectancyRValue != null ? Number(expectancyRValue.toFixed(2)) : Number((-(baseCell.losses / baseCell.count)).toFixed(2));",
+      "test": "src/lib/__tests__/review-fixes-leg6.test.ts"
+    },
+    {
+      "id": "M27-avgr-text-fallback",
+      "description": "F-5: dashboard avg R shows 1.00R/0.00R without rated sample",
+      "file": "src/lib/stats.ts",
+      "find": "if (value == null || !Number.isFinite(value)) return \"—\";",
+      "replace": "if (value == null || !Number.isFinite(value)) return side === \"win\" ? \"+0.00R\" : \"-1.00R\";",
+      "test": "src/lib/__tests__/review-fixes-leg6.test.ts"
+    },
+    {
+      "id": "M28-badinput-as-blank",
+      "description": "F-8: validity.badInput ignored (unparsable input saved as no risk)",
+      "file": "src/lib/risk.ts",
+      "find": "  if (badInput) return \"invalid\";\n",
+      "replace": "",
+      "test": "src/lib/__tests__/review-fixes-leg6.test.ts"
+    },
+    {
+      "id": "M29-new-prefs-utc",
+      "description": "F-2: new preferences row seeded with UTC instead of the browser zone",
+      "file": "src/store/usePreferenceStore.ts",
+      "find": "          timezone: initialTimeZone(),",
+      "replace": "          timezone: DEFAULT_PREFERENCES.timezone,",
+      "test": "src/store/__tests__/usePreferenceStore.test.ts"
+    }
+  ]
+}

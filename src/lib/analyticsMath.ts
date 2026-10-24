@@ -1,4 +1,6 @@
-import { Trade } from "@/store/useTradeStore";
+import type { Trade } from "@/store/useTradeStore";
+import { isRatedForR, rMultiple } from "@/lib/risk";
+import { avgR as statsAvgR, profitFactor as statsProfitFactor, winRate as statsWinRate } from "@/lib/stats";
 import { startOfWeek, startOfMonth, subDays, isAfter, format, parseISO } from "date-fns";
 
 export interface HistoricalDrawdown {
@@ -108,7 +110,6 @@ export function calculateExtendedStats(trades: Trade[], initialBalance?: number)
   let lossCount = 0;
 
   // R-Multiple accumulators
-  let totalR = 0;
   let totalWinR = 0;
   let totalLossR = 0;
   let rCount = 0;
@@ -129,14 +130,10 @@ export function calculateExtendedStats(trades: Trade[], initialBalance?: number)
       if (t.pnl < maxLossTrade) maxLossTrade = t.pnl;
     }
 
-    // Determine effective R-Multiple
-    let r = t.rMultiple;
-    if (r === undefined && t.riskAmount && t.riskAmount > 0) {
-      r = t.pnl / t.riskAmount;
-    }
+    // R-Multiple (P3): rated trades only, one formula (@/lib/risk); unrated (null risk) never counts as 0R.
+    const r = isRatedForR(t) ? rMultiple(t.pnl, t.riskAmount) : null;
 
-    if (r !== undefined && !isNaN(r)) {
-      totalR += r;
+    if (r != null) {
       rCount++;
       if (r > 0) {
         totalWinR += r;
@@ -148,28 +145,20 @@ export function calculateExtendedStats(trades: Trade[], initialBalance?: number)
     }
   });
 
-  // Profit Factor
-  let profitFactor = 0;
-  let isProfitFactorInfinite = false;
-  if (grossLoss === 0) {
-    if (grossProfit > 0) {
-      isProfitFactorInfinite = true;
-      profitFactor = 99.99; // Cap display
-    } else {
-      profitFactor = 0;
-    }
-  } else {
-    profitFactor = Number((grossProfit / grossLoss).toFixed(2));
-  }
+  // Profit Factor (P3: @/lib/stats, 99.99 cap; the "infinite" flag stays for the display)
+  const profitFactor = statsProfitFactor(trades);
+  const isProfitFactorInfinite = grossLoss === 0 && grossProfit > 0;
 
-  // Averages for R
-  const avgR = rCount > 0 ? Number((totalR / rCount).toFixed(2)) : 0;
+  // Averages for R (avgR from @/lib/stats: unrated excluded; 2 decimals, 0 when none rated as before)
+  const avgRValue = statsAvgR(trades);
+  const avgR = avgRValue != null ? Number(avgRValue.toFixed(2)) : 0;
   const avgWinR = winRCount > 0 ? Number((totalWinR / winRCount).toFixed(2)) : 0;
   const avgLossR = lossRCount > 0 ? Number((totalLossR / lossRCount).toFixed(2)) : 0;
 
   // Expectancy ($ and R)
   const totalDecisive = winCount + lossCount;
-  const winRate = totalDecisive > 0 ? winCount / totalDecisive : 0;
+  // stats.winRate is a percent (0-100, BE excluded); expectancy needs the 0-1 fraction.
+  const winRate = statsWinRate(trades) / 100;
   const lossRate = totalDecisive > 0 ? lossCount / totalDecisive : 0;
   const avgWinDollar = winCount > 0 ? grossProfit / winCount : 0;
   const avgLossDollar = lossCount > 0 ? grossLoss / lossCount : 0;
@@ -382,12 +371,13 @@ export function calculateMistakeLeakage(trades: Trade[]): MistakeLeakageResult {
     return { leakageList: [], totalLeaked: 0, costliestMistake: null };
   }
 
-  const map = new Map<string, { totalLoss: number; lossCount: number; totalCount: number; winCount: number; netPnl: number }>();
+  const map = new Map<string, { totalLoss: number; lossCount: number; totalCount: number; winCount: number; netPnl: number; trades: Trade[] }>();
 
   trades.forEach((t) => {
     if (!t.mistake || t.mistake.trim() === "" || t.mistake === "None") return;
     const tag = t.mistake.trim();
-    const current = map.get(tag) || { totalLoss: 0, lossCount: 0, totalCount: 0, winCount: 0, netPnl: 0 };
+    const current = map.get(tag) || { totalLoss: 0, lossCount: 0, totalCount: 0, winCount: 0, netPnl: 0, trades: [] };
+    current.trades.push(t);
     current.totalCount += 1;
     current.netPnl += t.pnl;
     if (t.pnl < 0) {
@@ -410,7 +400,7 @@ export function calculateMistakeLeakage(trades: Trade[]): MistakeLeakageResult {
       lossCount: val.lossCount,
       totalCount: val.totalCount,
       winCount: val.winCount,
-      winRate: val.totalCount > 0 ? Math.round((val.winCount / val.totalCount) * 100) : 0,
+      winRate: Math.round(statsWinRate(val.trades)),
       netPnl: Number(val.netPnl.toFixed(2)),
     });
   });

@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { Trade } from "@/store/useTradeStore";
+import { formRMultiple } from "@/lib/risk";
 import { Account } from "@/store/useAccountStore";
 import { calculateDailyDisciplineScore, DisciplineTier } from "@/lib/disciplineScore";
 import { playZenChime } from "@/lib/soundEngine";
@@ -34,6 +35,7 @@ export function DailyExecutiveReportCard({
   onSessionClosed,
 }: DailyExecutiveReportCardProps) {
   const t = useTranslations("DailyReportCard");
+  const tRisk = useTranslations("Risk");
   const [inspectTrade, setInspectTrade] = useState<Trade | null>(null);
 
   // Target date for storage key
@@ -216,13 +218,13 @@ export function DailyExecutiveReportCard({
                 {t("pillar_risk")}
               </span>
               <span className="font-mono font-bold text-gray-300">
-                {report.pillars.risk.score}/100
+                {report.pillars.risk.score == null ? "—" : `${report.pillars.risk.score}/100`}
               </span>
             </div>
             <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
               <div
                 className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                style={{ width: `${report.pillars.risk.score}%` }}
+                style={{ width: `${report.pillars.risk.score ?? 0}%` }}
               />
             </div>
             <p className="text-[11px] text-gray-400">{report.pillars.risk.notes}</p>
@@ -301,7 +303,11 @@ export function DailyExecutiveReportCard({
                     +${report.mvpTrade.pnl.toLocaleString()}
                   </div>
                   <div className="text-xs font-mono text-emerald-300">
-                    +{report.mvpTrade.rMultiple ?? (report.mvpTrade.pnl / 100).toFixed(1)}R
+                    {(() => {
+                      // P3: R from the trade risk only (no pnl/100 guess)
+                      const mvpR = report.mvpTrade.rMultiple != null ? report.mvpTrade.rMultiple : formRMultiple(report.mvpTrade.pnl, report.mvpTrade.riskAmount);
+                      return mvpR != null ? `+${mvpR}R` : tRisk("noRiskSet");
+                    })()}
                   </div>
                 </div>
               </div>
@@ -340,9 +346,9 @@ export function DailyExecutiveReportCard({
                     -${Math.abs(report.costliestLeakTrade.pnl).toLocaleString()}
                   </div>
                   <div className="text-xs font-mono text-rose-300">
-                    {report.costliestLeakTrade.rMultiple !== undefined
+                    {report.costliestLeakTrade.rMultiple != null
                       ? `${report.costliestLeakTrade.rMultiple}R`
-                      : "-1.0R"}
+                      : tRisk("noRiskSet")}
                   </div>
                 </div>
               </div>

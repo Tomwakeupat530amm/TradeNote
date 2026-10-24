@@ -3,15 +3,17 @@
 import { useState } from "react";
 import { useAccountStore } from "@/store/useAccountStore";
 import { useTradeStore } from "@/store/useTradeStore";
-import { Target, ShieldAlert, TrendingUp, TrendingDown, Activity, Wallet, Percent, AlertTriangle, Globe } from "lucide-react";
+import { Target, ShieldAlert, TrendingUp, TrendingDown, Activity, Wallet, Percent, AlertTriangle, Globe, Loader2 } from "lucide-react";
 import { EconomicCalendarWidget } from "@/components/EconomicCalendarWidget";
 import { PreMarketRoutineWidget } from "@/components/PreMarketRoutineWidget";
-import { format } from "date-fns";
 import { motion, Variants } from "framer-motion";
 import clsx from "clsx";
 import { useTranslations } from "next-intl";
 import { TodaySessionCockpit } from "@/components/TodaySessionCockpit";
-import { calculateAccount1RRisk, calculateRemainingBullets } from "@/lib/riskEngine";
+import { isRatedForR, rMultiple } from "@/lib/risk";
+import { avgR, formatAvgR, winRate as computeWinRate } from "@/lib/stats";
+import { computeConsistency, computePropRiskSnapshot, resolveDrawdownMode } from "@/lib/propRisk";
+import { useTradingDay } from "@/hooks/useTradingDay";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -28,8 +30,10 @@ const itemVariants: Variants = {
 
 export default function Dashboard() {
   const { accounts, activeAccountId } = useAccountStore();
-  const { trades, accountStats } = useTradeStore();
+  const { trades } = useTradeStore();
   const t = useTranslations("Dashboard");
+  const tStats = useTranslations("Stats");
+  const tradingDay = useTradingDay();
 
   const activeAccount = accounts.find((a) => a.id === activeAccountId);
   const [viewUnit, setViewUnit] = useState<'USD' | 'R'>('USD');
@@ -51,112 +55,50 @@ export default function Dashboard() {
   }
 
   const accountTrades = trades.filter((t) => t.accountId === activeAccountId);
-  
-  // Use RPC stats if available, fallback to local calculation
-  const totalPnL = accountStats ? accountStats.total_pnl : accountTrades.reduce((acc, trade) => acc + trade.pnl, 0);
+
+  const totalPnL = accountTrades.reduce((acc, trade) => acc + trade.pnl, 0);
   const currentBalance = activeAccount.initialBalance + totalPnL;
   const isPersonalAccount = Boolean(activeAccount.type && activeAccount.type.toLowerCase().includes("personal"));
   const capitalGrowthPercent = activeAccount.initialBalance > 0
     ? ((totalPnL / activeAccount.initialBalance) * 100)
     : 0;
 
-  // R-Multiple calculations
-  const totalR = accountTrades.reduce((acc, trade) => {
-    const r = trade.rMultiple !== undefined 
-      ? trade.rMultiple 
-      : ((trade.riskAmount && trade.riskAmount > 0) ? (trade.pnl / trade.riskAmount) : (trade.pnl / 500));
-    return acc + r;
+  // R-Multiple (P3): only rated trades (risk set) count; one formula from @/lib/risk + @/lib/stats.
+  const ratedTrades = accountTrades.filter(isRatedForR);
+  const totalR = ratedTrades.reduce((acc, trade) => {
+    const r = rMultiple(trade.pnl, trade.riskAmount);
+    return r === null ? acc : acc + r;
   }, 0);
+  const avgWinRValue = avgR(ratedTrades.filter(t => t.pnl > 0));
+  const avgLossRValue = avgR(ratedTrades.filter(t => t.pnl < 0));
+  // F-5: no rated sample -> "—" (never a fabricated 0.00R / 1.00R).
+  const avgWinR = formatAvgR(avgWinRValue, "win");
+  const avgLossR = formatAvgR(avgLossRValue, "loss");
 
-  const winningRTrades = accountTrades.filter(t => t.pnl > 0).map(t => t.rMultiple !== undefined ? t.rMultiple : (t.pnl / (t.riskAmount || 500)));
-  const losingRTrades = accountTrades.filter(t => t.pnl < 0).map(t => t.rMultiple !== undefined ? Math.abs(t.rMultiple) : Math.abs(t.pnl / (t.riskAmount || 500)));
+  // Win Rate (P3): break-even excluded; integer display as before.
+  const winRate = Math.round(computeWinRate(accountTrades));
+  const winTradesCount = accountTrades.filter(t => t.pnl > 0).length;
+  const totalTradesCount = winTradesCount + accountTrades.filter(t => t.pnl < 0).length;
 
-  const avgWinR = winningRTrades.length > 0 ? (winningRTrades.reduce((a, b) => a + b, 0) / winningRTrades.length).toFixed(2) : "0.00";
-  const avgLossR = losingRTrades.length > 0 ? (losingRTrades.reduce((a, b) => a + b, 0) / losingRTrades.length).toFixed(2) : "1.00";
-
-  // Win Rate
-  const winRate = accountStats ? accountStats.win_rate : (accountTrades.length > 0 ? Math.round((accountTrades.filter(t => t.pnl > 0).length / accountTrades.length) * 100) : 0);
-  const totalTradesCount = accountStats ? accountStats.total_trades : accountTrades.length;
-  const winTradesCount = accountStats ? accountStats.wins : accountTrades.filter(t => t.pnl > 0).length;
-
-  // Calculate Consistency Rule (Max 1 day profit / Total Profit)
-  let maxDailyProfit = 0;
-  let maxDailyProfitDate = "";
-  
-  const tradesByDate = accountTrades.reduce((acc, trade) => {
-    const dateStr = format(new Date(trade.date), "yyyy-MM-dd");
-    acc[dateStr] = (acc[dateStr] || 0) + trade.pnl;
-    return acc;
-  }, {} as Record<string, number>);
-
-  Object.entries(tradesByDate).forEach(([date, pnl]) => {
-    if (pnl > maxDailyProfit) {
-      maxDailyProfit = pnl;
-      maxDailyProfitDate = date;
-    }
-  });
-
-  const hasConsistencyRule = Boolean(activeAccount.rules.consistencyPercent && activeAccount.rules.consistencyPercent > 0);
-  const consistencyLimit = activeAccount.rules.consistencyPercent || 0;
-  let currentConsistency = 0;
-  if (totalPnL > 0) {
-    currentConsistency = (maxDailyProfit / totalPnL) * 100;
-  }
-  const isConsistencyViolated = hasConsistencyRule && currentConsistency > consistencyLimit && totalPnL > 0;
-
-  // Trailing Drawdown calculation (True High Water Mark according to Prop Firm standards)
+  // Prop risk (P3): HWM / trailing drawdown / live bullets / consistency from @/lib/propRisk,
+  // keyed by the user-tz trading day. Not computed before preferences have loaded.
   const maxDrawdownLimit = activeAccount.rules.trailingMaxDrawdown;
-  const drawdownMode = activeAccount.rules.drawdownMode || "Intraday";
-  let highWaterMark = activeAccount.initialBalance;
-
-  // Chronological sorting (oldest to newest)
-  const sortedChronologicalTrades = [...accountTrades].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
-
-  if (drawdownMode === "End of Day") {
-    // End of Day trailing drawdown (e.g. Apex, Topstep EOD, FTMO):
-    // Peak updates only at the end of each day based on daily closing balance.
-    const tradesByDay = new Map<string, number>();
-    sortedChronologicalTrades.forEach(trade => {
-      const dayKey = format(new Date(trade.date), "yyyy-MM-dd");
-      tradesByDay.set(dayKey, (tradesByDay.get(dayKey) || 0) + trade.pnl);
-    });
-
-    let runningEodBalance = activeAccount.initialBalance;
-    const todayKey = format(new Date(), "yyyy-MM-dd");
-
-    tradesByDay.forEach((dayPnl, dayKey) => {
-      runningEodBalance += dayPnl;
-      // In EOD rules, HWM ratchets up on closed prior days
-      if (dayKey !== todayKey) {
-        if (runningEodBalance > highWaterMark) {
-          highWaterMark = runningEodBalance;
-        }
-      }
-    });
-  } else {
-    // Intraday trailing drawdown (real-time ratchet after each trade):
-    let runningIntradayBalance = activeAccount.initialBalance;
-    sortedChronologicalTrades.forEach(trade => {
-      runningIntradayBalance += trade.pnl;
-      if (runningIntradayBalance > highWaterMark) {
-        highWaterMark = runningIntradayBalance;
-      }
-    });
-  }
-
-  // Active current drawdown from High Water Mark:
-  const currentDrawdown = Math.max(0, highWaterMark - currentBalance);
-  const breachLevel = highWaterMark - maxDrawdownLimit;
-  const bufferRemaining = Math.max(0, currentBalance - breachLevel);
-
-  const account1R = calculateAccount1RRisk(activeAccount);
-  const liveBulletsRemaining = calculateRemainingBullets(bufferRemaining, account1R.riskDollar);
-
-  const drawdownPercentage = maxDrawdownLimit && maxDrawdownLimit > 0
-    ? (currentDrawdown / maxDrawdownLimit) * 100
-    : 0;
+  const riskTz = tradingDay.tz;
+  const propRisk = riskTz ? computePropRiskSnapshot(accountTrades, activeAccount, { tz: riskTz }) : null;
+  const consistency = riskTz ? computeConsistency(accountTrades, activeAccount, riskTz) : null;
+  const drawdownMode = propRisk ? propRisk.drawdownMode : resolveDrawdownMode(activeAccount);
+  const highWaterMark = propRisk ? propRisk.highWaterMark : 0;
+  const currentDrawdown = propRisk ? propRisk.currentDrawdown : 0;
+  const breachLevel = propRisk ? propRisk.breachLevel : 0;
+  const bufferRemaining = propRisk ? propRisk.bufferRemaining : 0;
+  const liveBulletsRemaining = propRisk ? propRisk.liveBullets : 0;
+  const drawdownPercentage = propRisk ? propRisk.drawdownPercentage : 0;
+  const hasConsistencyRule = consistency ? consistency.hasRule : false;
+  const consistencyLimit = consistency ? consistency.limit : 0;
+  const currentConsistency = consistency ? consistency.currentConsistency : 0;
+  const maxDailyProfit = consistency ? consistency.maxDailyProfit : 0;
+  const maxDailyProfitDate = consistency ? consistency.maxDailyProfitDate : "";
+  const isConsistencyViolated = consistency ? consistency.isViolated : false;
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-10">
@@ -250,8 +192,8 @@ export default function Dashboard() {
                     {totalR >= 0 ? `+${totalR.toFixed(2)}R` : `${totalR.toFixed(2)}R`}
                   </div>
                   <div className="mt-2 flex items-center justify-between text-xs text-gray-400 font-mono">
-                    <span className="text-emerald-400">Avg Win: +{avgWinR}R</span>
-                    <span className="text-rose-400">Avg Loss: -{avgLossR}R</span>
+                    <span className="text-emerald-400">Avg Win: {avgWinR}</span>
+                    <span className="text-rose-400">Avg Loss: {avgLossR}</span>
                   </div>
                 </>
               )}
@@ -274,6 +216,7 @@ export default function Dashboard() {
               <span className="text-4xl font-bold tracking-tight text-white">{winRate}%</span>
               <span className="text-sm text-gray-500 font-medium">({winTradesCount}/{totalTradesCount} trades)</span>
             </dd>
+            <p className="mt-1 text-[11px] text-gray-500">{tStats("winRateExcludesBE")}</p>
           </div>
         </motion.div>
 
@@ -398,6 +341,11 @@ export default function Dashboard() {
         </motion.div>
       </motion.div>
 
+      {!propRisk ? (
+        <div className="mt-6 flex items-center justify-center rounded-3xl border border-white/5 bg-gray-900/40 p-10" aria-busy="true">
+          <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
+        </div>
+      ) : (
       <motion.div 
         variants={containerVariants}
         initial="hidden"
@@ -537,6 +485,7 @@ export default function Dashboard() {
           </motion.div>
         )}
       </motion.div>
+      )}
 
       {/* Pre-Market Routine Widget (Full Width Standalone Row) */}
       <motion.div

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Trade, useTradeStore, TradeResult } from "@/store/useTradeStore";
+import { Trade, useTradeStore, TradeResult, SaveTradeError } from "@/store/useTradeStore";
+import { classifyRiskInput, formRMultiple, toPositiveNumber, finiteOrZero } from "@/lib/risk";
 import { usePreferenceStore } from "@/store/usePreferenceStore";
 import { X, Save, Image as ImageIcon, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -31,12 +32,15 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
   const { preferences } = usePreferenceStore();
   const tTag = useTagTranslation();
   const tShot = useTranslations("Screenshots");
+  const tRisk = useTranslations("Risk");
+  const tTrade = useTranslations("Trade");
 
   const [saving, setSaving] = useState(false);
   const [asset, setAsset] = useState(trade.asset);
   const [lotSize, setLotSize] = useState(trade.lotSize.toString());
   const [pnl, setPnl] = useState(trade.pnl.toString());
-  const [riskAmount, setRiskAmount] = useState(trade.riskAmount ? trade.riskAmount.toString() : "500");
+  const [riskBadInput, setRiskBadInput] = useState(false);
+  const [riskAmount, setRiskAmount] = useState(trade.riskAmount != null ? trade.riskAmount.toString() : "");
   const [session, setSession] = useState(trade.session || "New York");
   const [result, setResult] = useState<TradeResult>(trade.result);
   const [setup, setSetup] = useState(trade.setup);
@@ -57,9 +61,10 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
   const signedShot = useSignedUrl(screenshotRemoved ? null : screenshotPath);
   const previewSrc = screenshot || signedShot.url;
 
-  const numRisk = parseFloat(riskAmount) || 500;
-  const numPnl = parseFloat(pnl) || 0;
-  const calculatedR = numRisk > 0 ? Number((numPnl / numRisk).toFixed(2)) : 0;
+  // P3: blank risk = no risk set (null), never a 500 fallback.
+  const numRisk = toPositiveNumber(riskAmount);
+  const numPnl = finiteOrZero(parseFloat(pnl));
+  const calculatedR = formRMultiple(numPnl, riskAmount);
 
   // Core image processor (Ultra-fast WebP compression)
   const processImageFile = useCallback(async (file: File | Blob) => {
@@ -142,6 +147,10 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (classifyRiskInput(riskAmount, riskBadInput) === "invalid") {
+      toast.warning(tRisk("invalidInput"));
+      return;
+    }
     setSaving(true);
     try {
       await updateTrade(trade.id, {
@@ -155,7 +164,6 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
         mistake,
         notes,
         riskAmount: numRisk,
-        rMultiple: calculatedR,
         session,
         // Only a freshly pasted/dropped data: image is uploaded; unchanged images are not sent.
         screenshotFile: screenshotRemoved
@@ -164,8 +172,13 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
       });
       toast.success("Trade updated successfully!");
       onSaved();
-    } catch {
-      toast.error("Failed to update trade.");
+    } catch (err) {
+      // Save failed: keep the form open with every entered value.
+      if (err instanceof SaveTradeError) {
+        toast.error(tTrade("saveError.failed", { detail: err.detail }));
+      } else {
+        toast.error("Failed to update trade.");
+      }
     } finally {
       setSaving(false);
     }
@@ -219,9 +232,11 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
             <label className="block text-sm font-medium text-gray-300">{t("risk_amount")}</label>
             <input
               type="number"
-              required
+              step="any"
+              min="0"
               value={riskAmount}
-              onChange={(e) => setRiskAmount(e.target.value)}
+              placeholder={tRisk("noRiskSet")}
+              onChange={(e) => { setRiskAmount(e.target.value); setRiskBadInput(e.target.validity.badInput); }}
               className="block w-full rounded-xl border-0 bg-white/5 py-2 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-indigo-500 sm:text-sm px-4"
             />
           </div>
@@ -230,11 +245,11 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
             <label className="block text-sm font-medium text-gray-300">{t("r_multiple")}</label>
             <div className={clsx(
               "flex items-center justify-between h-[38px] px-4 rounded-xl border sm:text-sm font-bold font-mono",
-              calculatedR > 0 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
-              calculatedR < 0 ? "bg-rose-500/10 border-rose-500/30 text-rose-400" :
+              calculatedR != null && calculatedR > 0 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
+              calculatedR != null && calculatedR < 0 ? "bg-rose-500/10 border-rose-500/30 text-rose-400" :
               "bg-white/5 border-white/10 text-gray-400"
             )}>
-              <span>{calculatedR > 0 ? `+${calculatedR}R` : `${calculatedR}R`}</span>
+              <span>{calculatedR == null ? tRisk("noRiskSet") : calculatedR > 0 ? `+${calculatedR}R` : `${calculatedR}R`}</span>
               <span className="text-xs text-gray-500 font-normal">PnL / Risk</span>
             </div>
           </div>

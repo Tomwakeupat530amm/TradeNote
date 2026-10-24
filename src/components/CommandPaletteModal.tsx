@@ -290,7 +290,7 @@ export function CommandPaletteModal({
           category: "trade",
           categoryLabel: t("matching_trades_label"),
           title: `${trade.asset} (${trade.lotSize}L) — ${trade.setup || "Setup"}`,
-          subtitle: `${formattedDate} • ${trade.result}${trade.rMultiple !== undefined ? ` • ${trade.rMultiple >= 0 ? `+${trade.rMultiple.toFixed(2)}R` : `${trade.rMultiple.toFixed(2)}R`}` : ""} ${trade.notes ? `• "${trade.notes.slice(0, 40)}..."` : ""}`,
+          subtitle: `${formattedDate} • ${trade.result}${trade.rMultiple != null ? ` • ${trade.rMultiple >= 0 ? `+${trade.rMultiple.toFixed(2)}R` : `${trade.rMultiple.toFixed(2)}R`}` : ""} ${trade.notes ? `• "${trade.notes.slice(0, 40)}..."` : ""}`,
           icon: isWin ? TrendingUp : isLoss ? TrendingDown : ArrowRight,
           badge: isWin ? `+$${Math.round(trade.pnl).toLocaleString()}` : isLoss ? `-$${Math.abs(Math.round(trade.pnl)).toLocaleString()}` : "$0",
           badgeColor: isWin

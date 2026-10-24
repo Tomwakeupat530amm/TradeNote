@@ -75,6 +75,15 @@ Probe 12 chạy TỪNG khối `DO $$`; mỗi khối kết thúc `RAISE EXCEPTION
 
 Lùi (route fail closed, nên thứ tự quan trọng): (1) revert route (git) và deploy, (2) `020_ai_coach_usage.down.sql`, (3) `delete from public.schema_migrations where version = '020';`.
 
+## Phase 03 (030, 031): cờ rủi ro ước tính
+
+- `030_risk_nullable_estimated`: idempotent; `ADD COLUMN IF NOT EXISTS` cho `risk_amount numeric`, `r_multiple numeric`, `session text`, `checklist_results jsonb DEFAULT '{}'`; `risk_amount` DROP NOT NULL / DROP DEFAULT có guard (no-op trên PROD: đã nullable, không default); thêm `risk_is_estimated boolean` NULLABLE, KHÔNG default (NULL = chưa phân loại, true = 500 cũ, false = rủi ro thật do client mới ghi). Không đổi dữ liệu. Down: `DROP COLUMN risk_is_estimated` + xóa dòng `schema_migrations` 030.
+- `031_backfill_flag_estimated`: KHÔNG mốc thời gian (PROD `trades` không có `created_at`); `UPDATE ... SET risk_is_estimated = true WHERE risk_amount = 500 AND risk_is_estimated IS NULL` - idempotent, chạy lại cập nhật 0 hàng, hàng cờ false không bị đụng. Down: mọi cờ true -> NULL (GIỚI HẠN: không phân biệt cờ true do user xác nhận tay) + xóa dòng 030/031 tương ứng.
+- Probe `probes/30_p3_estimated_counts.sql` (chỉ đọc): chạy được TRƯỚC 030 (đọc cờ qua `to_jsonb(t)`); theo account + TOTAL: invariants `total`, `risk_500`, `sum_pnl`, `sum_risk`, `sum_r` và `est_null/true/false`, `est_true_not_500`.
+- Áp PROD: `node scripts/p3_prod_apply.mjs --confirm-prod --backup-dir <ngoài repo>` (env `PROD_DB_URL`, `PG_MODULE_PATH`): preflight -> sao lưu (id, risk_amount, pnl, r_multiple [+ cờ nếu đã có]) ra JSON NGOÀI repo -> 030 -> probe (invariants phải bằng) -> 031 -> cờ true = số lệnh 500, chạy lại 031 = 0 hàng -> evidence đã che secret `harness/p3/d0-prod-apply.txt`. Lệch -> tự rollback 031.down rồi 030.down (chỉ patch áp trong phiên). Client mới KHÔNG push trước khi 030 áp.
+- Harness `npm run test:rls` có kịch bản `backfill-flag-migration` (cần TEST project đã áp 030; không có -> SKIPPED, residual `backfill-flag-migration-test-project`).
+- KHÔNG chạy lại `legacy/supabase_patch_enhancements.sql` (COALESCE risk_amount 500).
+
 ## Project TEST (cho harness 2 user)
 
 1. Tạo một Supabase project MỚI (không phải production).

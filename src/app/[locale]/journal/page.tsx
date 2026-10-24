@@ -23,6 +23,8 @@ import clsx from "clsx";
 import { useTranslations } from "next-intl";
 import { useTagTranslation } from "@/hooks/useTagTranslation";
 import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
+import { ESTIMATED_RISK_PARAM, isEstimatedRiskFilterOn, isEstimatedTrade } from "@/lib/estimatedRisk";
+import { EstimatedRiskBadge } from "@/components/EstimatedRiskBadge";
 
 const SETUPS: SetupTag[] = ["Breakout", "Pullback", "Reversal", "Continuation", "Other"];
 const SESSIONS: TradingSession[] = ["Asian", "London", "London-NY Overlap", "New York"];
@@ -74,6 +76,9 @@ function JournalContent() {
   };
 
   const searchParams = useSearchParams();
+  const tRisk = useTranslations("Risk");
+  // `?estimatedRisk=1` (from the Accounts banner) narrows the list to estimated-risk trades.
+  const estimatedOnly = isEstimatedRiskFilterOn(searchParams?.get(ESTIMATED_RISK_PARAM));
 
   // Dynamic setups: merge user Playbooks with defaults
   const dynamicSetups = Array.from(new Set([...playbooks.map(p => p.title), ...SETUPS]));
@@ -148,9 +153,11 @@ function JournalContent() {
         }
       }
 
-      return matchesSearch && matchesSetup && matchesResult && matchesSession && matchesMistake && matchesTimeframe;
+      const matchesEstimated = !estimatedOnly || isEstimatedTrade(t);
+
+      return matchesSearch && matchesSetup && matchesResult && matchesSession && matchesMistake && matchesTimeframe && matchesEstimated;
     });
-  }, [accountTrades, searchQuery, filterSetup, filterResult, filterSession, filterMistake, filterTimeframe]);
+  }, [accountTrades, searchQuery, filterSetup, filterResult, filterSession, filterMistake, filterTimeframe, estimatedOnly]);
 
   const hasActiveFilters = searchQuery !== "" || filterSetup !== "All" || filterResult !== "All" || filterSession !== "All" || filterMistake !== "All" || filterTimeframe !== "all";
 
@@ -159,7 +166,7 @@ function JournalContent() {
   const pageSize = 30;
 
   // Auto reset to page 1 on filter change
-  const filterKey = `${searchQuery}_${filterSetup}_${filterResult}_${filterSession}_${filterMistake}_${filterTimeframe}`;
+  const filterKey = `${searchQuery}_${filterSetup}_${filterResult}_${filterSession}_${filterMistake}_${filterTimeframe}_${estimatedOnly}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
 
   if (filterKey !== prevFilterKey) {
@@ -508,6 +515,15 @@ function JournalContent() {
               )}
             </div>
 
+            {estimatedOnly && (
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                <span>{tRisk("filterActive")}</span>
+                <Link href="/journal" className="font-semibold underline underline-offset-2 hover:text-amber-100">
+                  {tRisk("clearFilter")}
+                </Link>
+              </div>
+            )}
+
             {/* Filter Stats Badge */}
             <div className="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-white/5">
               <span>
@@ -619,6 +635,7 @@ function JournalContent() {
                                   );
                                 })()}
                                 <span className="text-xs font-medium text-gray-400 font-mono">({trade.lotSize}L)</span>
+                                <EstimatedRiskBadge trade={trade} />
                               </div>
                               <div className="flex flex-wrap gap-1 items-center">
                                 <span className="inline-flex items-center rounded-md bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 text-[11px] font-semibold text-blue-300">
@@ -666,7 +683,7 @@ function JournalContent() {
                                   </span>
                                   <span>{Math.abs(trade.pnl).toLocaleString()}</span>
                                 </span>
-                                {trade.rMultiple !== undefined && (
+                                {trade.rMultiple != null && (
                                   <span className={clsx(
                                     "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded w-fit border tabular-nums",
                                     trade.rMultiple > 0 ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/30" :

@@ -1,4 +1,5 @@
-import { Trade } from "@/store/useTradeStore";
+import type { Trade } from "@/store/useTradeStore";
+import { avgR as statsAvgR, countUnratedForR, winRate as statsWinRate } from "@/lib/stats";
 
 export interface AggregatedTradingHabits {
   accountName?: string;
@@ -8,6 +9,8 @@ export interface AggregatedTradingHabits {
   winsCount: number;
   lossesCount: number;
   averageR: number;
+  /** Trades excluded from R statistics because they have no risk set. */
+  unratedForR: number;
   sessionBreakdown: Record<string, { trades: number; pnl: number; winRate: number }>;
   mistakeCosts: Record<string, { count: number; totalLoss: number }>;
   revengeStreakLoss: number;
@@ -27,24 +30,22 @@ export function aggregateTradingHabits(trades: Trade[], accountName?: string): A
   const wins = sortedTrades.filter(t => t.pnl > 0);
   const losses = sortedTrades.filter(t => t.pnl < 0);
   const totalPnL = sortedTrades.reduce((sum, t) => sum + t.pnl, 0);
-  const winRate = totalTrades > 0 ? Math.round((wins.length / totalTrades) * 100) : 0;
+  // P3: one win-rate definition (break-even excluded) and one avgR (unrated excluded) from @/lib/stats.
+  const winRate = Math.round(statsWinRate(sortedTrades));
 
-  // Average R
-  const rValues = sortedTrades.map(t => {
-    if (t.rMultiple !== undefined) return t.rMultiple;
-    const risk = t.riskAmount || 500;
-    return risk > 0 ? t.pnl / risk : 0;
-  });
-  const averageR = totalTrades > 0 ? Number((rValues.reduce((a, b) => a + b, 0) / totalTrades).toFixed(2)) : 0;
+  // Average R over rated trades only; trades without risk are counted separately.
+  const avgRValue = statsAvgR(sortedTrades);
+  const averageR = avgRValue != null ? Number(avgRValue.toFixed(2)) : 0;
+  const unratedForR = countUnratedForR(sortedTrades);
 
   // 1. Session Breakdown
-  const sessionMap: Record<string, { trades: number; pnl: number; wins: number }> = {};
+  const sessionMap: Record<string, { trades: number; pnl: number; items: Trade[] }> = {};
   sortedTrades.forEach(t => {
     const sess = t.session || 'New York';
-    if (!sessionMap[sess]) sessionMap[sess] = { trades: 0, pnl: 0, wins: 0 };
+    if (!sessionMap[sess]) sessionMap[sess] = { trades: 0, pnl: 0, items: [] };
     sessionMap[sess].trades += 1;
     sessionMap[sess].pnl += t.pnl;
-    if (t.pnl > 0) sessionMap[sess].wins += 1;
+    sessionMap[sess].items.push(t);
   });
 
   const sessionBreakdown: Record<string, { trades: number; pnl: number; winRate: number }> = {};
@@ -52,7 +53,7 @@ export function aggregateTradingHabits(trades: Trade[], accountName?: string): A
     sessionBreakdown[sess] = {
       trades: data.trades,
       pnl: Math.round(data.pnl),
-      winRate: data.trades > 0 ? Math.round((data.wins / data.trades) * 100) : 0
+      winRate: Math.round(statsWinRate(data.items))
     };
   });
 
@@ -88,39 +89,39 @@ export function aggregateTradingHabits(trades: Trade[], accountName?: string): A
   }
 
   // 4. Setup Performance
-  const setupMap: Record<string, { count: number; wins: number; pnl: number }> = {};
+  const setupMap: Record<string, { count: number; items: Trade[]; pnl: number }> = {};
   sortedTrades.forEach(t => {
     const s = t.setup || 'Other';
-    if (!setupMap[s]) setupMap[s] = { count: 0, wins: 0, pnl: 0 };
+    if (!setupMap[s]) setupMap[s] = { count: 0, items: [], pnl: 0 };
     setupMap[s].count += 1;
     setupMap[s].pnl += t.pnl;
-    if (t.pnl > 0) setupMap[s].wins += 1;
+    setupMap[s].items.push(t);
   });
 
   const setupPerformance: Record<string, { count: number; winRate: number; pnl: number }> = {};
   Object.entries(setupMap).forEach(([s, data]) => {
     setupPerformance[s] = {
       count: data.count,
-      winRate: data.count > 0 ? Math.round((data.wins / data.count) * 100) : 0,
+      winRate: Math.round(statsWinRate(data.items)),
       pnl: Math.round(data.pnl)
     };
   });
 
   // 5. Asset Performance (MNQ vs Gold vs others)
-  const assetMap: Record<string, { count: number; wins: number; pnl: number }> = {};
+  const assetMap: Record<string, { count: number; items: Trade[]; pnl: number }> = {};
   sortedTrades.forEach(t => {
     const a = t.asset || 'Unknown';
-    if (!assetMap[a]) assetMap[a] = { count: 0, wins: 0, pnl: 0 };
+    if (!assetMap[a]) assetMap[a] = { count: 0, items: [], pnl: 0 };
     assetMap[a].count += 1;
     assetMap[a].pnl += t.pnl;
-    if (t.pnl > 0) assetMap[a].wins += 1;
+    assetMap[a].items.push(t);
   });
 
   const assetPerformance: Record<string, { count: number; winRate: number; pnl: number }> = {};
   Object.entries(assetMap).forEach(([a, data]) => {
     assetPerformance[a] = {
       count: data.count,
-      winRate: data.count > 0 ? Math.round((data.wins / data.count) * 100) : 0,
+      winRate: Math.round(statsWinRate(data.items)),
       pnl: Math.round(data.pnl)
     };
   });
@@ -133,6 +134,7 @@ export function aggregateTradingHabits(trades: Trade[], accountName?: string): A
     winsCount: wins.length,
     lossesCount: losses.length,
     averageR,
+    unratedForR,
     sessionBreakdown,
     mistakeCosts: mistakeMap,
     revengeStreakLoss: Math.round(revengeStreakLoss),

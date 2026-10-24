@@ -5,6 +5,7 @@ import { Trade } from "@/store/useTradeStore";
 import { Account } from "@/store/useAccountStore";
 import { detectSession, getSessionBadgeColor } from "@/lib/sessionUtils";
 import { calculateAccount1RRisk, calculateRemainingBullets } from "@/lib/riskEngine";
+import { isRatedForR, rMultiple } from "@/lib/risk";
 import {
   Compass,
   TrendingUp,
@@ -39,6 +40,7 @@ export function TodaySessionCockpit({
   onSelectTrade,
 }: TodaySessionCockpitProps) {
   const t = useTranslations("Cockpit");
+  const tRisk = useTranslations("Risk");
   const [isShieldOpen, setIsShieldOpen] = React.useState(false);
   const [shieldReason, setShieldReason] = React.useState<"consecutive_losses" | "hard_stop_warn" | "manual">("manual");
 
@@ -68,12 +70,9 @@ export function TodaySessionCockpit({
 
   const todayR = useMemo(() => {
     return todayTrades.reduce((sum, t) => {
-      const r = t.rMultiple !== undefined
-        ? t.rMultiple
-        : t.riskAmount && t.riskAmount > 0
-        ? t.pnl / t.riskAmount
-        : 0;
-      return sum + r;
+      // P3: only rated trades contribute to R (no 0 fallback for trades without risk)
+      const r = isRatedForR(t) ? rMultiple(t.pnl, t.riskAmount) : null;
+      return r != null ? sum + r : sum;
     }, 0);
   }, [todayTrades]);
 
@@ -561,11 +560,11 @@ export function TodaySessionCockpit({
                           : isLoss
                           ? `-$${Math.abs(Math.round(trade.pnl)).toLocaleString()}`
                           : "$0"
-                        : trade.rMultiple !== undefined
+                        : trade.rMultiple != null
                         ? trade.rMultiple >= 0
                           ? `+${trade.rMultiple.toFixed(2)}R`
                           : `${trade.rMultiple.toFixed(2)}R`
-                        : `${(trade.pnl / (trade.riskAmount || 500)).toFixed(2)}R`}
+                        : tRisk("noRiskSet")}
                     </div>
                   </div>
                 </div>

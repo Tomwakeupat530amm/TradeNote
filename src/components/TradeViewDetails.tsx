@@ -11,6 +11,7 @@ import { VisualRRBox } from "./VisualRRBox";
 import { TradingViewMiniChart } from "./TradingViewMiniChart";
 import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
 import { useSignedUrl } from "@/hooks/useSignedUrl";
+import { EstimatedRiskBadge } from "./EstimatedRiskBadge";
 
 interface TradeViewDetailsProps {
   trade: Trade;
@@ -24,6 +25,7 @@ export function TradeViewDetails({ trade, onEdit, onDelete, onClose, setZoomImag
   const t = useTranslations("TradeDetailsModal");
   const tVisual = useTranslations("VisualRR");
   const tShot = useTranslations("Screenshots");
+  const tRisk = useTranslations("Risk");
   const screenshotPath = trade.screenshotPath ?? pathFromLegacyUrl(trade.screenshotUrl);
   const signedShot = useSignedUrl(screenshotPath);
   const tTag = useTagTranslation();
@@ -65,7 +67,7 @@ export function TradeViewDetails({ trade, onEdit, onDelete, onClose, setZoomImag
               </span>
             </div>
 
-            {trade.rMultiple !== undefined && (
+            {trade.rMultiple != null && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-400">{t("r_multiple")}</span>
                 <span
@@ -81,10 +83,17 @@ export function TradeViewDetails({ trade, onEdit, onDelete, onClose, setZoomImag
               </div>
             )}
 
-            {trade.riskAmount !== undefined && (
+            {trade.riskAmount != null && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-400">{t("risk_amount")}</span>
                 <span className="font-mono font-medium text-white">${trade.riskAmount}</span>
+              </div>
+            )}
+
+            {trade.riskIsEstimated === true && (
+              <div className="space-y-1.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5">
+                <EstimatedRiskBadge trade={trade} showConfirm className="flex-wrap" />
+                <p className="text-[11px] leading-snug text-amber-200/80">{tRisk("estimatedHint")}</p>
               </div>
             )}
 

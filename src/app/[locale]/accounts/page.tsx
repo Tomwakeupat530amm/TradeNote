@@ -6,12 +6,16 @@ import { PlusCircle, Save, ShieldAlert, ShieldCheck, Lock, Sparkles, BookOpen, C
 import { useTranslations, useLocale } from "next-intl";
 import { calculateAccount1RRisk } from "@/lib/riskEngine";
 import { PROP_FIRM_PRESETS, PropFirmPreset } from "@/lib/propPresets";
+import { DEFAULT_DRAWDOWN_MODE, type DrawdownMode } from "@/lib/propRisk";
+import { isValidTimeZone } from "@/lib/tradingDay";
 import { Link } from "@/i18n/routing";
+import { useEstimatedRiskCounts } from "@/hooks/useEstimatedRiskCounts";
 import { toast } from "sonner";
 import clsx from "clsx";
 
 type AccountStatus = "Challenge" | "Funded" | "Personal";
-type DrawdownMode = "End of Day" | "Intraday";
+
+const RESET_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export default function AccountsPage() {
   const { accounts, addAccount, updateAccount, deleteAccount, activeAccountId, setActiveAccount } = useAccountStore();
@@ -20,6 +24,9 @@ export default function AccountsPage() {
   const t = useTranslations("Accounts");
   const c = useTranslations("Common");
   const locale = useLocale();
+  const tRisk = useTranslations("Risk");
+  const estimatedCounts = useEstimatedRiskCounts(accounts.map((a) => a.id));
+  const totalEstimated = Object.values(estimatedCounts).reduce((sum, n) => sum + n, 0);
 
   // Form State
   const [name, setName] = useState("");
@@ -32,7 +39,10 @@ export default function AccountsPage() {
   const [maxPositions, setMaxPositions] = useState("20");
   const [consistencyPercent, setConsistencyPercent] = useState("50");
   const [trailingMaxDrawdown, setTrailingMaxDrawdown] = useState("1000");
-  const [drawdownMode, setDrawdownMode] = useState<DrawdownMode>("End of Day");
+  const [drawdownMode, setDrawdownMode] = useState<DrawdownMode>(DEFAULT_DRAWDOWN_MODE);
+  // Per-account trading-day reset override (P3 D7); blank = the user's timezone at 00:00.
+  const [resetTime, setResetTime] = useState("");
+  const [resetTz, setResetTz] = useState("");
   const [maxDailyLoss, setMaxDailyLoss] = useState("500");
   const [maxDailyLossType, setMaxDailyLossType] = useState<"%" | "$">("$");
   const [defaultRiskType, setDefaultRiskType] = useState<"%" | "$">("%");
@@ -50,7 +60,9 @@ export default function AccountsPage() {
     setMaxPositions("20");
     setConsistencyPercent("50");
     setTrailingMaxDrawdown("1000");
-    setDrawdownMode("End of Day");
+    setDrawdownMode(DEFAULT_DRAWDOWN_MODE);
+    setResetTime("");
+    setResetTz("");
     setMaxDailyLoss("500");
     setMaxDailyLossType("$");
     setDefaultRiskType("%");
@@ -68,7 +80,7 @@ export default function AccountsPage() {
     setInitialBalance(preset.accountSize.toString());
     setStatus("Challenge");
     setTrailingMaxDrawdown(preset.rules.trailingMaxDrawdown.toString());
-    setDrawdownMode(preset.rules.drawdownMode || "End of Day");
+    setDrawdownMode(preset.rules.drawdownMode || DEFAULT_DRAWDOWN_MODE);
     setProfitTarget(preset.rules.profitTarget?.toString() || "");
     setMaxPositions(preset.rules.maxPositions?.toString() || "10");
     setConsistencyPercent(preset.rules.consistencyPercent?.toString() || "");
@@ -94,7 +106,9 @@ export default function AccountsPage() {
     setMaxPositions(rules.maxPositions?.toString() || "");
     setConsistencyPercent(rules.consistencyPercent?.toString() || "");
     setTrailingMaxDrawdown(rules.trailingMaxDrawdown?.toString() || "");
-    setDrawdownMode(rules.drawdownMode || "End of Day");
+    setDrawdownMode(rules.drawdownMode || DEFAULT_DRAWDOWN_MODE);
+    setResetTime(rules.resetTime ?? "");
+    setResetTz(rules.resetTz ?? "");
     setMaxDailyLoss(rules.maxDailyLoss?.toString() || "");
     setMaxDailyLossType(rules.maxDailyLossType || "$");
     setDefaultRiskType(rules.defaultRiskType || "%");
@@ -109,6 +123,16 @@ export default function AccountsPage() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmedResetTime = resetTime.trim();
+    const trimmedResetTz = resetTz.trim();
+    if (trimmedResetTime !== "" && !RESET_TIME_PATTERN.test(trimmedResetTime)) {
+      toast.error(t('resetOverride.invalidTime'));
+      return;
+    }
+    if (trimmedResetTz !== "" && !isValidTimeZone(trimmedResetTz)) {
+      toast.error(t('resetOverride.invalidTz'));
+      return;
+    }
     const accountData = {
       name,
       type: `${platform} - ${status}`,
@@ -119,6 +143,8 @@ export default function AccountsPage() {
         consistencyPercent: Number(consistencyPercent),
         trailingMaxDrawdown: Number(trailingMaxDrawdown),
         drawdownMode,
+        resetTime: trimmedResetTime !== "" ? trimmedResetTime : undefined,
+        resetTz: trimmedResetTz !== "" ? trimmedResetTz : undefined,
         maxDailyLoss: maxDailyLoss ? Number(maxDailyLoss) : undefined,
         maxDailyLossType,
         defaultRiskType,
@@ -287,6 +313,21 @@ export default function AccountsPage() {
                     <option className="bg-gray-800" value="Intraday">{t('intraday')}</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label htmlFor="resetTime" className="block text-sm font-medium leading-6 text-white">{t('resetOverride.timeLabel')}</label>
+                <div className="mt-2">
+                  <input type="time" id="resetTime" name="resetTime" value={resetTime} onChange={e => setResetTime(e.target.value)} className="block w-full rounded-md border-0 bg-white/5 py-1.5 text-white shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-green-500 sm:text-sm sm:leading-6 px-3" />
+                </div>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label htmlFor="resetTz" className="block text-sm font-medium leading-6 text-white">{t('resetOverride.tzLabel')}</label>
+                <div className="mt-2">
+                  <input type="text" id="resetTz" name="resetTz" value={resetTz} onChange={e => setResetTz(e.target.value)} placeholder="America/New_York" className="block w-full rounded-md border-0 bg-white/5 py-1.5 text-white shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-green-500 sm:text-sm sm:leading-6 px-3" />
+                </div>
+                <p className="mt-1 text-xs text-gray-500">{t('resetOverride.hint')}</p>
               </div>
 
               <div className="sm:col-span-3">
@@ -488,12 +529,37 @@ export default function AccountsPage() {
         </form>
       )}
 
+      {totalEstimated > 0 && (
+        <div className="flex flex-col gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-amber-200">{tRisk("estimatedBannerTitle")}</p>
+            <p className="text-xs text-amber-200/80">{tRisk("estimatedBannerBody", { count: totalEstimated })}</p>
+          </div>
+          <Link
+            href={{ pathname: "/journal", query: { estimatedRisk: "1" } }}
+            className="shrink-0 rounded-lg bg-amber-500/20 px-3 py-1.5 text-xs font-semibold text-amber-100 hover:bg-amber-500/30"
+          >
+            {tRisk("viewEstimated")}
+          </Link>
+        </div>
+      )}
+
       {/* Account List */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {accounts.map((account) => (
           <div key={account.id} className={`bg-gray-900 rounded-xl border p-6 flex flex-col ${activeAccountId === account.id ? 'border-green-500 ring-1 ring-green-500' : 'border-gray-800'}`}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-white">{account.name}</h3>
+              <div className="flex items-center gap-2 min-w-0">
+                <h3 className="text-lg font-medium text-white truncate">{account.name}</h3>
+                {(estimatedCounts[account.id] ?? 0) > 0 && (
+                  <span
+                    title={tRisk("estimatedHint")}
+                    className="shrink-0 inline-flex items-center rounded-md bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-bold text-amber-300"
+                  >
+                    {tRisk("estimatedCount", { count: estimatedCounts[account.id] })}
+                  </span>
+                )}
+              </div>
               <span className={clsx(
                 "inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset",
                 account.type.includes('Personal')

@@ -368,6 +368,15 @@
     "consistency_rule_label": "Quy tắc Nhất quán (%)",
     "trailing_max_drawdown_label": "Sụt giảm Tối đa / Trailing ($)",
     "drawdown_mode_label": "Chế độ Tính Sụt giảm",
+    "resetOverride": {
+      "timeLabel": "Giờ chốt ngày giao dịch (tuỳ chọn)",
+      "tzLabel": "Múi giờ chốt ngày (tuỳ chọn, IANA)",
+      "hint": "Để trống để dùng múi giờ của bạn, chốt lúc nửa đêm.",
+      "invalidTime": "Giờ chốt phải theo dạng HH:mm (00:00-23:59).",
+      "invalidTz": "Múi giờ không hợp lệ. Dùng tên IANA, ví dụ America/New_York.",
+      "label": "Ghi đè giờ chốt ngày giao dịch",
+      "invalid": "Thiết lập giờ chốt không hợp lệ."
+    },
     "end_of_day": "Cuối ngày",
     "intraday": "Trong ngày",
     "max_daily_loss_label": "Lỗ Hằng ngày Tối đa",
@@ -1392,5 +1401,30 @@
       "success": "Đã cập nhật mật khẩu. Vui lòng đăng nhập bằng mật khẩu mới.",
       "expired": "Liên kết đặt lại không hợp lệ hoặc đã hết hạn. Hãy yêu cầu liên kết mới từ trang đăng nhập."
     }
+  },
+  "Risk": {
+    "noRiskSet": "Chưa đặt rủi ro",
+    "invalidInput": "Rủi ro phải là số dương. Để trống nếu không đặt rủi ro.",
+    "estimated": "Ước tính",
+    "estimatedHint": "Rủi ro được ước tính từ mặc định $500 cũ. Xác nhận hoặc sửa rủi ro thật để tính R chính xác.",
+    "confirmReal": "Đây là rủi ro thật của tôi",
+    "confirmed": "Đã xác nhận rủi ro thật.",
+    "confirmFailed": "Không xác nhận được rủi ro. Vui lòng thử lại.",
+    "estimatedBannerTitle": "Một số lệnh có rủi ro ước tính",
+    "estimatedBannerBody": "{count, plural, other {# lệnh đang dùng}} mức rủi ro ước tính. Hãy xem lại để chỉ số R chính xác.",
+    "viewEstimated": "Xem các lệnh ước tính",
+    "estimatedCount": "{count} ước tính",
+    "filterActive": "Chỉ hiển thị lệnh có rủi ro ước tính",
+    "clearFilter": "Hiện tất cả lệnh"
+  },
+  "Trade": {
+    "saveError": {
+      "failed": "Không lưu được lệnh ({detail}). Dữ liệu bạn nhập vẫn được giữ, vui lòng thử lại.",
+      "saveFailed": "Không lưu được lệnh.",
+      "saveFailedHint": "Dữ liệu bạn nhập vẫn được giữ. Kiểm tra kết nối và thử lại."
+    }
+  },
+  "Stats": {
+    "winRateExcludesBE": "Tỷ lệ thắng không tính lệnh hòa vốn"
   }
 }

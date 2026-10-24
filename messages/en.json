@@ -368,6 +368,15 @@
     "consistency_rule_label": "Consistency Rule (%)",
     "trailing_max_drawdown_label": "Trailing / Max Drawdown ($)",
     "drawdown_mode_label": "Drawdown Calculation Mode",
+    "resetOverride": {
+      "timeLabel": "Trading day reset time (optional)",
+      "tzLabel": "Reset timezone (optional, IANA)",
+      "hint": "Leave blank to use your own timezone with a midnight reset.",
+      "invalidTime": "Reset time must be HH:mm (00:00-23:59).",
+      "invalidTz": "Unknown timezone. Use an IANA name such as America/New_York.",
+      "label": "Trading day reset override",
+      "invalid": "Invalid reset settings."
+    },
     "end_of_day": "End of Day",
     "intraday": "Intraday",
     "max_daily_loss_label": "Max Daily Loss",
@@ -1392,5 +1401,30 @@
       "success": "Password updated. Please sign in with your new password.",
       "expired": "This reset link is invalid or has expired. Request a new one from the sign-in page."
     }
+  },
+  "Risk": {
+    "noRiskSet": "No risk set",
+    "invalidInput": "Risk must be a positive number. Leave it blank for no risk.",
+    "estimated": "Estimated",
+    "estimatedHint": "Risk was estimated from the old $500 default. Confirm or edit the real risk to rate this trade accurately.",
+    "confirmReal": "This is my real risk",
+    "confirmed": "Risk confirmed as real.",
+    "confirmFailed": "Could not confirm the risk. Please try again.",
+    "estimatedBannerTitle": "Some trades have estimated risk",
+    "estimatedBannerBody": "{count, plural, one {# trade uses} other {# trades use}} an estimated risk amount. Review them so your R-multiples are accurate.",
+    "viewEstimated": "Review estimated trades",
+    "estimatedCount": "{count} estimated",
+    "filterActive": "Showing only trades with estimated risk",
+    "clearFilter": "Show all trades"
+  },
+  "Trade": {
+    "saveError": {
+      "failed": "Could not save the trade ({detail}). Your entries are kept, please try again.",
+      "saveFailed": "Could not save the trade.",
+      "saveFailedHint": "Your entries are kept. Check your connection and try again."
+    }
+  },
+  "Stats": {
+    "winRateExcludesBE": "Win rate excludes break-even trades"
   }
 }

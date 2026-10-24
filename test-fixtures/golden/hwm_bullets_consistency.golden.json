@@ -1,0 +1,37 @@
+{
+  "notes": "Account: initialBalance 50000, trailingMaxDrawdown 2000, 1R fixed $100, consistencyPercent 40. tz UTC unless stated. EOD skips the trading day that is 'today' (now).",
+  "account": { "id": "acc-g", "name": "Golden", "type": "Challenge", "initialBalance": 50000,
+    "rules": { "trailingMaxDrawdown": 2000, "consistencyPercent": 40, "defaultRiskType": "$", "defaultRiskValue": 100 } },
+  "trades": [
+    { "id": "t1", "accountId": "acc-g", "pnl": 500, "date": "2026-01-05T15:00:00Z" },
+    { "id": "t2", "accountId": "acc-g", "pnl": -200, "date": "2026-01-05T18:00:00Z" },
+    { "id": "t3", "accountId": "acc-g", "pnl": 300, "date": "2026-01-06T15:00:00Z" },
+    { "id": "t4", "accountId": "acc-g", "pnl": -800, "date": "2026-01-06T16:00:00Z" },
+    { "id": "t5", "accountId": "acc-g", "pnl": 100, "date": "2026-01-07T15:00:00Z" },
+    { "id": "x1", "accountId": "other", "pnl": 9999, "date": "2026-01-05T15:00:00Z" }
+  ],
+  "now": "2026-01-07T20:00:00Z",
+  "expected": {
+    "Intraday": { "totalPnL": -100, "currentBalance": 49900, "highWaterMark": 50600, "currentDrawdown": 700, "breachLevel": 48600, "bufferRemaining": 1300, "liveBullets": 13, "drawdownPercentage": 35 },
+    "End of Day": { "totalPnL": -100, "currentBalance": 49900, "highWaterMark": 50300, "currentDrawdown": 400, "breachLevel": 48300, "bufferRemaining": 1600, "liveBullets": 16, "drawdownPercentage": 20 }
+  },
+  "consistency": {
+    "trades": [
+      { "id": "c1", "accountId": "acc-g", "pnl": 600, "date": "2026-01-05T15:00:00Z" },
+      { "id": "c2", "accountId": "acc-g", "pnl": 200, "date": "2026-01-06T15:00:00Z" }
+    ],
+    "expected": { "maxDailyProfit": 600, "maxDailyProfitDate": "2026-01-05", "currentConsistency": 75, "isViolated": true }
+  },
+  "consistencyTzDelta": {
+    "notes": "Same trades grouped by trading day in UTC vs Asia/Ho_Chi_Minh (user tz) give different consistency: documented P3 delta.",
+    "trades": [
+      { "id": "d1", "accountId": "acc-g", "pnl": 400, "date": "2026-01-05T23:30:00Z" },
+      { "id": "d2", "accountId": "acc-g", "pnl": 100, "date": "2026-01-06T01:00:00Z" },
+      { "id": "d3", "accountId": "acc-g", "pnl": 100, "date": "2026-01-06T15:00:00Z" }
+    ],
+    "expected": {
+      "UTC": { "maxDailyProfit": 400, "maxDailyProfitDate": "2026-01-05", "isViolated": true },
+      "Asia/Ho_Chi_Minh": { "maxDailyProfit": 600, "maxDailyProfitDate": "2026-01-06", "currentConsistency": 100, "isViolated": true }
+    }
+  }
+}

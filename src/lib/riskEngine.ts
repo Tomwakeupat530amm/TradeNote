@@ -1,4 +1,4 @@
-import { Account } from "@/store/useAccountStore";
+import type { Account } from "@/store/useAccountStore";
 
 export interface Account1RDetails {
   riskDollar: number;

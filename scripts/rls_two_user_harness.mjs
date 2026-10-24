@@ -511,6 +511,13 @@ async function main() {
   // 8. ai-quota-foreign (P2): truy cập trực tiếp bảng ai_coach_usage bị từ chối (A, B), anon gọi RPC bị từ chối.
   await scenario('ai-quota-foreign', async () => quotaForeignCheck({ A, B, anon, aId }), { minStage: 'pre-012' });
 
+  // 9. backfill-flag-migration (P3, patch 030/031): cần 030 đã áp trên project TEST.
+  //    A tạo 3 lệnh: 500 cờ NULL, 500 cờ false, 300 cờ NULL; chạy logic 031 (UPDATE cờ true WHERE 500 AND NULL)
+  //    giới hạn trong 3 lệnh này. Kỳ vọng: đúng 1 hàng đổi; hàng cờ false không bị đụng; hàng 300 giữ NULL;
+  //    pnl/risk_amount không đổi; chạy lại cập nhật 0 hàng (no-op). Không có TEST project -> SKIPPED
+  //    (residual có tên `backfill-flag-migration-test-project`, KHÔNG phải bằng chứng Hybrid).
+  await scenario('backfill-flag-migration', async () => backfillFlagCheck({ A, aId, ctxA }), { minStage: 'pre-012' });
+
   // 6. preferences-delete-own (kịch bản bổ sung, không thuộc 5 kịch bản AC4): A xóa được preferences của mình?
   await scenario('preferences-delete-own', async () => {
     const { data, error } = await A.from('user_preferences').delete().eq('user_id', aId).select('id');
@@ -590,6 +597,61 @@ async function quotaForeignCheck({ A, B, anon, aId }) {
   }
   if (problems.length > 0) return { status: 'VULNERABLE', detail: problems.join('; ') };
   return { status: 'OK', detail: 'bảng ai_coach_usage bị từ chối truy cập trực tiếp (A, B, anon); anon gọi RPC bị từ chối' };
+}
+
+// ---------------------------------------------------------------- P3 backfill flag (patch 030/031)
+
+async function backfillFlagCheck({ A, aId, ctxA }) {
+  const specs = [
+    { tag: 'est-null-500', risk_amount: 500, risk_is_estimated: null, pnl: 100 },
+    { tag: 'est-false-500', risk_amount: 500, risk_is_estimated: false, pnl: -50 },
+    { tag: 'est-null-300', risk_amount: 300, risk_is_estimated: null, pnl: 25 },
+  ];
+  const ids = [];
+  for (let i = 0; i < specs.length; i++) {
+    const { tag, ...over } = specs[i];
+    const row = { ...rowFor('trades', aId, ctxA, 100 + i), ...over, notes: `${RUN_TAG} ${tag}` };
+    const { data, error } = await A.from('trades').insert(row).select('id').single();
+    if (error) return { status: 'INCONCLUSIVE', detail: `insert lệnh thử lỗi (030 đã áp?): ${errText(error)}` };
+    ids.push(data.id);
+    cleanup.push({ label: `A trades ${data.id}`, fn: () => A.from('trades').delete().eq('id', data.id) });
+  }
+  const read = async () => {
+    const { data, error } = await A.from('trades').select('id, risk_amount, pnl, risk_is_estimated').in('id', ids);
+    if (error) throw new Error(`đọc lại lệnh thử lỗi: ${errText(error)}`);
+    return new Map(data.map((r) => [r.id, r]));
+  };
+  const run031 = async () => {
+    const { data, error } = await A.from('trades')
+      .update({ risk_is_estimated: true })
+      .in('id', ids)
+      .eq('risk_amount', 500)
+      .is('risk_is_estimated', null)
+      .select('id');
+    if (error) throw new Error(`UPDATE 031 lỗi: ${errText(error)}`);
+    return data.length;
+  };
+  const before = await read();
+  const first = await run031();
+  const after = await read();
+  const second = await run031();
+  const problems = [];
+  if (first !== 1) problems.push(`lần 1 đổi ${first} hàng (cần 1)`);
+  if (second !== 0) problems.push(`chạy lại đổi ${second} hàng (cần 0)`);
+  const [nul500, false500, nul300] = ids.map((id) => after.get(id));
+  if (nul500?.risk_is_estimated !== true) problems.push('hàng 500/NULL không thành true');
+  if (false500?.risk_is_estimated !== false) problems.push('hàng cờ false bị đụng');
+  if (nul300?.risk_is_estimated !== null) problems.push('hàng 300 không giữ NULL');
+  for (const id of ids) {
+    const b = before.get(id);
+    const a = after.get(id);
+    if (Number(b.pnl) !== Number(a.pnl) || Number(b.risk_amount) !== Number(a.risk_amount)) {
+      problems.push(`pnl/risk_amount đổi ở ${id}`);
+    }
+  }
+  return problems.length === 0
+    ? { status: 'OK', detail: '1 hàng gắn cờ; cờ false không đụng; 300 giữ NULL; chạy lại no-op' }
+    : { status: 'VULNERABLE', detail: problems.join('; ') };
 }
 
 async function runCleanup() {

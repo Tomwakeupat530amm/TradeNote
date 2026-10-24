@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { TradeResult } from "@/store/useTradeStore";
+import type { TradeResult } from "@/store/useTradeStore";
+import { formRMultiple, toPositiveNumber } from "@/lib/risk";
 import { useTranslations } from "next-intl";
 import clsx from "clsx";
 import { ArrowUpRight, ArrowDownRight, Minus, ShieldAlert } from "lucide-react";
@@ -15,11 +16,20 @@ interface VisualRRBoxProps {
 
 export function VisualRRBox({ rMultiple, pnl, riskAmount, result }: VisualRRBoxProps) {
   const t = useTranslations("VisualRR");
+  const tRisk = useTranslations("Risk");
 
-  const effectiveRisk = riskAmount && riskAmount > 0 ? riskAmount : 100;
-  const calculatedR = rMultiple !== undefined && rMultiple !== null
-    ? rMultiple
-    : Number((pnl / effectiveRisk).toFixed(2));
+  // P3: no 100 fallback; a trade without risk shows "no risk set" instead of an invented R.
+  const effectiveRisk = toPositiveNumber(riskAmount ?? null);
+  const storedR = rMultiple != null ? rMultiple : null;
+  const calculatedR = storedR != null && effectiveRisk != null ? storedR : formRMultiple(pnl, effectiveRisk);
+  if (calculatedR == null || effectiveRisk == null) {
+    return (
+      <div className="p-4 rounded-2xl bg-gray-950/60 border border-white/5 flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">{t("title")}</span>
+        <span className="text-xs font-mono text-gray-500">{tRisk("noRiskSet")}</span>
+      </div>
+    );
+  }
 
   const isWin = result === "Win" || pnl > 0;
   const isLoss = result === "Loss" || pnl < 0;

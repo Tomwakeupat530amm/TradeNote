@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { usePlaybookStore, Playbook } from "@/store/usePlaybookStore";
 import { useTradeStore } from "@/store/useTradeStore";
+import { avgR as statsAvgR, winRate as statsWinRate } from "@/lib/stats";
 import { useAccountStore } from "@/store/useAccountStore";
 import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, Plus, X, Upload, Trash2, Edit, Activity, Target, AlignJustify, Calendar } from "lucide-react";
@@ -62,14 +63,11 @@ export default function PlaybookPage() {
     const wins = setupTrades.filter(t => t.result === 'Win').length;
     const losses = setupTrades.filter(t => t.result === 'Loss').length;
     const be = setupTrades.filter(t => t.result === 'Break Even').length;
-    const winRate = total > 0 ? (wins / total) * 100 : 0;
+    // P3: one win-rate (break-even excluded) and one avgR (unrated excluded, no 100 fallback) from @/lib/stats.
+    const winRate = statsWinRate(setupTrades);
     const netPnl = setupTrades.reduce((sum, t) => sum + t.pnl, 0);
-    
-    const rValues = setupTrades.map(t => {
-      const risk = (t.riskAmount && t.riskAmount > 0) ? t.riskAmount : 100;
-      return t.pnl / risk;
-    });
-    const avgR = rValues.length > 0 ? rValues.reduce((s, r) => s + r, 0) / rValues.length : 0;
+    const avgRValue = statsAvgR(setupTrades);
+    const avgR = avgRValue != null ? avgRValue : 0;
 
     return { total, wins, losses, be, winRate, netPnl, avgR };
   }, [accountTrades]);

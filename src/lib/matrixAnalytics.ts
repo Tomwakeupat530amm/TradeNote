@@ -1,4 +1,6 @@
-import { Trade } from "@/store/useTradeStore";
+import type { Trade } from "@/store/useTradeStore";
+import { isRatedForR, rMultiple } from "@/lib/risk";
+import { avgR as statsAvgR, winRate as statsWinRate } from "@/lib/stats";
 import { TradingSession, SESSIONS } from "./sessionUtils";
 
 export type MatrixMetricType = "winRate" | "netPnl" | "totalR" | "count";
@@ -49,10 +51,12 @@ export interface DayHourMatrixResult {
 
 export interface EmotionExpectancyItem extends MatrixCellData {
   emotion: string;
-  expectancyR: number;
+  /** Mean R over RATED trades of this emotion; null when no trade is rated (F-5: no fabricated 1R). */
+  expectancyR: number | null;
   expectancyDollar: number;
-  avgWinR: number;
-  avgLossR: number;
+  /** Rated-only averages; null when that side has no rated trade. */
+  avgWinR: number | null;
+  avgLossR: number | null;
 }
 
 export interface EmotionExpectancyMatrixResult {
@@ -93,20 +97,18 @@ function aggregateCell(trades: Trade[]): MatrixCellData {
 
   for (const t of trades) {
     netPnl += t.pnl;
-    const r = t.rMultiple !== undefined
-      ? t.rMultiple
-      : t.riskAmount && t.riskAmount > 0
-      ? t.pnl / t.riskAmount
-      : 0;
-    totalR += r;
+    // P3: unrated trades (no risk) are excluded from R, never counted as 0R.
+    const r = isRatedForR(t) ? rMultiple(t.pnl, t.riskAmount) : null;
+    if (r != null) totalR += r;
 
     if (t.pnl > 0) wins++;
     else if (t.pnl < 0) losses++;
     else breakEvens++;
   }
 
-  const winRate = Math.round((wins / count) * 100);
-  const avgR = Number((totalR / count).toFixed(2));
+  const winRate = Math.round(statsWinRate(trades));
+  const avgRValue = statsAvgR(trades);
+  const avgR = avgRValue != null ? Number(avgRValue.toFixed(2)) : 0;
 
   return {
     count,
@@ -313,19 +315,17 @@ export function calculateEmotionExpectancyMatrix(trades: Trade[]): EmotionExpect
     const winTrades = emoTrades.filter((t) => t.pnl > 0);
     const lossTrades = emoTrades.filter((t) => t.pnl < 0);
 
-    const avgWinR = winTrades.length > 0
-      ? winTrades.reduce((sum, t) => sum + (t.rMultiple ?? (t.riskAmount ? t.pnl / t.riskAmount : 1)), 0) / winTrades.length
-      : 0;
-
-    const avgLossR = lossTrades.length > 0
-      ? Math.abs(lossTrades.reduce((sum, t) => sum + (t.rMultiple ?? (t.riskAmount ? t.pnl / t.riskAmount : -1)), 0) / lossTrades.length)
-      : 1;
+    // P3/F-5: R figures use the RATED sample only (no 1R fallback, no mixing with all-trade probabilities).
+    // Expectancy R = mean R over rated trades (== rated win% * avgWinR - rated loss% * avgLossR).
+    const avgWinRValue = statsAvgR(winTrades);
+    const avgLossRValue = statsAvgR(lossTrades);
+    const expectancyRValue = statsAvgR(emoTrades);
+    const avgWinR = avgWinRValue != null ? Number(avgWinRValue.toFixed(2)) : null;
+    const avgLossR = avgLossRValue != null ? Number(Math.abs(avgLossRValue).toFixed(2)) : null;
+    const expectancyR = expectancyRValue != null ? Number(expectancyRValue.toFixed(2)) : null;
 
     const winProb = baseCell.wins / baseCell.count;
     const lossProb = baseCell.losses / baseCell.count;
-
-    // Expectancy R = (Win% * AvgWinR) - (Loss% * AvgLossR)
-    const expectancyR = Number(((winProb * avgWinR) - (lossProb * avgLossR)).toFixed(2));
 
     const avgWinDollar = winTrades.length > 0 ? winTrades.reduce((s, t) => s + t.pnl, 0) / winTrades.length : 0;
     const avgLossDollar = lossTrades.length > 0 ? Math.abs(lossTrades.reduce((s, t) => s + t.pnl, 0) / lossTrades.length) : 0;
@@ -336,13 +336,14 @@ export function calculateEmotionExpectancyMatrix(trades: Trade[]): EmotionExpect
       emotion,
       expectancyR,
       expectancyDollar,
-      avgWinR: Number(avgWinR.toFixed(2)),
-      avgLossR: Number(avgLossR.toFixed(2))
+      avgWinR,
+      avgLossR
     });
   }
 
   // Sort items: High expectancy first
-  items.sort((a, b) => b.expectancyR - a.expectancyR);
+  // Unrated emotions (null expectancy) sort last.
+  items.sort((a, b) => (b.expectancyR ?? -Infinity) - (a.expectancyR ?? -Infinity));
 
   // Calm vs Emotional Comparison
   const calmTrades = trades.filter((t) => (t.emotion || "").toLowerCase() === "calm");

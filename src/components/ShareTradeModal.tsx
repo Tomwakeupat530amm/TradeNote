@@ -180,7 +180,7 @@ export function ShareTradeModal({ isOpen, onClose, trade }: ShareTradeModalProps
     Object.keys(trade.checklistResults).length > 0 && 
     Object.values(trade.checklistResults).every(Boolean);
 
-  const formattedR = trade.rMultiple !== undefined
+  const formattedR = trade.rMultiple != null
     ? trade.rMultiple > 0 ? `+${trade.rMultiple.toFixed(2)}R` : `${trade.rMultiple.toFixed(2)}R`
     : null;
 
@@ -246,7 +246,7 @@ export function ShareTradeModal({ isOpen, onClose, trade }: ShareTradeModalProps
           resultLabel: tTag(trade.result),
           result: trade.result,
           rText: formattedR,
-          rPositive: Boolean(trade.rMultiple && trade.rMultiple > 0),
+          rPositive: trade.rMultiple != null && trade.rMultiple > 0,
           pnlText: hideDollarAmount ? null : formattedPnl,
           pnl: trade.pnl,
           setupText: `Setup: ${tTag(trade.setup)}${isAplus ? " ⭐ A+" : ""}`,
@@ -373,7 +373,7 @@ export function ShareTradeModal({ isOpen, onClose, trade }: ShareTradeModalProps
                   <span
                     className={clsx(
                       "text-sm font-mono font-bold",
-                      trade.rMultiple && trade.rMultiple > 0 ? "text-emerald-400" : "text-rose-400"
+                      trade.rMultiple != null && trade.rMultiple > 0 ? "text-emerald-400" : "text-rose-400"
                     )}
                   >
                     {formattedR}

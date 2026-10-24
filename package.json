@@ -10,7 +10,8 @@
     "test": "node scripts/test_enhancements_runner.mjs",
     "test:api": "node scripts/test_api_coach.mjs",
     "test:rls": "node scripts/rls_two_user_harness.mjs",
-    "lint:sql": "node scripts/sql_patch_lint.mjs"
+    "lint:sql": "node scripts/sql_patch_lint.mjs",
+    "test:unit": "vitest run"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
@@ -39,6 +40,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from './useAuthStore';
+import { fallbackTimeZone } from '@/lib/tradingDay';
 
 export interface UserPreferences {
   displayName?: string;
@@ -17,6 +18,8 @@ export interface UserPreferences {
 interface PreferenceState {
   preferences: UserPreferences | null;
   isLoading: boolean;
+  /** P3 D8 exception (logged): true once a fetch finished (success OR failure); `isLoading` is not a loaded flag. */
+  prefsLoaded: boolean;
   fetchPreferences: () => Promise<void>;
   updatePreferences: (updates: Partial<UserPreferences>) => Promise<void>;
 }
@@ -31,9 +34,15 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   theme: "dark"
 };
 
+/** Timezone seeded into a newly created preferences row: runtime IANA zone when valid, else "UTC". */
+export function initialTimeZone(): string {
+  return fallbackTimeZone();
+}
+
 export const usePreferenceStore = create<PreferenceState>((set, get) => ({
   preferences: null,
   isLoading: false,
+  prefsLoaded: false,
 
   fetchPreferences: async () => {
     const user = useAuthStore.getState().user;
@@ -50,7 +59,7 @@ export const usePreferenceStore = create<PreferenceState>((set, get) => ({
 
     if (error && error.code !== 'PGRST116') { // PGRST116 is not found
       console.error('Error fetching preferences:', error);
-      set({ isLoading: false });
+      set({ isLoading: false, prefsLoaded: true });
       return;
     }
 
@@ -67,7 +76,8 @@ export const usePreferenceStore = create<PreferenceState>((set, get) => ({
           privacyMode: data.privacy_mode ?? DEFAULT_PREFERENCES.privacyMode,
           theme: data.theme || DEFAULT_PREFERENCES.theme
         },
-        isLoading: false
+        isLoading: false,
+        prefsLoaded: true
       });
     } else {
       // Create default preferences for the user
@@ -75,7 +85,8 @@ export const usePreferenceStore = create<PreferenceState>((set, get) => ({
         .from('user_preferences')
         .insert([{
           user_id: user.id,
-          timezone: DEFAULT_PREFERENCES.timezone,
+          // F-2: NEW rows only — seed the browser's IANA zone (falls back to UTC). Existing rows are never rewritten.
+          timezone: initialTimeZone(),
           base_currency: DEFAULT_PREFERENCES.baseCurrency,
           psychology_tags: DEFAULT_PREFERENCES.psychologyTags,
           mistake_tags: DEFAULT_PREFERENCES.mistakeTags,
@@ -99,10 +110,11 @@ export const usePreferenceStore = create<PreferenceState>((set, get) => ({
             privacyMode: newData.privacy_mode,
             theme: newData.theme
           },
-          isLoading: false
+          isLoading: false,
+          prefsLoaded: true
         });
       } else {
-        set({ preferences: DEFAULT_PREFERENCES, isLoading: false });
+        set({ preferences: { ...DEFAULT_PREFERENCES, timezone: initialTimeZone() }, isLoading: false, prefsLoaded: true });
       }
     }
   },
@@ -140,3 +152,10 @@ export const usePreferenceStore = create<PreferenceState>((set, get) => ({
     }
   }
 }));
+
+// Sign-out resets the per-user preference state so the next user never sees a stale `prefsLoaded`.
+useAuthStore.subscribe((state, prev) => {
+  if (prev.user && !state.user) {
+    usePreferenceStore.setState({ preferences: null, isLoading: false, prefsLoaded: false });
+  }
+});

@@ -16,6 +16,10 @@ export interface AccountRules {
   defaultRiskType?: "%" | "$";
   defaultRiskValue?: number;
   riskBase?: "drawdown" | "balance";
+  /** Per-account trading-day reset "HH:mm" (blank = 00:00 in the user's timezone). */
+  resetTime?: string;
+  /** Per-account reset IANA timezone (blank = the user's timezone). */
+  resetTz?: string;
 }
 
 export interface Account {

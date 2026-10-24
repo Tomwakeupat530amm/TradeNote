@@ -5,6 +5,7 @@ import { useAccountStore } from './useAccountStore';
 import { useNotificationStore } from './useNotificationStore';
 import { compressScreenshot } from '@/lib/imageCompressor';
 import { SCREENSHOT_BUCKET, buildScreenshotPath, pathFromLegacyUrl } from '@/lib/screenshotStorage';
+import { rMultiple as computeRMultiple } from '@/lib/risk';
 
 export type TradeResult = "Win" | "Loss" | "Break Even";
 export type SetupTag = string;
@@ -28,66 +29,119 @@ export interface Trade {
   /** Storage path `{userId}/...` in the private bucket; source of truth for display + GC. */
   screenshotPath?: string;
   date: string;
-  riskAmount?: number;
-  rMultiple?: number;
+  /** Risk in $ for this trade; null = no risk set (never a 500/1R fallback). */
+  riskAmount: number | null;
+  /** Stored R-multiple; null = unrated (no risk). */
+  rMultiple: number | null;
+  /** true = legacy 500 risk flagged by patch 031 until the user confirms/corrects it. */
+  riskIsEstimated: boolean;
   session?: string;
   checklistResults?: Record<string, boolean>;
 }
 
-export interface AccountStats {
-  total_trades: number;
-  total_pnl: number;
-  win_rate: number;
-  wins: number;
-  losses: number;
-  profit_factor: number;
+/** Fields the caller may send when creating a trade; R-multiple and the flag are derived by the store. */
+export type NewTradeInput = Omit<Trade, 'id' | 'date' | 'riskAmount' | 'rMultiple' | 'riskIsEstimated'> & {
+  riskAmount?: number | null;
+  screenshotFile?: File | Blob | string;
+  date?: string;
+};
+
+export type TradeUpdateInput = Partial<Omit<Trade, 'id' | 'screenshotUrl' | 'screenshotPath' | 'rMultiple'>> & {
+  screenshotFile?: File | Blob | string | null;
+};
+
+/** Save failure surfaced to the forms (no silent partial save). `detail` = DB code + truncated message only. */
+export class SaveTradeError extends Error {
+  readonly code = 'SAVE_FAILED' as const;
+  readonly detail: string;
+  constructor(detail: string) {
+    super(`SAVE_FAILED: ${detail}`);
+    this.name = 'SaveTradeError';
+    this.detail = detail;
+  }
 }
+
+const SAVE_ERROR_MESSAGE_MAX = 120;
+
+function toSaveTradeError(error: { code?: string | null; message?: string | null } | null | undefined): SaveTradeError {
+  const code = error?.code ? String(error.code) : 'UNKNOWN';
+  const message = error?.message ? String(error.message).slice(0, SAVE_ERROR_MESSAGE_MAX) : '';
+  return new SaveTradeError(message ? `${code}: ${message}` : code);
+}
+
+/** The ONE mapper for the estimated flag: COALESCE(risk_is_estimated, false). */
+export function toRiskIsEstimated(value: unknown): boolean {
+  return value === true;
+}
+
+/** Stored R-multiple, rounded to 2 decimals like legacy rows; null when unrated. */
+function storedRMultiple(pnl: number, risk: number | null): number | null {
+  const r = computeRMultiple(pnl, risk);
+  return r === null ? null : Number(r.toFixed(2));
+}
+
+/** DB row -> risk fields of a Trade (no 500 fallback). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapRiskFields(d: any): Pick<Trade, 'riskAmount' | 'rMultiple' | 'riskIsEstimated'> {
+  const riskAmount = d.risk_amount != null ? Number(d.risk_amount) : null;
+  // No risk -> unrated: a stale stored r_multiple is never surfaced without its risk (F-6).
+  const rMultiple = riskAmount != null
+    ? (d.r_multiple != null ? Number(d.r_multiple) : storedRMultiple(Number(d.pnl), riskAmount))
+    : null;
+  return { riskAmount, rMultiple, riskIsEstimated: toRiskIsEstimated(d.risk_is_estimated) };
+}
+
+/** PostgREST page size; must not exceed the project's max_rows (default 1000). */
+export const TRADES_PAGE_SIZE = 1000;
+/** Safety cap on pages (100k trades) so a misbehaving backend cannot loop forever. */
+const TRADES_MAX_PAGES = 100;
 
 interface TradeState {
   trades: Trade[];
-  accountStats: AccountStats | null;
   isLoading: boolean;
   fetchTrades: (accountId: string) => Promise<void>;
-  fetchAccountStats: (accountId: string) => Promise<void>;
-  addTrade: (trade: Omit<Trade, 'id' | 'date'> & { screenshotFile?: File | Blob | string; date?: string }) => Promise<void>;
-  updateTrade: (id: string, updates: Partial<Omit<Trade, 'id' | 'screenshotUrl' | 'screenshotPath'>> & { screenshotFile?: File | Blob | string | null }) => Promise<void>;
+  addTrade: (trade: NewTradeInput) => Promise<void>;
+  updateTrade: (id: string, updates: TradeUpdateInput) => Promise<void>;
   deleteTrade: (id: string) => Promise<void>;
 }
 
 export const useTradeStore = create<TradeState>((set, get) => ({
   trades: [],
-  accountStats: null,
   isLoading: false,
-
-  fetchAccountStats: async (accountId: string) => {
-    const { data, error } = await supabase.rpc('get_account_stats', { p_account_id: accountId });
-    if (error) {
-      console.error('Error fetching account stats:', error);
-    } else if (data) {
-      set({ accountStats: data as AccountStats });
-    }
-  },
 
   fetchTrades: async (accountId: string) => {
     const user = useAuthStore.getState().user;
     if (!user || !accountId) return;
 
     set({ isLoading: true });
-    const { data, error } = await supabase
-      .from('trades')
-      .select('*')
-      .eq('account_id', accountId)
-      .order('date', { ascending: false });
+    // F-3: paginate so accounts with more than max_rows trades are not silently truncated.
+    // Stable order (date desc, id desc) keeps page boundaries deterministic; RLS + account scope unchanged.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let data: any[] | null = [];
+    let error: unknown = null;
+    for (let page = 0; page < TRADES_MAX_PAGES; page++) {
+      const from = page * TRADES_PAGE_SIZE;
+      const res = await supabase
+        .from('trades')
+        .select('*')
+        .eq('account_id', accountId)
+        .order('date', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, from + TRADES_PAGE_SIZE - 1);
+      if (res.error) {
+        error = res.error;
+        data = null;
+        break;
+      }
+      const rows = res.data ?? [];
+      data.push(...rows);
+      if (rows.length < TRADES_PAGE_SIZE) break;
+    }
 
     if (error) {
       console.error('Error fetching trades:', error);
     } else if (data) {
       const formattedTrades: Trade[] = data.map(d => {
-        const riskAmount = d.risk_amount !== undefined && d.risk_amount !== null ? Number(d.risk_amount) : 500;
-        const rMultiple = d.r_multiple !== undefined && d.r_multiple !== null
-          ? Number(d.r_multiple)
-          : (riskAmount > 0 ? Number((d.pnl / riskAmount).toFixed(2)) : 0);
-
         return {
           id: d.id,
           accountId: d.account_id,
@@ -103,8 +157,7 @@ export const useTradeStore = create<TradeState>((set, get) => ({
           screenshotUrl: d.screenshot_url,
           screenshotPath: d.screenshot_path ?? pathFromLegacyUrl(d.screenshot_url) ?? undefined,
           date: d.date,
-          riskAmount,
-          rMultiple,
+          ...mapRiskFields(d),
           session: d.session || 'New York',
           checklistResults: d.checklist_results || {},
         };
@@ -177,45 +230,28 @@ export const useTradeStore = create<TradeState>((set, get) => ({
       screenshot_path: finalScreenshotPath
     };
 
-    if (trade.riskAmount !== undefined) insertPayload.risk_amount = trade.riskAmount;
-    if (trade.rMultiple !== undefined) insertPayload.r_multiple = trade.rMultiple;
+    // P3: explicit nulls (never undefined / never a 500 fallback); new rows are never "estimated".
+    const riskAmount = trade.riskAmount != null && trade.riskAmount > 0 ? trade.riskAmount : null;
+    insertPayload.risk_amount = riskAmount ?? null;
+    insertPayload.r_multiple = storedRMultiple(trade.pnl, riskAmount);
+    insertPayload.risk_is_estimated = false;
     if (trade.session !== undefined) insertPayload.session = trade.session;
     if (trade.checklistResults !== undefined) insertPayload.checklist_results = trade.checklistResults;
     if (trade.date) insertPayload.date = trade.date;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let data: any = null;
-    const initialRes = await supabase
+    // Single insert; no reduced-column retry (all columns exist on PROD). Failure -> SaveTradeError.
+    const { data, error: insertError } = await supabase
       .from('trades')
       .insert([insertPayload])
       .select()
       .single();
 
-    if (initialRes.error) {
-      console.warn('Initial insert with enhancements had error, retrying without new columns:', initialRes.error.message);
-      delete insertPayload.risk_amount;
-      delete insertPayload.r_multiple;
-      delete insertPayload.session;
-      delete insertPayload.checklist_results;
-      const retryRes = await supabase
-        .from('trades')
-        .insert([insertPayload])
-        .select()
-        .single();
-      if (retryRes.error) {
-        console.error('Error adding trade on fallback retry:', retryRes.error);
-        throw retryRes.error;
-      }
-      data = retryRes.data;
-    } else {
-      data = initialRes.data;
+    if (insertError) {
+      console.error('Error adding trade:', insertError.code, insertError.message);
+      throw toSaveTradeError(insertError);
     }
 
     if (data) {
-      const calculatedRMultiple = trade.rMultiple !== undefined 
-        ? trade.rMultiple 
-        : ((trade.riskAmount && trade.riskAmount > 0) ? Number((trade.pnl / trade.riskAmount).toFixed(2)) : 0);
-
       const newTrade: Trade = {
         id: data.id,
         accountId: data.account_id,
@@ -231,19 +267,14 @@ export const useTradeStore = create<TradeState>((set, get) => ({
         screenshotUrl: data.screenshot_url ?? undefined,
         screenshotPath: data.screenshot_path ?? pathFromLegacyUrl(data.screenshot_url) ?? undefined,
         date: data.date,
-        riskAmount: trade.riskAmount || 500,
-        rMultiple: calculatedRMultiple,
+        ...mapRiskFields(data),
         session: trade.session || 'New York',
         checklistResults: trade.checklistResults || {},
       };
       
       set(state => ({
-        trades: [newTrade, ...state.trades],
-        accountStats: null // Invalidate cached RPC stats immediately for real-time reactivity
+        trades: [newTrade, ...state.trades]
       }));
-
-      // Refresh account stats in background
-      get().fetchAccountStats(data.account_id);
 
       // --- Rule Checking & Notifications ---
       const accountStore = useAccountStore.getState();
@@ -340,8 +371,36 @@ export const useTradeStore = create<TradeState>((set, get) => ({
     if (updates.emotion !== undefined) payload.emotion = updates.emotion;
     if (updates.mistake !== undefined) payload.mistake = updates.mistake;
     if (updates.notes !== undefined) payload.notes = updates.notes;
-    if (updates.riskAmount !== undefined) payload.risk_amount = updates.riskAmount;
-    if (updates.rMultiple !== undefined) payload.r_multiple = updates.rMultiple;
+    // P3 risk semantics (S7): presence is detected with `in`, never `!== undefined`.
+    const riskPatched = 'riskAmount' in updates;
+    const stateRisk: Partial<Pick<Trade, 'riskAmount' | 'rMultiple' | 'riskIsEstimated'>> = {};
+    if ('riskIsEstimated' in updates) {
+      payload.risk_is_estimated = toRiskIsEstimated(updates.riskIsEstimated);
+      stateRisk.riskIsEstimated = payload.risk_is_estimated;
+    }
+    if (riskPatched || updates.pnl !== undefined) {
+      const newRisk = riskPatched
+        ? (updates.riskAmount != null && updates.riskAmount > 0 ? updates.riskAmount : null)
+        : existingBefore ? existingBefore.riskAmount : null;
+      const mergedPnl = updates.pnl !== undefined ? updates.pnl : existingBefore?.pnl;
+      if (riskPatched) {
+        payload.risk_amount = newRisk;
+        stateRisk.riskAmount = newRisk;
+        if (!existingBefore || newRisk !== existingBefore.riskAmount) {
+          // the user just typed a real value -> no longer estimated
+          payload.risk_is_estimated = false;
+          stateRisk.riskIsEstimated = false;
+        }
+      }
+      if (mergedPnl !== undefined && (riskPatched || existingBefore)) {
+        payload.r_multiple = storedRMultiple(mergedPnl, newRisk);
+        stateRisk.rMultiple = payload.r_multiple;
+      } else if (riskPatched) {
+        // F-7: pnl unknown (trade not in the store) -> never leave a stale r_multiple next to the new risk.
+        payload.r_multiple = null;
+        stateRisk.rMultiple = null;
+      }
+    }
     if (updates.session !== undefined) payload.session = updates.session;
     if (updates.checklistResults !== undefined) payload.checklist_results = updates.checklistResults;
     
@@ -354,33 +413,20 @@ export const useTradeStore = create<TradeState>((set, get) => ({
       payload.screenshot_path = newScreenshotPath;
     }
 
-    let { error } = await supabase
+    // Single update; no reduced-column retry. Failure -> SaveTradeError, state untouched.
+    const { error } = await supabase
       .from('trades')
       .update(payload)
       .eq('id', id);
 
     if (error) {
-      console.warn('Initial update had error, retrying without enhancement columns:', error.message);
-      delete payload.risk_amount;
-      delete payload.r_multiple;
-      delete payload.session;
-      delete payload.checklist_results;
-      const retry = await supabase
-        .from('trades')
-        .update(payload)
-        .eq('id', id);
-      error = retry.error;
+      console.error('Error updating trade:', error.code, error.message);
+      throw toSaveTradeError(error);
     }
 
-    if (error) {
-      console.error('Error updating trade:', error);
-      throw error;
-    }
-
-    const existingTrade = get().trades.find(t => t.id === id);
     const imageChanged = Object.prototype.hasOwnProperty.call(payload, 'screenshot_path');
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { screenshotFile: _ignoredFile, ...stateUpdates } = updates;
+    const { screenshotFile: _ignoredFile, riskAmount: _ignoredRisk, riskIsEstimated: _ignoredFlag, ...stateUpdates } = updates;
 
     set(state => ({
       trades: state.trades.map(t => 
@@ -388,12 +434,12 @@ export const useTradeStore = create<TradeState>((set, get) => ({
           ? {
               ...t,
               ...stateUpdates,
+              ...stateRisk,
               screenshotUrl: imageChanged ? undefined : t.screenshotUrl,
               screenshotPath: imageChanged ? (payload.screenshot_path ?? undefined) : t.screenshotPath
             }
           : t
-      ),
-      accountStats: null
+      )
     }));
 
     // GC (best-effort, AFTER the DB update succeeded): drop the replaced/removed file.
@@ -403,10 +449,6 @@ export const useTradeStore = create<TradeState>((set, get) => ({
       } catch (storageErr) {
         console.warn('Could not remove previous screenshot from storage:', storageErr);
       }
-    }
-
-    if (existingTrade) {
-      get().fetchAccountStats(existingTrade.accountId);
     }
   },
 
@@ -436,12 +478,7 @@ export const useTradeStore = create<TradeState>((set, get) => ({
     }
 
     set(state => ({
-      trades: state.trades.filter(t => t.id !== id),
-      accountStats: null
+      trades: state.trades.filter(t => t.id !== id)
     }));
-
-    if (tradeToDelete) {
-      get().fetchAccountStats(tradeToDelete.accountId);
-    }
   }
 }));

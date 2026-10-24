@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// P3 F1 note: Sections 2-8, 10, 11, 13 contain LEGACY copy-logic tests (they test a copy of the
+// formula, not the app code). Each one is marked below with its Vitest equivalent (npm run test:unit)
+// or "no Vitest equivalent yet". Coverage is NOT deleted; removal needs explicit approval.
 // 1. Inlined / imported verification functions for pure domain math
 function calculateMNQPosition({ balance, riskType, riskValue, stopLossPoints }) {
   const dollarRisk = riskType === 'percent'
@@ -387,6 +390,7 @@ it("Insufficient risk for 1 contract: $20 risk, 20 pts SL (min $40) -> 0 contrac
   assert.strictEqual(res.contracts, 0);
 });
 
+// LEGACY copy-logic (P3 F1): Gold sizing math is copied here; no Vitest equivalent yet (positionCalculator not in P3 scope). Kept as-is.
 console.log("\n2. Position Size Calculator - Gold XAUUSD ($100/point per lot):");
 it("Standard % risk: $100k balance, 1% risk ($1000), $5.0 SL -> 2.00 lots", () => {
   const res = calculateGoldPosition({ balance: 100000, riskType: 'percent', riskValue: 1, stopLossDistance: 5 });
@@ -414,6 +418,7 @@ it("Zero or negative SL distance: returns 0 lot size safely", () => {
   assert.strictEqual(resNeg.lotSize, 0);
 });
 
+// LEGACY copy-logic (P3 F1): session tagging copied here; no Vitest equivalent yet (sessionUtils not in P3 scope; trading-day logic is covered by src/lib/__tests__/tradingDay.test.ts). Kept as-is.
 console.log("\n3. Auto Session Tagging (UTC-based Market Hours):");
 it("Asian Session: 03:30 UTC -> Asian", () => {
   const d = new Date('2026-09-19T03:30:00Z');
@@ -444,6 +449,7 @@ it("Malformed or invalid timestamp fallback: returns New York safely", () => {
   assert.strictEqual(detectSession("invalid-date"), 'New York');
 });
 
+// LEGACY copy-logic (P3 F1): Vitest equivalent = src/lib/__tests__/risk.test.ts ("no-risk-excluded-from-R: rMultiple / isRatedForR"). Kept until removal is approved.
 console.log("\n4. R-Multiple & Risk Math Verification:");
 it("Winning trade: PnL $1,250, Risk $500 -> +2.50R", () => {
   const pnl = 1250;
@@ -472,6 +478,7 @@ it("Average R aggregation: [+2.5R, -1.0R, +3.0R] -> Avg +1.50R", () => {
   assert.strictEqual(avg, 1.50);
 });
 
+// LEGACY copy-logic (P3 F1): checklist gate copied here; no Vitest equivalent yet (not P3 scope). Kept as-is.
 console.log("\n5. Playbook Checklist 100% Gatekeeper Logic:");
 it("100% rules checked triggers A+ Setup badge", () => {
   const rules = ["Rule 1: Liquidity Sweep", "Rule 2: MSS M5", "Rule 3: FVG Retest"];
@@ -487,6 +494,7 @@ it("Partial rules checked does NOT trigger A+ Setup badge", () => {
   assert.strictEqual(isAPlus, false);
 });
 
+// LEGACY copy-logic (P3 F1): Vitest equivalent = src/lib/__tests__/r-multiple-winrate-parity.test.ts (real aiCoachAggregator vs stats). Kept until removal is approved.
 console.log("\n6. AI Coach Level 1 Aggregator & Habit Analytics:");
 it("Correctly detects Tilt / Revenge Streak (trades < 60 min after loss)", () => {
   // Simulating 2 trades in quick succession after a loss
@@ -524,6 +532,7 @@ it("Correctly calculates costliest mistake (Mistake Leak)", () => {
   assert.strictEqual(mistakeCost["Overtrading"], 200);
 });
 
+// LEGACY copy-logic (P3 F1): Vitest equivalent = src/lib/__tests__/risk.test.ts ("account-1r-default") + riskEngine.test.ts. NOTE: the copy below still models the pre-P3 store-level 1R fill; the real code no longer does it (B1). Kept until removal is approved.
 console.log("\n7. Account Default 1R Baseline & Inheritance Logic:");
 function resolveAccount1RRisk(account) {
   const rType = account?.rules?.defaultRiskType || "%";
@@ -569,6 +578,7 @@ it("Position Size Calculator properly inherits account 1R rule", () => {
   assert.strictEqual(calcFixedVal, "400");
 });
 
+// LEGACY copy-logic (P3 F1): Vitest equivalent = src/lib/__tests__/propRisk.test.ts (hwm-bullets-consistency-golden-cases) + propRisk-intraday-characterization.test.ts (oracle). Kept until removal is approved.
 console.log("\n8. High Water Mark (HWM) Trailing Drawdown & Buffer Engine:");
 function calculateTrailingDrawdown({ initialBalance, trades, maxDrawdownLimit, mode }) {
   let highWaterMark = initialBalance;
@@ -707,6 +717,7 @@ it("Dynamic setups merge Playbooks with default setups without duplicates", () =
   ]);
 });
 
+// LEGACY copy-logic (P3 F1): Vitest equivalent = src/lib/__tests__/riskEngine.test.ts + propRisk.test.ts (live bullets). Kept until removal is approved.
 console.log("\n10. Prop Firm Risk Engine & Bullets Calculation (Solution A):");
 it("Prop Firm Challenge calculates 1R as % of Max Drawdown ($2,000 * 5% = $100, 20 Bullets)", () => {
   const account = {
@@ -801,6 +812,7 @@ it("Legacy Challenge account with undefined riskBase auto-defaults to drawdown t
   assert.strictEqual(r.bullets, 20);
 });
 
+// LEGACY copy-logic (P3 F1): Vitest equivalent = src/lib/__tests__/stats.test.ts (winRate BE-excluded, avgR unrated-excluded, profitFactor 99.99 cap, expectancy). NOTE: the copy below may use the pre-P3 win-rate definition. Kept until removal is approved.
 console.log("\n11. Extended Analytics KPI Calculations (Profit Factor, Avg R, Streaks, Expectancy):");
 it("Standard dataset: calculates Profit Factor, Avg R, Expectancy, and Streaks accurately", () => {
   const mockTrades = [
@@ -894,6 +906,7 @@ it("Timeframe Filter: filters trades by relative date window accurately", () => 
   assert.strictEqual(thisWeek.length, 2);
 });
 
+// LEGACY copy-logic (P3 F1): locale detection copied here; no Vitest equivalent yet (not P3 scope). Kept as-is.
 console.log("\n13. Local & International Locale Detection Logic:");
 it("Detects Vietnamese locale for users with Vietnamese Accept-Language or Geo-IP", () => {
   const detectLocaleFromHeaders = ({ acceptLanguage, country, cookie }) => {
@@ -3469,6 +3482,10 @@ it("E21(iv): ShareTradeModal exports PNG via plain Canvas 2D, no DOM-to-image de
     '@testing-library/react', '@testing-library/dom', '@testing-library/jest-dom', '@testing-library/user-event',
     'jsdom',
   ]);
+  // P3 logged exception (A1b): exactly this one script line may be added (no regex/prefix widening).
+  const E21_EXACT_ALLOWED_LINES = new Set([
+    '"test:unit": "vitest run"',
+  ]);
   const diffLines = diff.split(/\r?\n/).filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l));
   const norm = (l) => l.slice(1).trim().replace(/,$/, '');
   const added = diffLines.filter((l) => l.startsWith('+')).map(norm);
@@ -3480,6 +3497,7 @@ it("E21(iv): ShareTradeModal exports PNG via plain Canvas 2D, no DOM-to-image de
     addedRest.splice(idx, 1);
   }
   for (const line of addedRest) {
+    if (E21_EXACT_ALLOWED_LINES.has(line)) continue;
     const m = /^"([^"]+)"\s*:\s*"[^"]+"$/.exec(line);
     assert.ok(m && E21_ALLOWED_DEPS.has(m[1]), `package.json may only add allow-listed dependencies (got: ${line})`);
   }
@@ -3787,6 +3805,203 @@ it("B5/E-B3: option F - no @supabase/ssr anywhere in package.json or auth source
   }
 });
 // ===== END Section 36 =====
+
+// ===== BEGIN Section 37 (P3 hardening, Step F1: risk/R static guard, guard self-test, stats one-definition, form save-failure) =====
+// Guard self-test baseline: P3_BASELINE_REF pins the last pre-P3 commit (app repo HEAD when P3 started).
+// The plan text says `git show HEAD:<path>`; HEAD moves once P3 is committed, so the ref is pinned
+// here (P3 logged deviation) and can be overridden with env P3_GUARD_BASELINE_REF.
+console.log("\n37. P3 Hardening: Risk/R Static Guard, Guard Self-Test, One Win-Rate Definition, Form Save-Failure:");
+const { execSync: s37Exec } = await import('node:child_process');
+const S37_ROOT = path.resolve(__dirname, '..');
+const P3_BASELINE_REF = process.env.P3_GUARD_BASELINE_REF || '32603a9';
+const s37Read = (rel) => fs.readFileSync(path.resolve(S37_ROOT, rel), 'utf8');
+
+// Files touched by P3 Steps D1-D9 (+ new P3 libs). D-1 global patterns also scan all of src/.
+const S37_INSCOPE = [
+  'src/store/useTradeStore.ts', 'src/store/useAccountStore.ts', 'src/hooks/useTradingDay.ts',
+  'src/components/QuickLogTradeModal.tsx', 'src/components/TradeEditForm.tsx', 'src/components/TradeSlideOverDrawer.tsx',
+  'src/app/[locale]/page.tsx', 'src/components/AuthProvider.tsx', 'src/app/[locale]/accounts/page.tsx',
+  'src/app/[locale]/analytics/page.tsx', 'src/app/[locale]/playbook/page.tsx', 'src/app/[locale]/journal/page.tsx',
+  'src/lib/aiCoachAggregator.ts', 'src/lib/analyticsMath.ts', 'src/lib/matrixAnalytics.ts', 'src/lib/disciplineScore.ts',
+  'src/lib/propPresets.ts', 'src/lib/riskEngine.ts', 'src/lib/risk.ts', 'src/lib/stats.ts', 'src/lib/tradingDay.ts', 'src/lib/propRisk.ts',
+  'src/components/TodaySessionCockpit.tsx', 'src/components/VisualRRBox.tsx', 'src/components/TradeViewDetails.tsx',
+  'src/components/DailyExecutiveReportCard.tsx', 'src/components/TradeCardsView.tsx', 'src/components/JournalCalendarView.tsx',
+  'src/components/ShareTradeModal.tsx', 'src/components/CommandPaletteModal.tsx', 'src/components/MatrixCorrelationAnalytics.tsx',
+];
+const S37_FORMS = ['src/components/QuickLogTradeModal.tsx', 'src/components/TradeEditForm.tsx', 'src/components/TradeSlideOverDrawer.tsx'];
+const S37_STATS_FILES = [
+  'src/app/[locale]/page.tsx', 'src/app/[locale]/analytics/page.tsx', 'src/app/[locale]/playbook/page.tsx',
+  'src/lib/matrixAnalytics.ts', 'src/lib/aiCoachAggregator.ts', 'src/lib/analyticsMath.ts',
+];
+// avgR import is required where the file computes an average R; analytics/page.tsx gets avg R from analyticsMath.
+const S37_AVGR_EXEMPT = new Set(['src/app/[locale]/analytics/page.tsx']);
+
+// scope: 'src' = every non-test src file; 'inscope' = S37_INSCOPE; 'forms' = the 3 trade forms.
+const S37_PATTERNS = [
+  { id: 'D1-undefined-check', scope: 'src', re: /\b(riskAmount|rMultiple|r_multiple|risk_amount)\s*[!=]==?\s*undefined/g },
+  { id: 'D1-typeof-undefined', scope: 'src', re: /typeof\s+[\w.]*(riskAmount|rMultiple)\s*[!=]==?\s*["']undefined/g },
+  { id: 'D1-numeric-fallback', scope: 'src', re: /\b(riskAmount|rMultiple)\s*(\|\||\?\?)\s*(0|1|100|500)\b/g },
+  { id: 'D1-or-500', scope: 'src', re: /\|\|\s*500\b/g },
+  { id: 'S3i-nullish-not-null', scope: 'src', re: /\b(rMultiple|riskAmount)\s*\?\?(?!\s*null\b)/g },
+  { id: 'S3ii-ternary-numeric-else', scope: 'inscope', re: /\b(riskAmount|rMultiple)\s*\)?\s*:\s*-?\d+(\.\d+)?\b/g },
+  { id: 'S3iii-risk-or-100', scope: 'src', re: /riskAmount\s*>\s*0\s*\)?\s*\?\s*[\w.]*riskAmount\s*:\s*100\b/g },
+  { id: 'S3iv-or-account1R', scope: 'forms', re: /\|\|\s*account1R/g },
+  { id: 'S3iv-parseFloat-or', scope: 'forms', re: /parseFloat\([^)]*\)\s*\|\|/g },
+  { id: 'F1-colon-500', scope: 'inscope', re: /:\s*500\b/g },
+  { id: 'F1-string-500', scope: 'inscope', re: /["']500["']/g },
+];
+
+// Allow-list: FULL path + exact literal that must appear on the flagged line, with a justification.
+const S37_ALLOW = [
+  { file: 'src/app/[locale]/simulator/page.tsx', literal: 'hiddenRisk', why: 'simulator parameter, not a trade risk default' },
+  { file: 'src/app/[locale]/simulator/components/AnalysisTable.tsx', literal: '500', why: 'AnalysisTable.tsx:10 simulator table parameter' },
+  { file: 'src/components/PositionSizeCalculator.tsx', literal: 'placeholder=', why: 'calculator input placeholder' },
+  { file: 'src/components/PositionSizeCalculator.tsx', literal: 'setCustomRiskValue(isFutures ? "300" : "500")', why: 'calculator preset value, not a trade risk default' },
+  { file: 'src/app/[locale]/accounts/page.tsx', literal: 'setMaxDailyLoss("500")', why: 'maxDailyLoss "500" account form default (daily loss limit, not trade risk)' },
+  { file: 'src/app/[locale]/accounts/page.tsx', literal: 'useState("500")', why: 'maxDailyLoss "500" account form initial state (daily loss limit)' },
+  { file: 'src/app/api/ai-coach/route.ts', literal: 'lastStatus = 500', why: 'HTTP status, not risk' },
+  { file: 'src/lib/propPresets.ts', literal: 'maxDailyLoss: 500', why: 'prop preset daily loss limit (firm rule), not a trade risk default' },
+];
+const S37_WINRATE_ALLOW = [
+  { file: 'src/lib/matrixAnalytics.ts', literal: 'baseCell.wins / baseCell.count', why: 'matrix regime win probability in the P4 matrix/emotion region (registry Ordered Handoff P3 -> P4)' },
+  { file: 'src/lib/analyticsMath.ts', literal: 'group.wins / decisive', why: 'P3-DEFER-1 Emotion win rate (analyticsMath ~445-455), owned by P4' },
+];
+const S37_LOCAL_WINRATE = /\b\w*wins?\w*\s*\/\s*\(?\s*[\w.]*?\b(total|count|trades|decisive|decided)\w*/gi;
+
+const s37Lines = (src) => src.split(/\r?\n/);
+const s37LineOf = (src, idx) => src.slice(0, idx).split('\n').length;
+const s37Allowed = (list, file, lineText) => list.some((a) => a.file === file && lineText.includes(a.literal));
+
+function s37ScanSource(file, src, scopes) {
+  const hits = [];
+  const lines = s37Lines(src);
+  for (const p of S37_PATTERNS) {
+    if (!scopes.has(p.scope)) continue;
+    for (const m of src.matchAll(p.re)) {
+      const ln = s37LineOf(src, m.index);
+      const text = lines[ln - 1] || '';
+      const block = src.slice(Math.max(0, m.index - 120), m.index + m[0].length);
+      if (s37Allowed(S37_ALLOW, file, text) || s37Allowed(S37_ALLOW, file, block)) { if (process.env.S37_DUMP) console.log(`    [allow] ${p.id} ${file}:${ln} ${text.trim().slice(0, 100)}`); continue; }
+      hits.push({ id: p.id, file, line: ln, text: text.trim().slice(0, 140) });
+    }
+  }
+  return hits;
+}
+function s37Scopes(file) {
+  const s = new Set(['src']);
+  if (S37_INSCOPE.includes(file)) s.add('inscope');
+  if (S37_FORMS.includes(file)) s.add('forms');
+  return s;
+}
+function s37ListSrc() {
+  const out = [];
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(path.resolve(S37_ROOT, dir), { withFileTypes: true })) {
+      const rel = `${dir}/${e.name}`;
+      if (e.isDirectory()) { if (e.name !== '__tests__' && e.name !== 'node_modules') walk(rel); continue; }
+      if (/\.(ts|tsx)$/.test(e.name) && !/\.test\.tsx?$/.test(e.name)) out.push(rel);
+    }
+  };
+  walk('src');
+  return out.sort();
+}
+function s37FormCatchProblems(file, src) {
+  const problems = [];
+  if (!/SaveTradeError|SAVE_FAILED/.test(src)) problems.push(`${file}: does not handle SaveTradeError/SAVE_FAILED`);
+  const catches = [...src.matchAll(/catch\s*\(\s*(\w+)[^)]*\)\s*\{/g)];
+  const saveCatches = catches.filter((m) => /SaveTradeError|SAVE_FAILED/.test(src.slice(m.index, m.index + 600)));
+  if (saveCatches.length === 0) problems.push(`${file}: no catch branch that tests SaveTradeError/SAVE_FAILED`);
+  for (const m of saveCatches) {
+    // body of the catch up to its matching closing brace
+    let depth = 0; let end = m.index + m[0].length - 1;
+    for (let i = end; i < src.length; i++) { if (src[i] === '{') depth++; else if (src[i] === '}') { depth--; if (depth === 0) { end = i; break; } } }
+    const body = src.slice(m.index, end);
+    if (/\bonClose\s*\(|\breset\w*\s*\(|\bclose\w*\s*\(|setIsOpen\(\s*false/.test(body)) problems.push(`${file}:${s37LineOf(src, m.index)}: SaveTradeError catch closes/resets the form`);
+  }
+  return problems;
+}
+function s37StatsProblems(file, src) {
+  const problems = [];
+  const imp = src.match(/import\s*\{([^}]*)\}\s*from\s*["']@\/lib\/stats["']/);
+  const names = imp ? imp[1].split(',').map((s) => s.trim().split(/\s+as\s+/)[0]) : [];
+  if (!names.includes('winRate')) problems.push(`${file}: must import winRate from @/lib/stats`);
+  if (!S37_AVGR_EXEMPT.has(file) && !names.includes('avgR')) problems.push(`${file}: must import avgR from @/lib/stats`);
+  const lines = s37Lines(src);
+  for (const m of src.matchAll(S37_LOCAL_WINRATE)) {
+    const ln = s37LineOf(src, m.index);
+    const text = lines[ln - 1] || '';
+    if (/^\s*(\/\/|\*|\/\*|\{\/\*)/.test(text) || /<p|<span|<h\d/.test(text)) continue; // comments / JSX labels
+    if (s37Allowed(S37_WINRATE_ALLOW, file, text)) continue;
+    problems.push(`${file}:${ln}: local win-rate formula "${m[0]}"`);
+  }
+  return problems;
+}
+function s37WinRateExportCount(files, readFn) {
+  let n = 0;
+  for (const f of files) { const src = readFn(f); if (src == null) continue; n += (src.match(/export\s+(function|const|let)\s+winRate\b/g) || []).length; }
+  return n;
+}
+const s37GitShow = (ref, rel) => {
+  try { return s37Exec(`git show "${ref}:${rel}"`, { cwd: S37_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 32 * 1024 * 1024 }); } catch { return null; }
+};
+
+// --- Guard on the CURRENT code (GREEN required) ---
+const s37SrcFiles = s37ListSrc();
+const s37Current = s37SrcFiles.flatMap((f) => s37ScanSource(f, s37Read(f), s37Scopes(f)));
+it("F1/D-1+S3: static guard finds no risk/R fallback, undefined-check, `|| 500`, `: 500`, `\"500\"`, `?? <non-null>`, numeric ternary else, or form `|| account1R` / `parseFloat(...) ||` in current src", () => {
+  assert.deepStrictEqual(s37Current.map((h) => `${h.id} ${h.file}:${h.line} ${h.text}`), [], "static guard hits on current code");
+});
+it("F1/S4: the 3 trade forms catch SaveTradeError/SAVE_FAILED and the catch branch never closes or resets the form", () => {
+  const problems = S37_FORMS.flatMap((f) => s37FormCatchProblems(f, s37Read(f)));
+  assert.deepStrictEqual(problems, []);
+});
+it("F1/S5: dashboard, analytics, playbook, matrixAnalytics, aiCoachAggregator, analyticsMath import winRate/avgR from @/lib/stats with no local wins / total formula", () => {
+  const problems = S37_STATS_FILES.flatMap((f) => s37StatsProblems(f, s37Read(f)));
+  assert.deepStrictEqual(problems, []);
+});
+it("F1/D-1: exactly ONE exported winRate in src (src/lib/stats.ts)", () => {
+  assert.strictEqual(s37WinRateExportCount(s37SrcFiles, s37Read), 1);
+  assert.ok(/export\s+function\s+winRate\b/.test(s37Read('src/lib/stats.ts')), "the single winRate export lives in src/lib/stats.ts");
+});
+
+// --- Guard self-test on pre-P3 sources (RED required; anti vacuous-pass, precedent P2 D0b) ---
+const s37BaseFiles = (() => { try { return s37Exec(`git ls-tree -r --name-only "${P3_BASELINE_REF}" -- src`, { cwd: S37_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split(/\r?\n/).filter((f) => /\.(ts|tsx)$/.test(f) && !/\.test\.tsx?$/.test(f) && !f.includes('__tests__')); } catch { return []; } })();
+const s37BaseCache = new Map();
+const s37BaseRead = (f) => { if (!s37BaseCache.has(f)) s37BaseCache.set(f, s37GitShow(P3_BASELINE_REF, f)); return s37BaseCache.get(f); };
+// Patterns that never occurred in the pre-P3 tree are proven RED on a synthetic fixture instead.
+const S37_SYNTHETIC = {
+  'D1-typeof-undefined': 'const x = typeof t.riskAmount !== "undefined" ? t.riskAmount : 0;',
+  'S3i-nullish-not-null': 'const r = t.rMultiple ?? computeR(t);',
+  'D1-numeric-fallback': 'const risk = t.riskAmount || 100;',
+};
+it(`F1 self-test: guard is RED on pre-P3 sources (git show ${P3_BASELINE_REF}:<path>) for every D-1/S3 pattern (synthetic fixture only where the pre-P3 tree had no instance)`, () => {
+  assert.ok(s37BaseFiles.length > 50, `could not list pre-P3 tree at ${P3_BASELINE_REF} (git missing or ref absent)`);
+  const baseHits = s37BaseFiles.flatMap((f) => { const src = s37BaseRead(f); return src == null ? [] : s37ScanSource(f, src, s37Scopes(f)); });
+  const byId = new Map();
+  for (const h of baseHits) byId.set(h.id, (byId.get(h.id) || 0) + 1);
+  const missing = [];
+  const viaSynthetic = [];
+  for (const p of S37_PATTERNS) {
+    if (byId.get(p.id)) continue;
+    const fx = S37_SYNTHETIC[p.id];
+    const scope = p.scope === 'forms' ? S37_FORMS[0] : 'src/lib/stats.ts';
+    if (fx && s37ScanSource(scope, fx, s37Scopes(scope)).some((h) => h.id === p.id)) { viaSynthetic.push(p.id); continue; }
+    missing.push(p.id);
+  }
+  if (process.env.S37_DUMP) for (const h of baseHits) console.log(`    [red] ${h.id} ${h.file}:${h.line} ${h.text}`);
+  console.log(`    self-test RED counts @${P3_BASELINE_REF}: ${[...byId].map(([k, v]) => `${k}=${v}`).join(', ')}${viaSynthetic.length ? ` | synthetic: ${viaSynthetic.join(', ')}` : ''}`);
+  assert.deepStrictEqual(missing, [], "patterns the guard could not catch on pre-P3 code or synthetic fixture");
+});
+it(`F1 self-test: form, stats-import and single-winRate checks are RED on pre-P3 sources (${P3_BASELINE_REF})`, () => {
+  const formProblems = S37_FORMS.flatMap((f) => { const s = s37BaseRead(f); return s == null ? [`${f}: missing`] : s37FormCatchProblems(f, s); });
+  assert.ok(S37_FORMS.every((f) => formProblems.some((p) => p.startsWith(f))), "every pre-P3 form must fail the save-failure check");
+  const statsProblems = S37_STATS_FILES.flatMap((f) => { const s = s37BaseRead(f); return s == null ? [] : s37StatsProblems(f, s); });
+  assert.ok(S37_STATS_FILES.every((f) => statsProblems.some((p) => p.startsWith(f))), "every pre-P3 stats file must fail the import/formula check");
+  assert.ok(statsProblems.some((p) => p.includes('local win-rate formula')), "pre-P3 local wins / total formulas must be detected");
+  assert.notStrictEqual(s37WinRateExportCount(s37BaseFiles, s37BaseRead), 1, "pre-P3 tree must not satisfy the single-winRate check");
+});
+// ===== END Section 37 =====
+
 
 console.log("\n-------------------------------------------------------");
 console.log(`TOTAL: ${total} | PASSED: ${passed} | FAILED: ${total - passed}`);

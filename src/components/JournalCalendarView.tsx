@@ -250,7 +250,7 @@ export function JournalCalendarView({
                     >
                       {trade.pnl >= 0 ? `+$${trade.pnl.toLocaleString()}` : `-$${Math.abs(trade.pnl).toLocaleString()}`}
                     </div>
-                    {trade.rMultiple !== undefined && (
+                    {trade.rMultiple != null && (
                       <div className="text-[10px] text-gray-400 font-semibold">
                         {trade.rMultiple >= 0 ? `+${trade.rMultiple.toFixed(2)}R` : `${trade.rMultiple.toFixed(2)}R`}
                       </div>

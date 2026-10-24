@@ -2,11 +2,11 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useTradeStore, TradeResult, SetupTag } from "@/store/useTradeStore";
+import { useTradeStore, TradeResult, SetupTag, SaveTradeError } from "@/store/useTradeStore";
 import { useAccountStore } from "@/store/useAccountStore";
 import { usePlaybookStore } from "@/store/usePlaybookStore";
 import { detectSession, TradingSession } from "@/lib/sessionUtils";
-import { calculateAccount1RRisk } from "@/lib/riskEngine";
+import { classifyRiskInput, formRMultiple, suggestedRiskInput, toPositiveNumber, finiteOrZero } from "@/lib/risk";
 import { 
   X, Zap,
   TrendingUp, TrendingDown, Save, Upload, Trash2,
@@ -33,6 +33,8 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
   const router = useRouter();
   const t = useTranslations("QuickLog");
   const c = useTranslations("Common");
+  const tRisk = useTranslations("Risk");
+  const tTrade = useTranslations("Trade");
   const { accounts, activeAccountId } = useAccountStore();
   const { addTrade } = useTradeStore();
   const { playbooks, fetchPlaybooks } = usePlaybookStore();
@@ -50,8 +52,10 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
   const [pnl, setPnl] = useState("0");
   const [pnlSign, setPnlSign] = useState<"+" | "-">("+");
   const [prevAccountId, setPrevAccountId] = useState<string | null>(activeAccount?.id ?? null);
+  const [riskBadInput, setRiskBadInput] = useState(false);
   const [riskAmount, setRiskAmount] = useState<string>(() => {
-    return activeAccount ? calculateAccount1RRisk(activeAccount).riskDollar.toString() : "500";
+    // P3 D3: account 1R only as a suggestion; blank when the account has no risk configured.
+    return suggestedRiskInput(activeAccount);
   });
   const [setup, setSetup] = useState<string>("Breakout");
   const [notes, setNotes] = useState("");
@@ -103,7 +107,8 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
   // Synchronize default risk when active account switches
   if (activeAccount && activeAccount.id !== prevAccountId) {
     setPrevAccountId(activeAccount.id);
-    setRiskAmount(calculateAccount1RRisk(activeAccount).riskDollar.toString());
+    setRiskAmount(suggestedRiskInput(activeAccount));
+    setRiskBadInput(false);
   }
 
   useEffect(() => {
@@ -199,15 +204,12 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
 
   // Live R calculation
   const numericPnl = useMemo(() => {
-    const raw = Math.abs(parseFloat(pnl) || 0);
+    const raw = Math.abs(finiteOrZero(parseFloat(pnl)));
     return pnlSign === "-" ? -raw : raw;
   }, [pnl, pnlSign]);
 
-  const liveRMultiple = useMemo(() => {
-    const risk = parseFloat(riskAmount) || 500;
-    if (risk <= 0) return 0;
-    return Number((numericPnl / risk).toFixed(2));
-  }, [numericPnl, riskAmount]);
+  // null = no risk set (blank input) -> shown as "no risk set", never a 500 fallback
+  const liveRMultiple = useMemo(() => formRMultiple(numericPnl, riskAmount), [numericPnl, riskAmount]);
 
   // Handle file select
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -230,7 +232,11 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
       return;
     }
 
-    const parsedRisk = parseFloat(riskAmount) || 500;
+    if (classifyRiskInput(riskAmount, riskBadInput) === "invalid") {
+      toast.warning(tRisk("invalidInput"));
+      return;
+    }
+    const parsedRisk = toPositiveNumber(riskAmount);
     const derivedResult: TradeResult = 
       numericPnl > 0 ? "Win" : numericPnl < 0 ? "Loss" : "Break Even";
 
@@ -252,7 +258,6 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
         notes: notes.trim(),
         screenshotFile: screenshot || undefined,
         riskAmount: parsedRisk,
-        rMultiple: liveRMultiple,
         session: detectedSession,
         checklistResults: {},
         date: now.toISOString(),
@@ -266,8 +271,13 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
       setScreenshot(null);
       setCompressionRatio(null);
       onClose();
-    } catch {
-      toast.error(c("error"));
+    } catch (err) {
+      // Save failed: keep the modal open with every entered value (no reset here).
+      if (err instanceof SaveTradeError) {
+        toast.error(tTrade("saveError.failed", { detail: err.detail }));
+      } else {
+        toast.error(c("error"));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -275,7 +285,7 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
 
   const handleSwitchToDetailed = () => {
     if (activeAccount) {
-      const numericPnl = parseFloat(pnl) || 0;
+      const numericPnl = finiteOrZero(parseFloat(pnl));
       const draftData = {
         asset: asset.toUpperCase().trim(),
         lotSize: lotSize.trim(),
@@ -535,8 +545,8 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
                       type="number"
                       step="any"
                       value={riskAmount}
-                      onChange={(e) => setRiskAmount(e.target.value)}
-                      placeholder="500"
+                      onChange={(e) => { setRiskAmount(e.target.value); setRiskBadInput(e.target.validity.badInput); }}
+                      placeholder={tRisk("noRiskSet")}
                       className="w-full rounded-xl bg-gray-950/80 border border-white/10 px-3.5 py-2.5 text-sm font-bold font-mono tabular-nums text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>
@@ -548,13 +558,13 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
                 <span className="text-xs text-gray-400 font-medium">{t("calculated_r")}:</span>
                 <span className={clsx(
                   "text-sm font-bold font-mono tabular-nums px-2.5 py-0.5 rounded-full border",
-                  liveRMultiple > 0 
+                  liveRMultiple != null && liveRMultiple > 0
                     ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400" 
-                    : liveRMultiple < 0 
+                    : liveRMultiple != null && liveRMultiple < 0
                     ? "bg-rose-500/15 border-rose-500/30 text-rose-400" 
                     : "bg-white/5 border-white/10 text-gray-300"
                 )}>
-                  {liveRMultiple >= 0 ? `+${liveRMultiple}R` : `${liveRMultiple}R`}
+                  {liveRMultiple == null ? tRisk("noRiskSet") : liveRMultiple >= 0 ? `+${liveRMultiple}R` : `${liveRMultiple}R`}
                 </span>
               </div>
 

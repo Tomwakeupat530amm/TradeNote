@@ -462,10 +462,10 @@ export function MatrixCorrelationAnalytics({ trades }: MatrixCorrelationAnalytic
                       <td className="py-3 px-4 text-center font-bold">
                         <span
                           className={clsx(
-                            item.expectancyR >= 0 ? "text-emerald-400" : "text-rose-400"
+                            item.expectancyR == null ? "text-gray-500" : item.expectancyR >= 0 ? "text-emerald-400" : "text-rose-400"
                           )}
                         >
-                          {item.expectancyR >= 0 ? "+" : ""}{item.expectancyR.toFixed(2)}R
+                          {item.expectancyR == null ? "—" : `${item.expectancyR >= 0 ? "+" : ""}${item.expectancyR.toFixed(2)}R`}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right">
@@ -571,7 +571,7 @@ export function MatrixCorrelationAnalytics({ trades }: MatrixCorrelationAnalytic
                         {trade.pnl >= 0 ? "+" : ""}${trade.pnl.toLocaleString()}
                       </div>
                       <div className="text-[10px] font-mono text-gray-400">
-                        {trade.rMultiple !== undefined && trade.rMultiple !== null
+                        {trade.rMultiple != null
                           ? `${trade.rMultiple >= 0 ? "+" : ""}${trade.rMultiple}R`
                           : trade.result}
                       </div>

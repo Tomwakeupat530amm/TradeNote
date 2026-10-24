@@ -1,10 +1,19 @@
-import { Trade } from "@/store/useTradeStore";
-import { Account } from "@/store/useAccountStore";
+import type { Trade } from "@/store/useTradeStore";
+import type { Account } from "@/store/useAccountStore";
+import { isRatedForR, rMultiple } from "@/lib/risk";
+
+/** R of a rated trade; null when the trade has no risk (P3: never a 0/1 fallback). */
+function ratedR(t: Trade): number | null {
+  return isRatedForR(t) ? rMultiple(t.pnl, t.riskAmount) : null;
+}
 
 export type DisciplineTier = "tier_master" | "tier_disciplined" | "tier_leak" | "tier_tilt";
 
 export interface PillarBreakdown {
-  score: number; // 0 - 100
+  /** 0 - 100; null = unrated (no measurable sample, excluded from the weighted score). */
+  score: number | null;
+  /** true when the pillar could not be measured (F-4: losses without any risk set). */
+  unrated?: boolean;
   weight: number; // e.g. 0.40
   weightedScore: number;
   labelKey: string;
@@ -76,12 +85,8 @@ export function calculateDailyDisciplineScore(
 
   for (const t of dayTrades) {
     netPnl += t.pnl;
-    const r = t.rMultiple !== undefined
-      ? t.rMultiple
-      : t.riskAmount && t.riskAmount > 0
-      ? t.pnl / t.riskAmount
-      : 0;
-    totalR += r;
+    const r = ratedR(t);
+    if (r != null) totalR += r;
     if (t.pnl > 0) wins++;
     else if (t.pnl < 0) losses++;
   }
@@ -102,15 +107,16 @@ export function calculateDailyDisciplineScore(
 
   // 2. Risk 1R Containment (25%)
   const lossTrades = dayTrades.filter((t) => t.pnl < 0);
-  let sRisk = 100;
+  let sRisk: number | null = 100;
   if (lossTrades.length > 0) {
+    // P3: only rated losses can be measured against 1R; unrated losses are excluded (no fallback R).
     let riskScoreSum = 0;
+    let ratedLossCount = 0;
     for (const lt of lossTrades) {
-      const r = lt.rMultiple !== undefined
-        ? Math.abs(lt.rMultiple)
-        : lt.riskAmount && lt.riskAmount > 0
-        ? Math.abs(lt.pnl / lt.riskAmount)
-        : 1;
+      const rated = ratedR(lt);
+      if (rated == null) continue;
+      ratedLossCount++;
+      const r = Math.abs(rated);
 
       if (r <= 1.05) {
         riskScoreSum += 100;
@@ -119,7 +125,8 @@ export function calculateDailyDisciplineScore(
         riskScoreSum += Math.max(0, Math.round(100 - excess * 80));
       }
     }
-    sRisk = Math.round(riskScoreSum / lossTrades.length);
+    // F-4: losses exist but none carries a risk -> unrated (blank risk must not earn a perfect score).
+    sRisk = ratedLossCount > 0 ? Math.round(riskScoreSum / ratedLossCount) : null;
   }
 
   // 3. Hard Stop Respect (20%)
@@ -157,11 +164,10 @@ export function calculateDailyDisciplineScore(
   }
 
   // Final Weighted Score
+  // An unrated risk pillar is dropped and the remaining weights are renormalized to 100%.
+  const otherWeighted = sPlaybook * 0.40 + sHardStop * 0.20 + sFrequency * 0.15;
   const weightedScore = Math.round(
-    sPlaybook * 0.40 +
-    sRisk * 0.25 +
-    sHardStop * 0.20 +
-    sFrequency * 0.15
+    sRisk != null ? otherWeighted + sRisk * 0.25 : otherWeighted / 0.75
   );
   const score = Math.max(0, Math.min(100, weightedScore));
 
@@ -175,9 +181,13 @@ export function calculateDailyDisciplineScore(
   const winningTrades = dayTrades.filter((t) => t.pnl > 0);
   const mvpTrade = winningTrades.length > 0
     ? winningTrades.reduce((best, cur) => {
-        const curR = cur.rMultiple ?? (cur.riskAmount ? cur.pnl / cur.riskAmount : 0);
-        const bestR = best.rMultiple ?? (best.riskAmount ? best.pnl / best.riskAmount : 0);
-        return curR > bestR ? cur : best;
+        // P3: a rated trade outranks an unrated one; unrated trades compare by pnl.
+        const curR = ratedR(cur);
+        const bestR = ratedR(best);
+        if (curR != null && bestR != null) return curR > bestR ? cur : best;
+        if (curR != null) return cur;
+        if (bestR != null) return best;
+        return cur.pnl > best.pnl ? cur : best;
       }, winningTrades[0])
     : null;
 
@@ -217,10 +227,13 @@ export function calculateDailyDisciplineScore(
       },
       risk: {
         score: sRisk,
-        weight: 0.25,
-        weightedScore: Number((sRisk * 0.25).toFixed(1)),
+        unrated: sRisk == null,
+        weight: sRisk == null ? 0 : 0.25,
+        weightedScore: sRisk == null ? 0 : Number((sRisk * 0.25).toFixed(1)),
         labelKey: "pillar_risk",
-        notes: lossTrades.length > 0 ? `${lossTrades.length} loss(es) contained` : "Zero losses incurred"
+        notes: sRisk == null
+          ? `${lossTrades.length} loss(es) without risk set (unrated)`
+          : lossTrades.length > 0 ? `${lossTrades.length} loss(es) contained` : "Zero losses incurred"
       },
       hardStop: {
         score: sHardStop,

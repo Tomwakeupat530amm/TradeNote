@@ -16,6 +16,7 @@ import { useTagTranslation } from "@/hooks/useTagTranslation";
 import { getAssetBadgeStyle } from "@/lib/assetColors";
 import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
 import { prefetchSignedUrls, useSignedUrl } from "@/hooks/useSignedUrl";
+import { EstimatedRiskBadge } from "./EstimatedRiskBadge";
 
 function screenshotPathOf(trade: Trade): string | null {
   return trade.screenshotPath ?? pathFromLegacyUrl(trade.screenshotUrl);
@@ -187,7 +188,8 @@ export function TradeCardsView({
                   </div>
 
                   <div className="flex items-center gap-1.5">
-                    {trade.rMultiple !== undefined && (
+                    <EstimatedRiskBadge trade={trade} />
+                    {trade.rMultiple != null && (
                       <span className={clsx(
                         "text-xs font-mono font-bold px-2 py-0.5 rounded-lg border tabular-nums",
                         trade.rMultiple > 0 ? "text-emerald-300 bg-emerald-500/15 border-emerald-500/30" :

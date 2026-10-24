@@ -2,6 +2,8 @@
 "use client";
 
 import { useTradeStore } from "@/store/useTradeStore";
+import type { Trade } from "@/store/useTradeStore";
+import { winRate as statsWinRate } from "@/lib/stats";
 import { useAccountStore } from "@/store/useAccountStore";
 import { 
   BarChart, Bar, Cell, Area, AreaChart, ComposedChart, Line, Legend,
@@ -61,6 +63,7 @@ export default function AnalyticsPage() {
   const { accounts, activeAccountId } = useAccountStore();
   const activeAccount = accounts.find((a) => a.id === activeAccountId);
   const t = useTranslations("Analytics");
+  const tStats = useTranslations("Stats");
   const [isAICoachOpen, setIsAICoachOpen] = useState(false);
   const [timeframe, setTimeframe] = useState<TimeframeFilter>("all");
   const [chartViewMode, setChartViewMode] = useState<"equity" | "drawdown" | "daily">("equity");
@@ -135,8 +138,8 @@ export default function AnalyticsPage() {
       if (t.result === "Win") wins++;
       else if (t.result === "Loss") losses++;
     });
-    const total = wins + losses;
-    const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
+    // P3: one win-rate definition (@/lib/stats, break-even excluded); integer display as before.
+    const winRate = Math.round(statsWinRate(accountTrades));
     return { netPnl, wins, losses, winRate, totalTrades: accountTrades.length };
   }, [accountTrades]);
 
@@ -182,17 +185,17 @@ export default function AnalyticsPage() {
 
   // Win Rate by Setup
   const setupData = useMemo(() => {
-    const stats: Record<string, { wins: number; total: number; pnl: number }> = {};
+    const stats: Record<string, { items: Trade[]; total: number; pnl: number }> = {};
     accountTrades.forEach((t) => {
-      if (!stats[t.setup]) stats[t.setup] = { wins: 0, total: 0, pnl: 0 };
+      if (!stats[t.setup]) stats[t.setup] = { items: [], total: 0, pnl: 0 };
       stats[t.setup].total += 1;
       stats[t.setup].pnl += t.pnl;
-      if (t.result === "Win") stats[t.setup].wins += 1;
+      stats[t.setup].items.push(t);
     });
 
     return Object.keys(stats).map((key) => ({
       name: key,
-      winRate: Math.round((stats[key].wins / stats[key].total) * 100),
+      winRate: Math.round(statsWinRate(stats[key].items)),
       pnl: stats[key].pnl,
     }));
   }, [accountTrades]);
@@ -219,11 +222,11 @@ export default function AnalyticsPage() {
 
   // Session Impact - using true assigned session with detectSession fallback
   const sessionData = useMemo(() => {
-    const stats: Record<string, { wins: number; total: number; pnl: number }> = {
-      "Asian": { wins: 0, total: 0, pnl: 0 },
-      "London": { wins: 0, total: 0, pnl: 0 },
-      "London-NY Overlap": { wins: 0, total: 0, pnl: 0 },
-      "New York": { wins: 0, total: 0, pnl: 0 }
+    const stats: Record<string, { items: Trade[]; total: number; pnl: number }> = {
+      "Asian": { items: [], total: 0, pnl: 0 },
+      "London": { items: [], total: 0, pnl: 0 },
+      "London-NY Overlap": { items: [], total: 0, pnl: 0 },
+      "New York": { items: [], total: 0, pnl: 0 }
     };
 
     accountTrades.forEach((tTrade) => {
@@ -232,11 +235,11 @@ export default function AnalyticsPage() {
         : detectSession(tTrade.date);
       
       if (!stats[sessionKey]) {
-        stats[sessionKey] = { wins: 0, total: 0, pnl: 0 };
+        stats[sessionKey] = { items: [], total: 0, pnl: 0 };
       }
       stats[sessionKey].total += 1;
       stats[sessionKey].pnl += tTrade.pnl;
-      if (tTrade.result === "Win") stats[sessionKey].wins += 1;
+      stats[sessionKey].items.push(tTrade);
     });
 
     return Object.keys(stats)
@@ -249,7 +252,7 @@ export default function AnalyticsPage() {
         else if (key === "London-NY Overlap") nameTranslated = "London-NY Overlap";
         return {
           name: nameTranslated,
-          winRate: Math.round((stats[key].wins / stats[key].total) * 100),
+          winRate: Math.round(statsWinRate(stats[key].items)),
           pnl: stats[key].pnl,
           total: stats[key].total
         };
@@ -404,6 +407,7 @@ export default function AnalyticsPage() {
               <p className="text-[11px] text-gray-400 mt-1 truncate">
                 {t('trades_count_summary', { wins: summaryStats.wins, losses: summaryStats.losses, total: summaryStats.totalTrades })}
               </p>
+              <p className="text-[10px] text-gray-500 mt-0.5">{tStats("winRateExcludesBE")}</p>
             </div>
 
             {/* 3. Max Win / Max Loss */}
