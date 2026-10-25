@@ -3,9 +3,15 @@ import { supabase } from '@/lib/supabase';
 import { useAuthStore } from './useAuthStore';
 import { useAccountStore } from './useAccountStore';
 import { useNotificationStore } from './useNotificationStore';
+import { usePreferenceStore } from './usePreferenceStore';
 import { compressScreenshot } from '@/lib/imageCompressor';
 import { SCREENSHOT_BUCKET, buildScreenshotPath, pathFromLegacyUrl } from '@/lib/screenshotStorage';
 import { rMultiple as computeRMultiple } from '@/lib/risk';
+import { assertMutationAllowed, effectiveLimit, evaluateHardStop, HardStopError, type HardStopTrade } from '@/lib/hardStop';
+import { isRated } from '@/lib/psychology';
+
+// The Hard Stop error lives in the pure lib (E-3); re-exported for the forms.
+export { HardStopError } from '@/lib/hardStop';
 
 export type TradeResult = "Win" | "Loss" | "Break Even";
 export type SetupTag = string;
@@ -91,6 +97,101 @@ function mapRiskFields(d: any): Pick<Trade, 'riskAmount' | 'rMultiple' | 'riskIs
   return { riskAmount, rMultiple, riskIsEstimated: toRiskIsEstimated(d.risk_is_estimated) };
 }
 
+/** Upper bound on rows read by the Hard Stop window select (one account-day is far below this). */
+const HARD_STOP_FETCH_LIMIT = 2000;
+/** Window around `now` that covers the previous, current and next trading day for any zone/reset. */
+const HARD_STOP_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+
+/**
+ * Trades needed to judge the Hard Stop of `accountIds` (D-2 / E-8). The active account's trades
+ * come from the store; other accounts are read with ONE bounded read-only select. Any fetch
+ * failure returns null = fail OPEN (the caller skips the client guard; P5 enforces server-side).
+ */
+export async function loadHardStopTrades(accountIds: readonly string[], now: Date = new Date()): Promise<HardStopTrade[] | null> {
+  const activeId = useAccountStore.getState().activeAccountId;
+  const local: HardStopTrade[] = activeId && accountIds.includes(activeId)
+    ? useTradeStore.getState().trades.filter(t => t.accountId === activeId)
+    : [];
+  const remote = accountIds.filter(id => id !== activeId);
+  if (remote.length === 0) return local;
+  try {
+    const { data, error } = await supabase
+      .from('trades')
+      .select('id, account_id, pnl, date')
+      .in('account_id', remote)
+      .gte('date', new Date(now.getTime() - HARD_STOP_WINDOW_MS).toISOString())
+      .lte('date', new Date(now.getTime() + HARD_STOP_WINDOW_MS).toISOString())
+      .limit(HARD_STOP_FETCH_LIMIT);
+    if (error) {
+      console.warn('[hardStop] could not read trades for the lock check; skipping the client guard:', error.code);
+      return null;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows = (data ?? []).map((d: any) => ({ id: d.id, accountId: d.account_id, pnl: Number(d.pnl), date: d.date }));
+    return [...local, ...rows];
+  } catch (err) {
+    console.warn('[hardStop] could not read trades for the lock check; skipping the client guard:', err);
+    return null;
+  }
+}
+
+function hardStopPrefs() {
+  const { preferences, prefsLoaded } = usePreferenceStore.getState();
+  return { tz: preferences?.timezone ?? null, prefsLoaded };
+}
+
+/**
+ * Hard Stop guard (P4 client convenience guard, D-2/D-14): runs FIRST in add/update/delete.
+ * Returns the trades used (for the notification step) or null when the guard did not apply.
+ */
+async function guardHardStop(
+  op: 'add' | 'update' | 'delete',
+  accountId: string | undefined,
+  before: Trade | undefined,
+  after: Record<string, unknown> | undefined,
+): Promise<HardStopTrade[] | null> {
+  if (!accountId) return null;
+  const account = useAccountStore.getState().accounts.find(a => a.id === accountId);
+  if (!account || effectiveLimit(account.rules, account.initialBalance) === null) return null;
+  const trades = await loadHardStopTrades([accountId]);
+  if (!trades) return null;
+  const decision = assertMutationAllowed({ op, accountId, account, before, after, trades, now: new Date(), ...hardStopPrefs() });
+  if (!decision.allowed) {
+    const ev = decision.evaluation;
+    throw new HardStopError('HARD_STOP', { dayKey: ev.dayKey, lossToday: ev.lossToday, limit: ev.limit });
+  }
+  return trades;
+}
+
+/** Never lets a notification failure escape the trade mutation (B3-v2 c). */
+async function notifySafely(notification: { title: string; message: string; type: 'warning' | 'error' }): Promise<void> {
+  try {
+    await useNotificationStore.getState().addNotification(notification);
+  } catch (err) {
+    console.warn('[notifications] could not create notification:', err);
+  }
+}
+
+let notificationsLoadPromise: Promise<void> | null = null;
+
+/** Dedupe lookup: loads notifications once when they were never fetched in this session. */
+async function hasNotificationKey(key: string): Promise<boolean> {
+  const store = useNotificationStore.getState();
+  if (!store.notificationsLoaded) {
+    notificationsLoadPromise ??= store
+      .fetchNotifications()
+      .catch((err) => {
+        console.warn('[notifications] could not load notifications for dedupe:', err);
+      })
+      .finally(() => {
+        notificationsLoadPromise = null;
+      });
+    await notificationsLoadPromise;
+  }
+  const tag = `[${key}]`;
+  return useNotificationStore.getState().notifications.some(n => n.message.includes(tag) || n.title.includes(tag));
+}
+
 /** PostgREST page size; must not exceed the project's max_rows (default 1000). */
 export const TRADES_PAGE_SIZE = 1000;
 /** Safety cap on pages (100k trades) so a misbehaving backend cannot loop forever. */
@@ -171,25 +272,12 @@ export const useTradeStore = create<TradeState>((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return;
 
-    // --- Hard Stop Check ---
-    const accountStore = useAccountStore.getState();
-    const account = accountStore.accounts.find(a => a.id === trade.accountId);
-    const rules = account?.rules || ({} as (typeof accountStore.accounts)[0]["rules"]);
-    if (account && rules.maxDailyLoss && rules.enableHardStop) {
-      const today = new Date().toISOString().split('T')[0];
-      const allTrades = get().trades;
-      const todayTrades = allTrades.filter(t => t.accountId === account.id && t.date.startsWith(today));
-      const todayPnl = todayTrades.reduce((sum, t) => sum + t.pnl, 0);
-
-      let lossLimit = rules.maxDailyLoss;
-      if (rules.maxDailyLossType === '%') {
-        lossLimit = account.initialBalance * (rules.maxDailyLoss / 100);
-      }
-
-      if (todayPnl < 0 && Math.abs(todayPnl) >= lossLimit) {
-        throw new Error("TILT_GUARD_ACTIVE: You have reached your max daily loss for today. Trading is locked.");
-      }
-    }
+    // --- Hard Stop guard (FIRST, before any upload/insert) ---
+    const guardTrades = await guardHardStop('add', trade.accountId, undefined, {
+      accountId: trade.accountId,
+      pnl: trade.pnl,
+      date: trade.date,
+    });
 
     let finalScreenshotPath: string | null = null;
 
@@ -276,50 +364,41 @@ export const useTradeStore = create<TradeState>((set, get) => ({
         trades: [newTrade, ...state.trades]
       }));
 
-      // --- Rule Checking & Notifications ---
-      const accountStore = useAccountStore.getState();
-      const account = accountStore.accounts.find(a => a.id === data.account_id);
+      // --- Rule Checking & Notifications (awaited, isolated; never fail the save) ---
+      const account = useAccountStore.getState().accounts.find(a => a.id === data.account_id);
       if (account) {
-        const { rules } = account;
-        const addNotification = useNotificationStore.getState().addNotification;
-
-        // Check if a mistake was made (broken rule)
-        if (newTrade.mistake !== "None") {
-          addNotification({
+        // Rule Broken only for a rated trade with a real mistake.
+        if (isRated(newTrade) && newTrade.mistake !== "None") {
+          await notifySafely({
             title: "Rule Broken!",
             message: `You recorded a mistake: ${newTrade.mistake} on ${newTrade.asset}. Stick to your plan!`,
             type: "warning"
           });
         }
 
-        // Check Max Daily Loss
-        if (rules.maxDailyLoss) {
-          // Calculate today's total PnL for this account
-          const today = new Date().toISOString().split('T')[0];
-          const allTrades = get().trades;
-          const todayTrades = allTrades.filter(t => t.accountId === account.id && t.date.startsWith(today));
-          const todayPnl = todayTrades.reduce((sum, t) => sum + t.pnl, 0);
-
-          let lossLimit = rules.maxDailyLoss;
-          if (rules.maxDailyLossType === '%') {
-             lossLimit = account.initialBalance * (rules.maxDailyLoss / 100);
-          }
-          
-          if (todayPnl < 0) {
-            const currentLoss = Math.abs(todayPnl);
-            // If loss exceeds limit
-            if (currentLoss >= lossLimit) {
-              addNotification({
-                title: "Max Daily Loss Exceeded!",
-                message: `You have hit your max daily loss limit of ${rules.maxDailyLossType === '%' ? rules.maxDailyLoss + '%' : '$' + rules.maxDailyLoss}. Stop trading for today!`,
-                type: "error"
-              });
+        // Max Daily Loss: only when Hard Stop is enforced; trading day (not UTC); once per account and day.
+        if (effectiveLimit(account.rules, account.initialBalance) !== null) {
+          const tradesForDay: HardStopTrade[] = guardTrades
+            ? [newTrade, ...guardTrades.filter(t => t.id !== newTrade.id)]
+            : get().trades;
+          const ev = evaluateHardStop({ trades: tradesForDay, account, now: new Date(), ...hardStopPrefs() });
+          const { rules } = account;
+          if (ev.enforced && ev.state !== "ok") {
+            const key = `daily-loss:${account.id}:${ev.dayKey}`;
+            if (ev.state === "breach") {
+              if (!(await hasNotificationKey(key))) {
+                await notifySafely({
+                  title: "Max Daily Loss Exceeded!",
+                  message: `You have hit your max daily loss limit of ${rules.maxDailyLossType === '%' ? rules.maxDailyLoss + '%' : '$' + rules.maxDailyLoss}. Stop trading for today! [${key}]`,
+                  type: "error"
+                });
+              }
             } else {
-              const alertThreshold = (rules.dailyLossAlertThreshold || 80) / 100;
-              if (currentLoss >= lossLimit * alertThreshold) {
-                addNotification({
+              const warnKey = `${key}:warn`;
+              if (!(await hasNotificationKey(key)) && !(await hasNotificationKey(warnKey))) {
+                await notifySafely({
                   title: "Approaching Max Daily Loss",
-                  message: `You are at ${rules.dailyLossAlertThreshold || 80}% of your max daily loss limit. Be careful!`,
+                  message: `You are at ${rules.dailyLossAlertThreshold ?? 80}% of your max daily loss limit. Be careful! [${warnKey}]`,
                   type: "warning"
                 });
               }
@@ -337,6 +416,8 @@ export const useTradeStore = create<TradeState>((set, get) => ({
     // Image contract: only a fresh `data:` image triggers an upload; `null` removes the image;
     // anything else (undefined, signed/public URL) leaves the image columns untouched.
     const existingBefore = get().trades.find(t => t.id === id);
+    // --- Hard Stop guard (FIRST, before any upload/update) ---
+    await guardHardStop('update', existingBefore?.accountId, existingBefore, updates as Record<string, unknown>);
     const previousPath = existingBefore
       ? (existingBefore.screenshotPath ?? pathFromLegacyUrl(existingBefore.screenshotUrl))
       : null;
@@ -454,6 +535,8 @@ export const useTradeStore = create<TradeState>((set, get) => ({
 
   deleteTrade: async (id) => {
     const tradeToDelete = get().trades.find(t => t.id === id);
+    // --- Hard Stop guard (FIRST, before storage GC and the delete) ---
+    await guardHardStop('delete', tradeToDelete?.accountId, tradeToDelete, undefined);
 
     // Storage Garbage Collection: Clean up screenshot from Supabase Storage
     const storagePath = tradeToDelete

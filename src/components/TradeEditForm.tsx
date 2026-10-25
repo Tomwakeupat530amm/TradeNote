@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Trade, useTradeStore, TradeResult, SaveTradeError } from "@/store/useTradeStore";
+import { Trade, useTradeStore, TradeResult, SaveTradeError, HardStopError } from "@/store/useTradeStore";
+import { useHardStop } from "@/hooks/useHardStop";
+import { HardStopBanner } from "@/components/HardStopBanner";
 import { classifyRiskInput, formRMultiple, toPositiveNumber, finiteOrZero } from "@/lib/risk";
 import { usePreferenceStore } from "@/store/usePreferenceStore";
 import { X, Save, Image as ImageIcon, Sparkles, Loader2 } from "lucide-react";
@@ -34,6 +36,10 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
   const tShot = useTranslations("Screenshots");
   const tRisk = useTranslations("Risk");
   const tTrade = useTranslations("Trade");
+  const tHardStop = useTranslations("HardStop");
+  const hardStop = useHardStop(trade.accountId);
+  // Locked trading day: only notes/tags/screenshot stay editable (PnL/risk/time/result disabled).
+  const locked = hardStop.isLockedDay(trade.date);
 
   const [saving, setSaving] = useState(false);
   const [asset, setAsset] = useState(trade.asset);
@@ -153,6 +159,21 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
     }
     setSaving(true);
     try {
+      if (locked) {
+        await updateTrade(trade.id, {
+          setup,
+          confluences,
+          emotion,
+          mistake,
+          notes,
+          screenshotFile: screenshotRemoved
+            ? null
+            : (screenshot && screenshot.startsWith("data:") ? screenshot : undefined),
+        });
+        toast.success("Trade updated successfully!");
+        onSaved();
+        return;
+      }
       await updateTrade(trade.id, {
         asset,
         lotSize: Number(lotSize),
@@ -174,7 +195,9 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
       onSaved();
     } catch (err) {
       // Save failed: keep the form open with every entered value.
-      if (err instanceof SaveTradeError) {
+      if (err instanceof HardStopError) {
+        toast.error(tHardStop("lockedSubmit"));
+      } else if (err instanceof SaveTradeError) {
         toast.error(tTrade("saveError.failed", { detail: err.detail }));
       } else {
         toast.error("Failed to update trade.");
@@ -186,6 +209,10 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
 
   return (
     <form onSubmit={handleSave} className="space-y-6">
+      <HardStopBanner state={hardStop} />
+      {locked && (
+        <p className="text-xs text-rose-300" data-testid="hard-stop-edit-restricted">{tHardStop("editRestricted")}</p>
+      )}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
         <div className="space-y-1">
           <label className="block text-sm font-medium text-gray-300">{t("asset_ticker")}</label>
@@ -193,6 +220,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
             type="text"
             required
             value={asset}
+            disabled={locked}
             onChange={(e) => setAsset(e.target.value.toUpperCase())}
             className="block w-full rounded-xl border-0 bg-white/5 py-2 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-green-500 sm:text-sm px-4"
           />
@@ -205,6 +233,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
             step="0.01"
             required
             value={lotSize}
+            disabled={locked}
             onChange={(e) => setLotSize(e.target.value)}
             className="block w-full rounded-xl border-0 bg-white/5 py-2 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-green-500 sm:text-sm px-4"
           />
@@ -216,6 +245,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
               type="number"
               required
               value={pnl}
+              disabled={locked}
               onChange={(e) => setPnl(e.target.value)}
               className={clsx(
                 "block w-full rounded-xl border-0 py-2 shadow-sm ring-1 ring-inset focus:ring-2 sm:text-sm px-4 font-bold",
@@ -235,6 +265,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
               step="any"
               min="0"
               value={riskAmount}
+              disabled={locked}
               placeholder={tRisk("noRiskSet")}
               onChange={(e) => { setRiskAmount(e.target.value); setRiskBadInput(e.target.validity.badInput); }}
               className="block w-full rounded-xl border-0 bg-white/5 py-2 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-indigo-500 sm:text-sm px-4"
@@ -258,6 +289,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
             <label className="block text-sm font-medium text-gray-300">{t("session")}</label>
             <select
               value={session}
+              disabled={locked}
               onChange={(e) => setSession(e.target.value)}
               className="block w-full rounded-xl border-0 bg-gray-900 border-white/10 py-2 text-white shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-blue-500 sm:text-sm px-3 cursor-pointer"
             >
@@ -275,6 +307,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
             <button
               key={r}
               type="button"
+              disabled={locked}
               onClick={() => setResult(r)}
               className={clsx(
                 "px-4 py-1.5 rounded-full text-sm font-semibold transition-all border",

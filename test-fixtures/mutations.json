@@ -232,6 +232,54 @@
       "find": "          timezone: initialTimeZone(),",
       "replace": "          timezone: DEFAULT_PREFERENCES.timezone,",
       "test": "src/store/__tests__/usePreferenceStore.test.ts"
+    },
+    {
+      "id": "P4-M1-hardstop-ge-to-gt",
+      "description": "P4: 100% threshold becomes strictly greater (pct > 100)",
+      "file": "src/lib/hardStop.ts",
+      "find": "if (pct >= 100) state = \"breach\";",
+      "replace": "if (pct > 100) state = \"breach\";",
+      "test": "src/lib/__tests__/hardStop.test.ts"
+    },
+    {
+      "id": "P4-M2-skip-delete-branch",
+      "description": "P4: assertMutationAllowed no longer blocks deletes on the locked day",
+      "file": "src/lib/hardStop.ts",
+      "find": "    return beforeKey === nowKey ? block : allow;",
+      "replace": "    return allow;",
+      "test": "src/lib/__tests__/hardStop.test.ts"
+    },
+    {
+      "id": "P4-M3-pnl-editable-when-locked",
+      "description": "P4: pnl added to the locked-day allow-list",
+      "file": "src/lib/hardStop.ts",
+      "find": "  riskIsEstimated: \"risk_is_estimated\",\n} as const;",
+      "replace": "  riskIsEstimated: \"risk_is_estimated\",\n  pnl: \"pnl\",\n} as const;",
+      "test": "src/lib/__tests__/hardStop.test.ts"
+    },
+    {
+      "id": "P4-M4-skip-hardstop-off-loosening",
+      "description": "P4: D6 no longer treats removing the effective limit (enableHardStop off) as loosening",
+      "file": "src/lib/hardStop.ts",
+      "find": "const removed = oldL !== null && newL === null;",
+      "replace": "const removed = false;",
+      "test": "src/lib/__tests__/hardStop.test.ts"
+    },
+    {
+      "id": "P4-M5-net-pnl-sign-flip",
+      "description": "P4: lossToday uses +net instead of -net (D-1 sign flip)",
+      "file": "src/lib/hardStop.ts",
+      "find": "const lossToday = Math.max(0, -net);",
+      "replace": "const lossToday = Math.max(0, net);",
+      "test": "src/lib/__tests__/hardStop.test.ts"
+    },
+    {
+      "id": "P4-M6-break-fail-open",
+      "description": "P4: preferences-not-loaded no longer fails open (D-3)",
+      "file": "src/lib/hardStop.ts",
+      "find": "const locked = enforced && state === \"breach\" && input.prefsLoaded !== false;",
+      "replace": "const locked = enforced && state === \"breach\";",
+      "test": "src/lib/__tests__/hardStop.test.ts"
     }
   ]
 }

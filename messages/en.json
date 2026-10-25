@@ -1426,5 +1426,24 @@
   },
   "Stats": {
     "winRateExcludesBE": "Win rate excludes break-even trades"
+  },
+  "HardStop": {
+    "configLocked": "Hard Stop is locked for today: you cannot loosen the daily loss limit, turn Hard Stop off, or change the reset time or timezone until the next trading day. Tightening is still allowed.",
+    "bannerTitle": "Hard Stop: trading locked for today",
+    "bannerBody": "You reached your max daily loss. New trades, P&L/risk/time/account edits and deletes are blocked until the next trading day. Notes, tags and screenshots stay editable.",
+    "lossOf": "Loss today {loss} of {limit}",
+    "unlocksAt": "Unlocks on trading day {day}",
+    "editRestricted": "Locked day: only notes, tags and screenshot can be edited.",
+    "deleteBlocked": "Hard Stop is active: trades of the locked trading day cannot be deleted.",
+    "lockedSubmit": "Hard Stop is active: this change is blocked until the next trading day.",
+    "timezoneEstimated": "Timezone estimated (preferences not available)."
+  },
+  "Psych": {
+    "unrated": "Unrated",
+    "unratedCount": "{count} unrated trades (excluded)",
+    "chooseEmotion": "Choose emotion",
+    "chooseMistake": "Choose mistake",
+    "chooseSetup": "Choose setup",
+    "reservedTag": "\"Unrated\" is a reserved name."
   }
 }

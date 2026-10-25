@@ -1,4 +1,5 @@
 import { useTranslations } from "next-intl";
+import { UNRATED } from "@/lib/psychology";
 
 /**
  * A hook that provides a function to translate dynamic core tags (e.g., TradeResult, SetupTag, EmotionTag).
@@ -7,9 +8,12 @@ import { useTranslations } from "next-intl";
  */
 export function useTagTranslation() {
   const t = useTranslations("Tags");
+  const tPsych = useTranslations("Psych");
 
   return (tag: string) => {
     if (!tag) return tag;
+    // P4: the exact UNRATED sentinel shows the neutral "Unrated" label; custom tags are unchanged.
+    if (tag === UNRATED) return tPsych("unrated");
     
     // Convert tag to key format: "Break Even" -> "Break_Even", "Support/Resistance" -> "Support_Resistance"
     const key = tag.replace(/[\s\/]/g, '_');

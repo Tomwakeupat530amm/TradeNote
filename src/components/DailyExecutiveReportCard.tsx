@@ -20,11 +20,37 @@ import {
   Zap,
 } from "lucide-react";
 import TradeDetailsModal from "./TradeDetailsModal";
+import { format } from "date-fns";
+import { useTradingDay } from "@/hooks/useTradingDay";
+import { accountResetOverride } from "@/lib/propRisk";
+
+const SESSION_CLOSED_PREFIX = "tradenote_session_closed_";
+
+/** Legacy key format (`Date#toDateString`, "Mon Oct 05 2026") of a `YYYY-MM-DD` trading-day key. */
+function legacySessionKey(dayKey: string): string | null {
+  const [y, m, d] = dayKey.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return `${SESSION_CLOSED_PREFIX}${format(new Date(y, m - 1, d), "EEE MMM dd yyyy")}`;
+}
+
+/** D-6: read the new trading-day key first, then the legacy key; the legacy key is never written. */
+function readSessionClosed(dayKey: string | null): boolean {
+  if (!dayKey || typeof window === "undefined") return false;
+  try {
+    if (localStorage.getItem(`${SESSION_CLOSED_PREFIX}${dayKey}`)) return true;
+    const legacy = legacySessionKey(dayKey);
+    return legacy ? !!localStorage.getItem(legacy) : false;
+  } catch {
+    return false;
+  }
+}
 
 interface DailyExecutiveReportCardProps {
   trades: Trade[];
   account?: Account | null;
   targetDateStr?: string;
+  /** Trading-day timezone for the score (default: the user's preference via useTradingDay). */
+  tz?: string | null;
   onSessionClosed?: () => void;
 }
 
@@ -32,39 +58,41 @@ export function DailyExecutiveReportCard({
   trades,
   account,
   targetDateStr,
+  tz,
   onSessionClosed,
 }: DailyExecutiveReportCardProps) {
   const t = useTranslations("DailyReportCard");
   const tRisk = useTranslations("Risk");
+  const tPsych = useTranslations("Psych");
   const [inspectTrade, setInspectTrade] = useState<Trade | null>(null);
 
-  // Target date for storage key
-  const dateKey = useMemo(() => {
-    return targetDateStr || new Date().toDateString();
-  }, [targetDateStr]);
+  // Trading day (user timezone + account reset) from the card itself (E-20: the Cockpit renders it
+  // without targetDateStr). Before preferences load there is no day key.
+  const tradingDay = useTradingDay();
+  const resetOverride = useMemo(() => accountResetOverride(account ?? null), [account]);
+  const dateKey = targetDateStr || (tradingDay.ready ? tradingDay.key(new Date(), resetOverride) : null);
+  const scoreTz = tz ?? tradingDay.tz ?? "UTC";
 
-  // Lazy check if user has closed this session today
-  const [isSessionClosed, setIsSessionClosed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return !!localStorage.getItem(`tradenote_session_closed_${dateKey}`);
-    } catch {
-      return false;
-    }
-  });
+  // Session closed for this trading day (new key, legacy fallback read-only).
+  const [closedKey, setClosedKey] = useState<string | null>(null);
+  const isSessionClosed = useMemo(
+    () => dateKey !== null && (closedKey === dateKey || readSessionClosed(dateKey)),
+    [dateKey, closedKey],
+  );
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Calculate report card metrics
   const report = useMemo(() => {
-    return calculateDailyDisciplineScore(trades, account, targetDateStr);
-  }, [trades, account, targetDateStr]);
+    return calculateDailyDisciplineScore(trades, account, dateKey ?? undefined, scoreTz);
+  }, [trades, account, dateKey, scoreTz]);
 
   const handleCloseSession = () => {
     playZenChime();
-    setIsSessionClosed(true);
+    if (!dateKey) return;
+    setClosedKey(dateKey);
     try {
-      localStorage.setItem(`tradenote_session_closed_${dateKey}`, new Date().toISOString());
+      localStorage.setItem(`${SESSION_CLOSED_PREFIX}${dateKey}`, new Date().toISOString());
     } catch (e) {
       console.error("Failed to save session close status", e);
     }
@@ -180,6 +208,11 @@ export function DailyExecutiveReportCard({
           <div className="text-xs text-gray-400 font-mono">
             {report.totalTrades} Trades · Net: {report.netPnl >= 0 ? "+" : ""}${report.netPnl.toLocaleString()} ({report.totalR >= 0 ? "+" : ""}{report.totalR}R)
           </div>
+          {report.unratedCount > 0 && (
+            <p className="text-[11px] text-gray-400 italic" data-testid="report-unrated-count">
+              {tPsych("unratedCount", { count: report.unratedCount })}
+            </p>
+          )}
 
           {report.isRestDay && (
             <p className="text-[11px] text-gray-400 max-w-xs mt-2 italic">

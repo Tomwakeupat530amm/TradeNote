@@ -31,7 +31,7 @@ function trade(o: Partial<Trade>): Trade {
 describe("F-4 discipline risk pillar is unrated when no loss is rated", () => {
   it("losses without risk -> risk pillar null/unrated, weights renormalized (not a free 100)", () => {
     const trades = [trade({ pnl: -300, riskAmount: null }), trade({ pnl: 200, riskAmount: null })];
-    const r = calculateDailyDisciplineScore(trades, null, DAY);
+    const r = calculateDailyDisciplineScore(trades, null, DAY, "UTC");
     expect(r.pillars.risk.score).toBeNull();
     expect(r.pillars.risk.unrated).toBe(true);
     expect(r.pillars.risk.weightedScore).toBe(0);
@@ -41,7 +41,7 @@ describe("F-4 discipline risk pillar is unrated when no loss is rated", () => {
 
   it("golden: a rated loss keeps the original 4-pillar formula", () => {
     const trades = [trade({ pnl: -200, riskAmount: 100 }), trade({ pnl: 200, riskAmount: null })];
-    const r = calculateDailyDisciplineScore(trades, null, DAY);
+    const r = calculateDailyDisciplineScore(trades, null, DAY, "UTC");
     // |R| = 2 -> 100 - 80 = 20; 75*.4 + 20*.25 + 100*.2 + 100*.15 = 70
     expect(r.pillars.risk.score).toBe(20);
     expect(r.pillars.risk.unrated).toBe(false);
@@ -49,7 +49,7 @@ describe("F-4 discipline risk pillar is unrated when no loss is rated", () => {
   });
 
   it("wins-only day keeps the risk pillar at 100 (zero losses incurred)", () => {
-    const r = calculateDailyDisciplineScore([trade({ pnl: 50 })], null, DAY);
+    const r = calculateDailyDisciplineScore([trade({ pnl: 50 })], null, DAY, "UTC");
     expect(r.pillars.risk.score).toBe(100);
     expect(r.pillars.risk.unrated).toBe(false);
   });

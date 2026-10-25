@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from './useAuthStore';
 import { fallbackTimeZone } from '@/lib/tradingDay';
+import { useAccountStore } from './useAccountStore';
+import { effectiveLimit, evaluatePrefsConfigChange, HardStopError } from '@/lib/hardStop';
 
 export interface UserPreferences {
   displayName?: string;
@@ -123,6 +125,28 @@ export const usePreferenceStore = create<PreferenceState>((set, get) => ({
     const user = useAuthStore.getState().user;
     const currentPrefs = get().preferences;
     if (!user || !currentPrefs) return;
+
+    // D6 config-lock guard (client), BEFORE the optimistic set and the update. Only a real timezone
+    // change is examined; tags / privacy / avatar / theme stay on the cheap path (E-19).
+    const normTz = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
+    if ('timezone' in updates && normTz(updates.timezone) !== normTz(currentPrefs.timezone)) {
+      const accounts = useAccountStore.getState().accounts.filter(a => effectiveLimit(a.rules, a.initialBalance) !== null);
+      if (accounts.length > 0) {
+        // Lazy import: useTradeStore imports this store (no static cycle).
+        const { loadHardStopTrades } = await import('./useTradeStore');
+        const trades = await loadHardStopTrades(accounts.map(a => a.id));
+        if (trades) {
+          const decision = evaluatePrefsConfigChange({
+            accounts,
+            oldTz: currentPrefs.timezone,
+            newTz: updates.timezone,
+            trades,
+            prefsLoaded: get().prefsLoaded,
+          });
+          if (!decision.allowed) throw new HardStopError('HARD_STOP_CONFIG_LOCKED');
+        }
+      }
+    }
 
     const newPrefs = { ...currentPrefs, ...updates };
     

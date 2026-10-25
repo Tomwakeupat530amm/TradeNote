@@ -3,7 +3,11 @@
 import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/routing";
-import { useTradeStore, SetupTag, Trade } from "@/store/useTradeStore";
+import { useTradeStore, SetupTag, Trade, HardStopError } from "@/store/useTradeStore";
+import { useHardStop } from "@/hooks/useHardStop";
+import { useTradingDay } from "@/hooks/useTradingDay";
+import { accountResetOverride } from "@/lib/propRisk";
+import { UNRATED } from "@/lib/psychology";
 import { useAccountStore } from "@/store/useAccountStore";
 import { usePreferenceStore } from "@/store/usePreferenceStore";
 import { usePlaybookStore } from "@/store/usePlaybookStore";
@@ -52,6 +56,9 @@ function JournalContent() {
   const t = useTranslations("Journal");
   const tCards = useTranslations("JournalCards");
   const tTag = useTagTranslation();
+  const tHardStop = useTranslations("HardStop");
+  const hardStop = useHardStop();
+  const tradingDay = useTradingDay();
 
   // Load layout preference from localStorage
   useEffect(() => {
@@ -95,39 +102,21 @@ function JournalContent() {
     ? trades.find(t => t.id === selectedTradeId) ?? null
     : null;
 
-  // Today's Realized Loss Calculation for Daily Loss Warning / Hard Stop
-  const todayPnL = useMemo(() => {
-    const todayStr = new Date().toDateString();
-    return accountTrades
-      .filter(t => new Date(t.date).toDateString() === todayStr)
-      .reduce((sum, t) => sum + t.pnl, 0);
-  }, [accountTrades]);
-
+  // Daily Loss Warning / Hard Stop: one decision (evaluateHardStop via useHardStop, trading-day net PnL).
+  // The warning still shows when enforcement is off (D-9); only the lock needs `enforced`.
   const dailyLossRule = useMemo(() => {
-    if (!activeAccount || !activeAccount.rules) return null;
-    const rules = activeAccount.rules;
-    const rawMaxLoss = rules.maxDailyLoss;
-    if (!rawMaxLoss || rawMaxLoss <= 0) return null;
-
-    const maxLossLimit: number = rules.maxDailyLossType === "%"
-      ? activeAccount.initialBalance * (rawMaxLoss / 100)
-      : rawMaxLoss;
-    
-    const currentLoss = Math.max(0, -todayPnL);
-    const lossPercent = maxLossLimit > 0 ? (currentLoss / maxLossLimit) * 100 : 0;
-    const alertThreshold = rules.dailyLossAlertThreshold ?? 80;
-    const isBreached = currentLoss >= maxLossLimit;
-    const isWarning = lossPercent >= alertThreshold && !isBreached;
-
+    if (!hardStop.configured || hardStop.limit === null) return null;
+    const isBreached = hardStop.state === "breach";
     return {
-      maxLossLimit,
-      currentLoss,
-      lossPercent: Math.min(100, Math.round(lossPercent)),
-      isWarning,
+      maxLossLimit: hardStop.limit,
+      currentLoss: hardStop.lossToday,
+      lossPercent: Math.min(100, Math.round(hardStop.pct)),
+      isWarning: hardStop.state === "warn",
       isBreached,
-      enableHardStop: rules.enableHardStop ?? false
+      enableHardStop: hardStop.enforced,
     };
-  }, [activeAccount, todayPnL]);
+  }, [hardStop]);
+  const resetOverride = useMemo(() => accountResetOverride(activeAccount), [activeAccount]);
 
   const filteredTrades = useMemo(() => {
     return accountTrades.filter(t => {
@@ -142,7 +131,9 @@ function JournalContent() {
         const tDate = new Date(t.date);
         const now = new Date();
         if (filterTimeframe === "today") {
-          matchesTimeframe = tDate.toDateString() === now.toDateString();
+          // Trading day of the user's timezone + account reset (not the browser calendar day).
+          const todayKey = tradingDay.key(now, resetOverride);
+          matchesTimeframe = todayKey !== null && tradingDay.key(t.date, resetOverride) === todayKey;
         } else if (filterTimeframe === "week") {
           const weekStart = new Date(now);
           weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
@@ -157,7 +148,7 @@ function JournalContent() {
 
       return matchesSearch && matchesSetup && matchesResult && matchesSession && matchesMistake && matchesTimeframe && matchesEstimated;
     });
-  }, [accountTrades, searchQuery, filterSetup, filterResult, filterSession, filterMistake, filterTimeframe, estimatedOnly]);
+  }, [accountTrades, searchQuery, filterSetup, filterResult, filterSession, filterMistake, filterTimeframe, estimatedOnly, tradingDay, resetOverride]);
 
   const hasActiveFilters = searchQuery !== "" || filterSetup !== "All" || filterResult !== "All" || filterSession !== "All" || filterMistake !== "All" || filterTimeframe !== "all";
 
@@ -258,8 +249,12 @@ function JournalContent() {
     try {
       await deleteTrade(id);
       toast.success(t('trade_deleted'));
-    } catch {
-      toast.error(t('failed_to_delete'));
+    } catch (err) {
+      if (err instanceof HardStopError) {
+        toast.error(tHardStop('deleteBlocked'));
+      } else {
+        toast.error(t('failed_to_delete'));
+      }
     }
   };
 
@@ -331,7 +326,9 @@ function JournalContent() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={handleOpenAdd}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-green-600/20 border border-green-500/50 px-3.5 py-2 text-xs sm:text-sm font-semibold text-green-400 shadow-[0_0_15px_rgba(22,163,74,0.2)] hover:bg-green-600 hover:text-white transition-all cursor-pointer"
+            disabled={hardStop.locked}
+            title={hardStop.locked ? tHardStop('lockedSubmit') : undefined}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-green-600/20 border border-green-500/50 px-3.5 py-2 text-xs sm:text-sm font-semibold text-green-400 shadow-[0_0_15px_rgba(22,163,74,0.2)] hover:bg-green-600 hover:text-white transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <PlusCircle className="h-4 w-4" aria-hidden="true" />
             <span className="hidden sm:inline">{t('log_new_trade')}</span>
@@ -703,7 +700,7 @@ function JournalContent() {
                                 <span className="inline-flex items-center rounded-md bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 text-[11px] font-medium text-purple-300">
                                   {tTag(trade.emotion)}
                                 </span>
-                                {trade.mistake && trade.mistake !== "None" && (
+                                {trade.mistake && trade.mistake !== "None" && trade.mistake !== UNRATED && (
                                   <span className="inline-flex items-center rounded-md bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 text-[11px] font-medium text-orange-400">
                                     {tTag(trade.mistake)}
                                   </span>
@@ -730,6 +727,7 @@ function JournalContent() {
                                 <button 
                                   type="button" 
                                   onClick={(e) => { e.stopPropagation(); handleDelete(trade.id); }} 
+                                  disabled={hardStop.isLockedDay(trade.date)}
                                   className="text-gray-400 hover:text-red-400 p-1.5 hover:bg-red-500/10 rounded-lg cursor-pointer transition-colors"
                                   title={t('delete_trade_tip')}
                                 >

@@ -1426,5 +1426,24 @@
   },
   "Stats": {
     "winRateExcludesBE": "Tỷ lệ thắng không tính lệnh hòa vốn"
+  },
+  "HardStop": {
+    "configLocked": "Hard Stop đang khóa hôm nay: không thể nới lỏng giới hạn lỗ ngày, tắt Hard Stop, hay đổi giờ reset hoặc múi giờ cho đến ngày giao dịch kế tiếp. Vẫn có thể siết chặt.",
+    "bannerTitle": "Hard Stop: khóa giao dịch hôm nay",
+    "bannerBody": "Bạn đã chạm giới hạn lỗ ngày. Lệnh mới, sửa PnL/risk/thời gian/tài khoản và xóa lệnh bị chặn đến ngày giao dịch kế tiếp. Vẫn sửa được ghi chú, thẻ và ảnh.",
+    "lossOf": "Lỗ hôm nay {loss} / {limit}",
+    "unlocksAt": "Mở khóa vào ngày giao dịch {day}",
+    "editRestricted": "Ngày bị khóa: chỉ sửa được ghi chú, thẻ và ảnh.",
+    "deleteBlocked": "Hard Stop đang bật: không thể xóa lệnh của ngày giao dịch bị khóa.",
+    "lockedSubmit": "Hard Stop đang bật: thay đổi này bị chặn đến ngày giao dịch kế tiếp.",
+    "timezoneEstimated": "Múi giờ ước tính (chưa có cài đặt)."
+  },
+  "Psych": {
+    "unrated": "Chưa đánh giá",
+    "unratedCount": "{count} lệnh chưa đánh giá (không tính)",
+    "chooseEmotion": "Chọn cảm xúc",
+    "chooseMistake": "Chọn lỗi",
+    "chooseSetup": "Chọn setup",
+    "reservedTag": "\"Unrated\" là tên dành riêng."
   }
 }

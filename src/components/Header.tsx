@@ -18,9 +18,12 @@ import { QuickLogTradeModal } from "./QuickLogTradeModal";
 import { DisciplineShieldModal } from "./DisciplineShieldModal";
 import { UserGuideModal } from "./UserGuideModal";
 import { isSoundEnabled, toggleSound } from "@/lib/soundEngine";
+import { useHardStop } from "@/hooks/useHardStop";
 
 export function Header() {
   const t = useTranslations('Header');
+  const tHardStop = useTranslations('HardStop');
+  const hardStop = useHardStop();
   const { user } = useAuthStore();
   const userEmail = user?.email || "trader@example.com";
   const userInitial = userEmail.charAt(0).toUpperCase();
@@ -132,8 +135,9 @@ export function Header() {
             whileTap={{ scale: 0.95 }}
             type="button"
             onClick={() => setIsQuickLogOpen(true)}
-            title={t('tooltip_quick_log')}
-            className="relative flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-300 hover:text-white bg-emerald-500/15 hover:bg-emerald-500/25 rounded-xl transition-all border border-emerald-500/30 shadow-sm shadow-emerald-500/10 cursor-pointer"
+            disabled={hardStop.locked}
+            title={hardStop.locked ? tHardStop('lockedSubmit') : t('tooltip_quick_log')}
+            className="relative flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-300 hover:text-white bg-emerald-500/15 hover:bg-emerald-500/25 rounded-xl transition-all border border-emerald-500/30 shadow-sm shadow-emerald-500/10 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <PlusCircle className="h-4 w-4 text-emerald-400" />
             <span className="hidden sm:inline">{t('quick_log_btn')}</span>

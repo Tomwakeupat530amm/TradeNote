@@ -2,6 +2,7 @@ import type { Trade } from "@/store/useTradeStore";
 import { isRatedForR, rMultiple } from "@/lib/risk";
 import { avgR as statsAvgR, winRate as statsWinRate } from "@/lib/stats";
 import { TradingSession, SESSIONS } from "./sessionUtils";
+import { UNRATED } from "@/lib/psychology";
 
 export type MatrixMetricType = "winRate" | "netPnl" | "totalR" | "count";
 
@@ -69,6 +70,8 @@ export interface EmotionExpectancyMatrixResult {
     edgeDeltaR: number; // calmAvgR - emotionalAvgR
   };
   grandTotal: MatrixCellData;
+  /** P4: trades without a rated emotion (UNRATED / empty) — excluded from the emotion rows. */
+  unratedCount: number;
 }
 
 function createEmptyCell(): MatrixCellData {
@@ -297,8 +300,14 @@ export function calculateEmotionExpectancyMatrix(trades: Trade[]): EmotionExpect
     emotionMap[emo] = [];
   }
 
+  let unratedCount = 0;
   for (const t of trades) {
-    const emo = t.emotion?.trim() || "Calm";
+    const emo = t.emotion?.trim();
+    // P4 (D-13): no emotion / UNRATED is excluded and counted, never treated as Calm.
+    if (!emo || emo === UNRATED) {
+      unratedCount++;
+      continue;
+    }
     if (!emotionMap[emo]) {
       emotionMap[emo] = [];
     }
@@ -324,8 +333,10 @@ export function calculateEmotionExpectancyMatrix(trades: Trade[]): EmotionExpect
     const avgLossR = avgLossRValue != null ? Number(Math.abs(avgLossRValue).toFixed(2)) : null;
     const expectancyR = expectancyRValue != null ? Number(expectancyRValue.toFixed(2)) : null;
 
-    const winProb = baseCell.wins / baseCell.count;
-    const lossProb = baseCell.losses / baseCell.count;
+    // Probabilities over the whole sample (break-even included) for the $ expectancy.
+    const sampleSize = baseCell.count;
+    const winProb = baseCell.wins / sampleSize;
+    const lossProb = baseCell.losses / sampleSize;
 
     const avgWinDollar = winTrades.length > 0 ? winTrades.reduce((s, t) => s + t.pnl, 0) / winTrades.length : 0;
     const avgLossDollar = lossTrades.length > 0 ? Math.abs(lossTrades.reduce((s, t) => s + t.pnl, 0) / lossTrades.length) : 0;
@@ -361,6 +372,7 @@ export function calculateEmotionExpectancyMatrix(trades: Trade[]): EmotionExpect
       emotionalWinRate: emotionalStats.winRate,
       edgeDeltaR: Number((calmStats.avgR - emotionalStats.avgR).toFixed(2))
     },
-    grandTotal: aggregateCell(trades)
+    grandTotal: aggregateCell(trades),
+    unratedCount
   };
 }

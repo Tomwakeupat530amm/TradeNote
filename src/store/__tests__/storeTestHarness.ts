@@ -38,9 +38,20 @@ export function createSupabaseMock() {
     orderCalls: [] as string[],
     /** Result of `.select().eq().single()` (e.g. user_preferences lookup). */
     singleResult: { data: null as unknown, error: null as DbError | null },
+    /** P4: every `.from(table)` call, in order. */
+    fromCalls: [] as string[],
+    /** P4: bounded Hard Stop window select `.select(cols).in(col, ids).gte().lte().limit(n)`. */
+    windowCalls: [] as { columns: string; inColumn: string; ids: unknown[]; gte: unknown; lte: unknown; limit: number }[],
+    windowRows: [] as Record<string, unknown>[],
+    windowError: null as DbError | null,
+    windowThrows: false,
+    deleteCalls: [] as string[],
+    storageRemoveCalls: [] as string[][],
   };
   const client = {
-    from: vi.fn(() => ({
+    from: vi.fn((table: string) => {
+      state.fromCalls.push(table);
+      return {
       insert: (rows: unknown[]) => {
         state.insertCalls.push(rows);
         return { select: () => ({ single: async () => state.insertResult }) };
@@ -55,9 +66,30 @@ export function createSupabaseMock() {
           },
         };
       },
-      select: () => {
+      select: (columns = "*") => {
+        const win = { columns, inColumn: "", ids: [] as unknown[], gte: undefined as unknown, lte: undefined as unknown, limit: 0 };
         const chain = {
           eq: () => chain,
+          in: (col: string, ids: unknown[]) => {
+            win.inColumn = col;
+            win.ids = ids;
+            return chain;
+          },
+          gte: (_col: string, v: unknown) => {
+            win.gte = v;
+            return chain;
+          },
+          lte: (_col: string, v: unknown) => {
+            win.lte = v;
+            return chain;
+          },
+          limit: async (n: number) => {
+            win.limit = n;
+            state.windowCalls.push(win);
+            if (state.windowThrows) throw new Error("network down");
+            if (state.windowError) return { data: null, error: state.windowError };
+            return { data: state.windowRows, error: null };
+          },
           order: (col: string) => {
             state.orderCalls.push(col);
             return chain;
@@ -71,9 +103,23 @@ export function createSupabaseMock() {
         };
         return chain;
       },
-      delete: () => ({ eq: async () => ({ error: null }) }),
-    })),
-    storage: { from: () => ({ upload: async () => ({ data: null, error: null }), remove: async () => ({ error: null }) }) },
+      delete: () => ({
+        eq: async (_col: string, id: string) => {
+          state.deleteCalls.push(id);
+          return { error: null };
+        },
+      }),
+      };
+    }),
+    storage: {
+      from: () => ({
+        upload: async () => ({ data: null, error: null }),
+        remove: async (paths: string[]) => {
+          state.storageRemoveCalls.push(paths);
+          return { error: null };
+        },
+      }),
+    },
     rpc: vi.fn(async () => ({ data: null, error: null })),
     auth: {
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),

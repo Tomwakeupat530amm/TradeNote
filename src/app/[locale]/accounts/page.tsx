@@ -11,6 +11,7 @@ import { isValidTimeZone } from "@/lib/tradingDay";
 import { Link } from "@/i18n/routing";
 import { useEstimatedRiskCounts } from "@/hooks/useEstimatedRiskCounts";
 import { toast } from "sonner";
+import { HardStopError } from "@/lib/hardStop";
 import clsx from "clsx";
 
 type AccountStatus = "Challenge" | "Funded" | "Personal";
@@ -25,6 +26,7 @@ export default function AccountsPage() {
   const c = useTranslations("Common");
   const locale = useLocale();
   const tRisk = useTranslations("Risk");
+  const tHardStop = useTranslations("HardStop");
   const estimatedCounts = useEstimatedRiskCounts(accounts.map((a) => a.id));
   const totalEstimated = Object.values(estimatedCounts).reduce((sum, n) => sum + n, 0);
 
@@ -121,7 +123,7 @@ export default function AccountsPage() {
     setIsAdding(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedResetTime = resetTime.trim();
     const trimmedResetTz = resetTz.trim();
@@ -156,7 +158,18 @@ export default function AccountsPage() {
     };
 
     if (editingAccountId) {
-      updateAccount(editingAccountId, accountData);
+      try {
+        await updateAccount(editingAccountId, accountData);
+      } catch (err) {
+        // D6: loosening Hard Stop on a locked day is refused; keep the form open with the reason.
+        if (err instanceof HardStopError && err.code === "HARD_STOP_CONFIG_LOCKED") {
+          toast.error(tHardStop("configLocked"));
+        } else {
+          console.error(err);
+          toast.error(c("failed_save"));
+        }
+        return;
+      }
     } else {
       addAccount(accountData);
     }

@@ -16,6 +16,8 @@ interface NotificationState {
   notifications: Notification[];
   unreadCount: number;
   isLoading: boolean;
+  /** P4: true once a fetch succeeded in this session (dedupe of daily-loss notifications). */
+  notificationsLoaded: boolean;
   fetchNotifications: () => Promise<void>;
   addNotification: (notification: Omit<Notification, 'id' | 'createdAt' | 'userId' | 'isRead'>) => Promise<void>;
   markAsRead: (id: string) => Promise<void>;
@@ -27,6 +29,7 @@ export const useNotificationStore = create<NotificationState>((set) => ({
   notifications: [],
   unreadCount: 0,
   isLoading: false,
+  notificationsLoaded: false,
 
   fetchNotifications: async () => {
     const user = useAuthStore.getState().user;
@@ -52,6 +55,7 @@ export const useNotificationStore = create<NotificationState>((set) => ({
       }));
       set({ 
         notifications: formattedNotifications,
+        notificationsLoaded: true,
         unreadCount: formattedNotifications.filter(n => !n.isRead).length
       });
     }

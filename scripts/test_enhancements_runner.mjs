@@ -3862,10 +3862,8 @@ const S37_ALLOW = [
   { file: 'src/app/api/ai-coach/route.ts', literal: 'lastStatus = 500', why: 'HTTP status, not risk' },
   { file: 'src/lib/propPresets.ts', literal: 'maxDailyLoss: 500', why: 'prop preset daily loss limit (firm rule), not a trade risk default' },
 ];
-const S37_WINRATE_ALLOW = [
-  { file: 'src/lib/matrixAnalytics.ts', literal: 'baseCell.wins / baseCell.count', why: 'matrix regime win probability in the P4 matrix/emotion region (registry Ordered Handoff P3 -> P4)' },
-  { file: 'src/lib/analyticsMath.ts', literal: 'group.wins / decisive', why: 'P3-DEFER-1 Emotion win rate (analyticsMath ~445-455), owned by P4' },
-];
+// P4 (D-13 / E-7): both P3 entries removed; the matrix and emotion win rates now use @/lib/stats.
+const S37_WINRATE_ALLOW = [];
 const S37_LOCAL_WINRATE = /\b\w*wins?\w*\s*\/\s*\(?\s*[\w.]*?\b(total|count|trades|decisive|decided)\w*/gi;
 
 const s37Lines = (src) => src.split(/\r?\n/);
@@ -4001,6 +3999,187 @@ it(`F1 self-test: form, stats-import and single-winRate checks are RED on pre-P3
   assert.notStrictEqual(s37WinRateExportCount(s37BaseFiles, s37BaseRead), 1, "pre-P3 tree must not satisfy the single-winRate check");
 });
 // ===== END Section 37 =====
+
+
+// ===== Section 38 (P4 Hard Stop client static guard; append-only after Section 37) =====
+// Every check is a pure function of a file reader so it runs GREEN on the current tree and RED on
+// the pre-P4 baseline (git show ${P4_GUARD_BASELINE_REF}:<path>) — anti vacuous-pass (E-21).
+console.log("\n38. P4 Hard Stop Client: Lock Errors, Config Lock UI, Trading-Day Today, Unrated Sentinel, i18n:");
+const P4_GUARD_BASELINE_REF = process.env.P4_GUARD_BASELINE_REF || 'afba4c9';
+const s38Cur = (rel) => { try { return s37Read(rel); } catch { return null; } };
+const s38BaseCache = new Map();
+const s38Base = (rel) => { if (!s38BaseCache.has(rel)) s38BaseCache.set(rel, s37GitShow(P4_GUARD_BASELINE_REF, rel)); return s38BaseCache.get(rel); };
+const s38Norm = (src) => (src == null ? null : src.replace(/\r\n/g, '\n'));
+
+const S38_LOCK_CATCH_FILES = [
+  'src/components/QuickLogTradeModal.tsx', 'src/components/TradeSlideOverDrawer.tsx', 'src/components/TradeEditForm.tsx',
+  'src/components/EstimatedRiskBadge.tsx', 'src/components/TradeDetailsModal.tsx', 'src/app/[locale]/journal/page.tsx',
+];
+const S38_CLASS_I = [
+  'src/store/useTradeStore.ts', 'src/app/[locale]/journal/page.tsx', 'src/components/TodaySessionCockpit.tsx',
+  'src/lib/disciplineScore.ts', 'src/app/[locale]/daily-review/page.tsx', 'src/components/DailyExecutiveReportCard.tsx',
+  'src/components/PreMarketRoutineWidget.tsx',
+];
+const S38_DAY_BOUNDARY = [
+  { id: 'toDateString', re: /\.toDateString\(\)/ },
+  { id: 'toISOString-split', re: /toISOString\(\)\s*\.split\(\s*['"]T['"]\s*\)\s*\[\s*0\s*\]/ },
+  { id: 'toISOString-slice10', re: /toISOString\(\)\s*\.slice\(\s*0\s*,\s*10\s*\)/ },
+  { id: 'format-today-yyyy-MM-dd', re: /format\(\s*new Date\(\)\s*,\s*["']yyyy-MM-dd["']\s*\)/ },
+];
+const S38_DAY_IMPORT = /\b(tradingDayKey|nowTradingDayKey|useTradingDay|tradesOfTradingDay|evaluateHardStop|useHardStop)\b/;
+const S38_SENTINEL_FILES = [
+  'src/components/TradeCardsView.tsx', 'src/components/TradeViewDetails.tsx', 'src/app/[locale]/journal/page.tsx',
+  'src/lib/aiCoachAggregator.ts', 'src/lib/analyticsMath.ts', 'src/store/useTradeStore.ts',
+];
+const S38_I18N_REQUIRED = {
+  HardStop: ['bannerTitle', 'bannerBody', 'lossOf', 'unlocksAt', 'editRestricted', 'deleteBlocked', 'lockedSubmit', 'configLocked', 'timezoneEstimated'],
+  Psych: ['unrated', 'unratedCount', 'chooseEmotion', 'chooseMistake', 'chooseSetup'],
+};
+
+function s38FnBody(src, name) {
+  const i = src.indexOf(`const ${name} =`);
+  if (i < 0) return null;
+  const next = src.slice(i + 1).search(/\n\s{2}const handle\w+ =/);
+  return next < 0 ? src.slice(i) : src.slice(i, i + 1 + next);
+}
+function s38CatchBodies(src, marker) {
+  const out = [];
+  for (const m of src.matchAll(/catch\s*(\(\s*\w*[^)]*\))?\s*\{/g)) {
+    let depth = 0; let end = m.index + m[0].length - 1;
+    for (let k = end; k < src.length; k++) { if (src[k] === '{') depth++; else if (src[k] === '}') { depth--; if (depth === 0) { end = k; break; } } }
+    const body = src.slice(m.index, end);
+    if (body.includes(marker)) out.push({ line: s37LineOf(src, m.index), body });
+  }
+  return out;
+}
+const s38Checks = {
+  noTiltGuard: (read, files) => files.filter((f) => (read(f) || '').includes('TILT_GUARD_ACTIVE')).map((f) => `${f}: TILT_GUARD_ACTIVE`),
+  accountsConfigLock: (read) => {
+    const f = 'src/app/[locale]/accounts/page.tsx'; const s = s38Norm(read(f)) || ''; const p = [];
+    if (!/await updateAccount\(/.test(s)) p.push(`${f}: updateAccount is not awaited`);
+    if (!/\.code === ["']HARD_STOP_CONFIG_LOCKED["']/.test(s)) p.push(`${f}: no HARD_STOP_CONFIG_LOCKED match by code`);
+    return p;
+  },
+  settingsConfigLock: (read) => {
+    const f = 'src/app/[locale]/settings/page.tsx'; const s = s38Norm(read(f)) || ''; const p = [];
+    for (const fn of ['handleSaveRisk', 'handleSaveProfile']) {
+      const body = s38FnBody(s, fn);
+      if (!body) { p.push(`${f}: ${fn} missing`); continue; }
+      if (!/\.code === ["']HARD_STOP_CONFIG_LOCKED["']/.test(body)) p.push(`${f}: ${fn} swallows HARD_STOP_CONFIG_LOCKED`);
+      if (!body.includes('HardStop') && !body.includes('tHardStop')) p.push(`${f}: ${fn} has no HardStop message`);
+    }
+    return p;
+  },
+  lockCatches: (read) => {
+    const p = [];
+    for (const f of S38_LOCK_CATCH_FILES) {
+      const s = s38Norm(read(f));
+      if (s == null) { p.push(`${f}: missing`); continue; }
+      const bodies = s38CatchBodies(s, 'HardStopError');
+      if (bodies.length === 0) { p.push(`${f}: no catch handles HardStopError`); continue; }
+      if (S37_FORMS.includes(f)) {
+        for (const b of bodies) if (/\bonClose\s*\(|\breset\w*\s*\(|\bclose\w*\s*\(|setIsOpen\(\s*false/.test(b.body)) p.push(`${f}:${b.line}: HardStopError catch closes/resets the form`);
+      }
+    }
+    return p;
+  },
+  noPositiveDefaults: (read, files) => {
+    const p = [];
+    for (const f of files) {
+      const s = read(f) || '';
+      if (/useState<EmotionTag>\(\s*["']Calm["']\s*\)/.test(s)) p.push(`${f}: useState<EmotionTag>("Calm")`);
+      if (/useState<string>\(\s*["']Breakout["']\s*\)/.test(s)) p.push(`${f}: useState<string>("Breakout")`);
+      if (/useState<MistakeTag>\(\s*["']None["']\s*\)/.test(s)) p.push(`${f}: useState<MistakeTag>("None")`);
+      if (/emotion:\s*["']Calm["'],\s*\n\s*mistake:\s*["']None["']/.test(s.replace(/\r\n/g, '\n'))) p.push(`${f}: hard-coded emotion Calm / mistake None on save`);
+    }
+    return p;
+  },
+  dayBoundary: (read) => {
+    const p = [];
+    for (const f of S38_CLASS_I) {
+      const s = read(f);
+      if (s == null) { p.push(`${f}: missing`); continue; }
+      for (const d of S38_DAY_BOUNDARY) if (d.re.test(s)) p.push(`${f}: day boundary via ${d.id}`);
+      if (!S38_DAY_IMPORT.test(s)) p.push(`${f}: does not use tradingDayKey/useTradingDay/shared day helper`);
+    }
+    return p;
+  },
+  sentinel: (read) => {
+    const p = [];
+    for (const f of S38_SENTINEL_FILES) {
+      const s = read(f);
+      if (s == null) { p.push(`${f}: missing`); continue; }
+      s37Lines(s).forEach((line, i) => {
+        if (/mistake\s*!==\s*["']None["']/.test(line) && !/UNRATED|isRated/.test(line)) p.push(`${f}:${i + 1}: mistake !== "None" without UNRATED/isRated`);
+      });
+    }
+    const m = read('src/lib/matrixAnalytics.ts') || '';
+    if (/\|\|\s*["']Calm["']/.test(m)) p.push('src/lib/matrixAnalytics.ts: missing emotion counted as Calm');
+    return p;
+  },
+  i18n: (read) => {
+    const p = [];
+    let en; let vi;
+    try { en = JSON.parse(read('messages/en.json')); vi = JSON.parse(read('messages/vi.json')); } catch { return ['messages: unreadable']; }
+    for (const [ns, keys] of Object.entries(S38_I18N_REQUIRED)) {
+      const a = Object.keys(en?.[ns] || {}).sort(); const b = Object.keys(vi?.[ns] || {}).sort();
+      if (JSON.stringify(a) !== JSON.stringify(b)) p.push(`${ns}: EN/VI key sets differ`);
+      for (const k of keys) { if (!(k in (en?.[ns] || {}))) p.push(`en ${ns}.${k} missing`); if (!(k in (vi?.[ns] || {}))) p.push(`vi ${ns}.${k} missing`); }
+    }
+    return p;
+  },
+};
+
+// --- current tree (GREEN required) ---
+it("P4/F2b(1): no TILT_GUARD_ACTIVE string error left in src (HardStopError code HARD_STOP instead)", () => {
+  assert.deepStrictEqual(s38Checks.noTiltGuard(s38Cur, s37SrcFiles), []);
+});
+it("P4/F2b(2): accounts page awaits updateAccount and maps HARD_STOP_CONFIG_LOCKED by code", () => {
+  assert.deepStrictEqual(s38Checks.accountsConfigLock(s38Cur), []);
+});
+it("P4/F2b(3): settings handleSaveRisk AND handleSaveProfile map HARD_STOP_CONFIG_LOCKED (not swallowed by risk_failed/profile_failed)", () => {
+  assert.deepStrictEqual(s38Checks.settingsConfigLock(s38Cur), []);
+});
+it("P4/F2b(4): QuickLog, Drawer, EditForm, EstimatedRiskBadge, TradeDetailsModal, journal handleDelete catch HardStopError; form catch bodies never close/reset", () => {
+  assert.deepStrictEqual(s38Checks.lockCatches(s38Cur), []);
+});
+it("P4/F2b(5): S37_WINRATE_ALLOW is EMPTY at runtime (both P3 allow-list entries removed, D-13/E-7)", () => {
+  assert.ok(Array.isArray(S37_WINRATE_ALLOW));
+  assert.strictEqual(S37_WINRATE_ALLOW.length, 0);
+});
+it("P4/F2b(6): no positive-biased psychology defaults (Calm / None / Breakout) in src", () => {
+  assert.deepStrictEqual(s38Checks.noPositiveDefaults(s38Cur, s37SrcFiles), []);
+});
+it("P4/F2b(7a): class-(i) files use the trading day (no toDateString / toISOString date cut / format(new Date) as day boundary)", () => {
+  assert.deepStrictEqual(s38Checks.dayBoundary(s38Cur), []);
+});
+it("P4/F2b(7b): Unrated sentinel sweep: every mistake !== \"None\" also handles UNRATED/isRated; no `|| \"Calm\"` in the emotion matrix", () => {
+  assert.deepStrictEqual(s38Checks.sentinel(s38Cur), []);
+});
+it("P4/F1: i18n EN = VI parity and required keys for the HardStop and Psych namespaces", () => {
+  assert.deepStrictEqual(s38Checks.i18n(s38Cur), []);
+});
+
+// --- self-test on the pre-P4 baseline (RED required) ---
+const s38BaseSrc = (() => { try { return s37Exec(`git ls-tree -r --name-only "${P4_GUARD_BASELINE_REF}" -- src`, { cwd: S37_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split(/\r?\n/).filter((f) => /\.(ts|tsx)$/.test(f) && !/\.test\.tsx?$/.test(f) && !f.includes('__tests__')); } catch { return []; } })();
+it(`P4 self-test: every Section 38 check is RED on the pre-P4 baseline (git show ${P4_GUARD_BASELINE_REF}:<path>)`, () => {
+  assert.ok(s38BaseSrc.length > 50, `could not list the pre-P4 tree at ${P4_GUARD_BASELINE_REF}`);
+  const red = {
+    noTiltGuard: s38Checks.noTiltGuard(s38Base, s38BaseSrc).length,
+    accountsConfigLock: s38Checks.accountsConfigLock(s38Base).length,
+    settingsConfigLock: s38Checks.settingsConfigLock(s38Base).length,
+    lockCatches: s38Checks.lockCatches(s38Base).length,
+    noPositiveDefaults: s38Checks.noPositiveDefaults(s38Base, s38BaseSrc).length,
+    dayBoundary: s38Checks.dayBoundary(s38Base).length,
+    sentinel: s38Checks.sentinel(s38Base).length,
+    i18n: s38Checks.i18n(s38Base).length,
+  };
+  const baseRunner = s38Base('scripts/test_enhancements_runner.mjs') || '';
+  red.winRateAllowList = (baseRunner.match(/S37_WINRATE_ALLOW = \[\s*\n\s*\{/) ? 1 : 0);
+  console.log(`    self-test RED counts @${P4_GUARD_BASELINE_REF}: ${Object.entries(red).map(([k, v]) => `${k}=${v}`).join(', ')}`);
+  assert.deepStrictEqual(Object.entries(red).filter(([, v]) => v === 0).map(([k]) => k), [], "checks that are NOT red on the baseline (vacuous)");
+});
+// ===== END Section 38 =====
 
 
 console.log("\n-------------------------------------------------------");

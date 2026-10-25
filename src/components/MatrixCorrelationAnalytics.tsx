@@ -10,6 +10,7 @@ import {
   MatrixCellData,
 } from "@/lib/matrixAnalytics";
 import { useTranslations } from "next-intl";
+import { useTagTranslation } from "@/hooks/useTagTranslation";
 import clsx from "clsx";
 import {
   Grid,
@@ -28,6 +29,8 @@ interface MatrixCorrelationAnalyticsProps {
 
 export function MatrixCorrelationAnalytics({ trades }: MatrixCorrelationAnalyticsProps) {
   const t = useTranslations("MatrixAnalytics");
+  const tPsych = useTranslations("Psych");
+  const tTag = useTagTranslation();
   const [activeTab, setActiveTab] = useState<"setup_session" | "day_hour" | "emotion_expectancy">("setup_session");
   const [metric, setMetric] = useState<MatrixMetricType>("winRate");
   const [selectedCell, setSelectedCell] = useState<{ title: string; cellData: MatrixCellData } | null>(null);
@@ -193,7 +196,7 @@ export function MatrixCorrelationAnalytics({ trades }: MatrixCorrelationAnalytic
                   return (
                     <tr key={setup} className="hover:bg-white/[0.02] transition-colors">
                       <td className="py-3 px-4 font-medium text-white max-w-[200px] truncate">
-                        {setup}
+                        {tTag(setup)}
                       </td>
                       {setupSessionData.sessions.map((sess) => {
                         const cell = setupSessionData.cells[setup]?.[sess];
@@ -417,6 +420,12 @@ export function MatrixCorrelationAnalytics({ trades }: MatrixCorrelationAnalytic
                 {t("edge_delta", { delta: emotionExpectancyData.calmVsEmotional.edgeDeltaR })}
               </div>
             </div>
+          )}
+
+          {emotionExpectancyData.unratedCount > 0 && (
+            <p className="text-[11px] text-gray-400 italic" data-testid="matrix-unrated-count">
+              {tPsych("unratedCount", { count: emotionExpectancyData.unratedCount })}
+            </p>
           )}
 
           {/* Emotion Items Table */}

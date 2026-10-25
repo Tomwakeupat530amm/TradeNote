@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Trade, useTradeStore } from "@/store/useTradeStore";
+import { Trade, useTradeStore, HardStopError } from "@/store/useTradeStore";
+import { useHardStop } from "@/hooks/useHardStop";
 import { usePreferenceStore } from "@/store/usePreferenceStore";
 import { X, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -43,6 +44,9 @@ export default function TradeDetailsModal({ isOpen, onClose, trade }: TradeDetai
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const t = useTranslations("TradeDetailsModal");
   const c = useTranslations("Common");
+  const tHardStop = useTranslations("HardStop");
+  const hardStop = useHardStop(trade?.accountId ?? null);
+  const deleteLocked = hardStop.isLockedDay(trade?.date);
 
   const [prevTrade, setPrevTrade] = useState<Trade | null>(null);
 
@@ -57,6 +61,10 @@ export default function TradeDetailsModal({ isOpen, onClose, trade }: TradeDetai
   if (!isOpen || !trade) return null;
 
   const handleDelete = () => {
+    if (deleteLocked) {
+      toast.error(tHardStop("deleteBlocked"));
+      return;
+    }
     setIsConfirmingDelete(true);
   };
 
@@ -65,8 +73,12 @@ export default function TradeDetailsModal({ isOpen, onClose, trade }: TradeDetai
       await deleteTrade(trade.id);
       toast.success(c("trade_deleted"));
       onClose();
-    } catch {
-      toast.error(c("error"));
+    } catch (err) {
+      if (err instanceof HardStopError) {
+        toast.error(tHardStop("deleteBlocked"));
+      } else {
+        toast.error(c("error"));
+      }
     } finally {
       setIsConfirmingDelete(false);
     }
@@ -172,6 +184,7 @@ export default function TradeDetailsModal({ isOpen, onClose, trade }: TradeDetai
                 trade={trade}
                 onEdit={() => setIsEditing(true)}
                 onDelete={handleDelete}
+                deleteDisabledReason={deleteLocked ? tHardStop("deleteBlocked") : null}
                 onClose={onClose}
                 setZoomImageSrc={setZoomImageSrc}
               />

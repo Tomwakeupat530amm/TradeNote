@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import clsx from "clsx";
-import { useTradeStore, type Trade } from "@/store/useTradeStore";
+import { useTradeStore, HardStopError, type Trade } from "@/store/useTradeStore";
 import { isEstimatedTrade } from "@/lib/estimatedRisk";
 
 interface EstimatedRiskBadgeProps {
@@ -20,6 +20,7 @@ interface EstimatedRiskBadgeProps {
  */
 export function EstimatedRiskBadge({ trade, showConfirm = false, className }: EstimatedRiskBadgeProps) {
   const t = useTranslations("Risk");
+  const tHardStop = useTranslations("HardStop");
   const updateTrade = useTradeStore((s) => s.updateTrade);
   const [busy, setBusy] = useState(false);
 
@@ -32,8 +33,9 @@ export function EstimatedRiskBadge({ trade, showConfirm = false, className }: Es
     try {
       await updateTrade(trade.id, { riskIsEstimated: false });
       toast.success(t("confirmed"));
-    } catch {
-      toast.error(t("confirmFailed"));
+    } catch (err) {
+      // D-4: confirming the estimate is allowed on a locked day; any HardStopError still gets its own message.
+      toast.error(err instanceof HardStopError ? tHardStop("lockedSubmit") : t("confirmFailed"));
     } finally {
       setBusy(false);
     }

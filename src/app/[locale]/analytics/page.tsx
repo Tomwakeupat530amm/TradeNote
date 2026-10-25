@@ -44,6 +44,7 @@ import {
 import { detectSession } from "@/lib/sessionUtils";
 import { MatrixCorrelationAnalytics } from "@/components/MatrixCorrelationAnalytics";
 import clsx from "clsx";
+import { UNRATED } from "@/lib/psychology";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -187,6 +188,7 @@ export default function AnalyticsPage() {
   const setupData = useMemo(() => {
     const stats: Record<string, { items: Trade[]; total: number; pnl: number }> = {};
     accountTrades.forEach((t) => {
+      if (t.setup === UNRATED) return; // P4: unrated setup is not a setup bucket
       if (!stats[t.setup]) stats[t.setup] = { items: [], total: 0, pnl: 0 };
       stats[t.setup].total += 1;
       stats[t.setup].pnl += t.pnl;
@@ -204,6 +206,7 @@ export default function AnalyticsPage() {
   const emotionData = useMemo(() => {
     const stats: Record<string, number> = {};
     accountTrades.forEach((t) => {
+      if (!t.emotion || t.emotion === UNRATED) return; // P4: unrated emotion excluded
       if (!stats[t.emotion]) stats[t.emotion] = 0;
       stats[t.emotion] += t.pnl;
     });

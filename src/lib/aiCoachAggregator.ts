@@ -1,5 +1,6 @@
 import type { Trade } from "@/store/useTradeStore";
 import { avgR as statsAvgR, countUnratedForR, winRate as statsWinRate } from "@/lib/stats";
+import { UNRATED } from "@/lib/psychology";
 
 export interface AggregatedTradingHabits {
   accountName?: string;
@@ -60,7 +61,8 @@ export function aggregateTradingHabits(trades: Trade[], accountName?: string): A
   // 2. Mistake Costs
   const mistakeMap: Record<string, { count: number; totalLoss: number }> = {};
   sortedTrades.forEach(t => {
-    if (t.mistake && t.mistake !== 'None') {
+    // P4: the UNRATED sentinel is not a mistake (no `Unrated` bucket; payload shape unchanged).
+    if (t.mistake && t.mistake !== 'None' && t.mistake !== UNRATED) {
       if (!mistakeMap[t.mistake]) mistakeMap[t.mistake] = { count: 0, totalLoss: 0 };
       mistakeMap[t.mistake].count += 1;
       if (t.pnl < 0) {
@@ -92,6 +94,7 @@ export function aggregateTradingHabits(trades: Trade[], accountName?: string): A
   const setupMap: Record<string, { count: number; items: Trade[]; pnl: number }> = {};
   sortedTrades.forEach(t => {
     const s = t.setup || 'Other';
+    if (s === UNRATED) return; // unrated setup is not a setup bucket
     if (!setupMap[s]) setupMap[s] = { count: 0, items: [], pnl: 0 };
     setupMap[s].count += 1;
     setupMap[s].pnl += t.pnl;

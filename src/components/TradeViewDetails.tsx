@@ -12,16 +12,19 @@ import { TradingViewMiniChart } from "./TradingViewMiniChart";
 import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
 import { useSignedUrl } from "@/hooks/useSignedUrl";
 import { EstimatedRiskBadge } from "./EstimatedRiskBadge";
+import { UNRATED } from "@/lib/psychology";
 
 interface TradeViewDetailsProps {
   trade: Trade;
   onEdit: () => void;
   onDelete: () => void;
+  /** Hard Stop: when set, the delete control is disabled and shows this reason. */
+  deleteDisabledReason?: string | null;
   onClose: () => void;
   setZoomImageSrc: (src: string | null) => void;
 }
 
-export function TradeViewDetails({ trade, onEdit, onDelete, onClose, setZoomImageSrc }: TradeViewDetailsProps) {
+export function TradeViewDetails({ trade, onEdit, onDelete, deleteDisabledReason, onClose, setZoomImageSrc }: TradeViewDetailsProps) {
   const t = useTranslations("TradeDetailsModal");
   const tVisual = useTranslations("VisualRR");
   const tShot = useTranslations("Screenshots");
@@ -128,7 +131,7 @@ export function TradeViewDetails({ trade, onEdit, onDelete, onClose, setZoomImag
               <span className="inline-flex items-center rounded-md bg-purple-500/10 border border-purple-500/20 px-2.5 py-1 text-xs font-semibold text-purple-400">
                 {tTag(trade.emotion)}
               </span>
-              {trade.mistake !== "None" && (
+              {trade.mistake !== "None" && trade.mistake !== UNRATED && (
                 <span className="inline-flex items-center rounded-md bg-orange-500/10 border border-orange-500/20 px-2.5 py-1 text-xs font-semibold text-orange-400">
                   {tTag(trade.mistake)}
                 </span>
@@ -247,7 +250,9 @@ export function TradeViewDetails({ trade, onEdit, onDelete, onClose, setZoomImag
       <div className="flex items-center justify-between border-t border-gray-800 p-6 bg-gray-950/40">
         <button
           onClick={onDelete}
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 px-4 py-2 rounded-xl transition-all"
+          disabled={!!deleteDisabledReason}
+          title={deleteDisabledReason ?? undefined}
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 px-4 py-2 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Trash2 className="w-4 h-4" />
           {t("delete_log")}

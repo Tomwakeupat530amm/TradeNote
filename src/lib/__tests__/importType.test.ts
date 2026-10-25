@@ -4,7 +4,7 @@ import path from "node:path";
 
 // import-type-enforcement: pure libs may only import TYPES from the Supabase client and stores,
 // so Vitest (and any server caller) never loads the browser Supabase client or a Zustand store.
-const FILES = ["risk.ts", "stats.ts", "tradingDay.ts", "propRisk.ts", "riskEngine.ts"];
+const FILES = ["risk.ts", "stats.ts", "tradingDay.ts", "propRisk.ts", "riskEngine.ts", "hardStop.ts"];
 const VALUE_IMPORT = /^\s*import\s+(?!type\b)[^;]*?from\s+["'](@\/lib\/supabase|@\/store\/[^"']+|\.\.?\/[^"']*(supabase|store)[^"']*)["']/m;
 const SIDE_EFFECT_IMPORT = /^\s*import\s+["'](@\/lib\/supabase|@\/store\/[^"']+)["']/m;
 const DYNAMIC_IMPORT = /import\(\s*["'](@\/lib\/supabase|@\/store\/[^"']+)["']\s*\)/;

@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { useTranslations } from "next-intl";
+import { useTradingDay } from "@/hooks/useTradingDay";
 
 function ReviewsContent() {
   const searchParams = useSearchParams();
@@ -31,7 +32,11 @@ function ReviewsContent() {
   } = useReviewStore();
   
   const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly'>('daily');
-  const [selectedDate, setSelectedDate] = useState(() => paramDate || format(new Date(), "yyyy-MM-dd"));
+  // E-20: the default day is the user's TRADING day; before preferences load there is none, so
+  // nothing day-based renders until it is known. A date picked by the user always wins.
+  const tradingDay = useTradingDay();
+  const [pickedDate, setSelectedDate] = useState<string | null>(() => paramDate || null);
+  const selectedDate = pickedDate ?? tradingDay.todayKey;
   const [saving, setSaving] = useState(false);
   const t = useTranslations("DailyReview");
 
@@ -54,7 +59,7 @@ function ReviewsContent() {
   }, [fetchPeriodicReviews]);
 
   useEffect(() => {
-    if (activeTab === 'daily') {
+    if (activeTab === 'daily' && selectedDate) {
       fetchReviewForDate(selectedDate);
     }
   }, [selectedDate, fetchReviewForDate, activeTab]);
@@ -64,7 +69,7 @@ function ReviewsContent() {
     setActiveTab(tab);
     const now = new Date();
     if (tab === 'daily') {
-      setSelectedDate(format(now, "yyyy-MM-dd"));
+      setSelectedDate(tradingDay.todayKey);
     } else if (tab === 'weekly') {
       setSelectedDate(format(startOfWeek(now, { weekStartsOn: 1 }), "yyyy-MM-dd"));
     } else if (tab === 'monthly') {
@@ -101,7 +106,7 @@ function ReviewsContent() {
           <Calendar className="w-5 h-5 text-blue-400" />
           <input
             type="date"
-            value={selectedDate}
+            value={selectedDate ?? ""}
             onChange={handleDateChange}
             className="bg-transparent text-white border-none focus:ring-0 outline-none cursor-pointer font-medium"
           />
@@ -131,12 +136,13 @@ function ReviewsContent() {
       </div>
 
       <AnimatePresence mode="wait">
-        {activeTab === 'daily' && (
+        {activeTab === 'daily' && selectedDate && (
           <div className="space-y-6">
             <DailyExecutiveReportCard
               trades={accountTrades}
               account={activeAccount}
               targetDateStr={selectedDate}
+              tz={tradingDay.tz}
             />
             <DailyForm 
               key="daily"
@@ -149,7 +155,7 @@ function ReviewsContent() {
             />
           </div>
         )}
-        {(activeTab === 'weekly' || activeTab === 'monthly') && (
+        {(activeTab === 'weekly' || activeTab === 'monthly') && selectedDate && (
           <PeriodicForm 
             key={activeTab}
             type={activeTab}

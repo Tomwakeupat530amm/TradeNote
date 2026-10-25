@@ -13,7 +13,10 @@ import { toast } from "sonner";
 import clsx from "clsx";
 import { useTranslations } from "next-intl";
 
-import { useTradeStore, Trade, TradeResult, SetupTag, EmotionTag, MistakeTag, SaveTradeError } from "@/store/useTradeStore";
+import { useTradeStore, Trade, TradeResult, SetupTag, EmotionTag, MistakeTag, SaveTradeError, HardStopError } from "@/store/useTradeStore";
+import { useHardStop } from "@/hooks/useHardStop";
+import { HardStopBanner } from "@/components/HardStopBanner";
+import { UNRATED } from "@/lib/psychology";
 import { classifyRiskInput, formRMultiple, suggestedRiskInput, toPositiveNumber, finiteOrZero } from "@/lib/risk";
 import { useAccountStore } from "@/store/useAccountStore";
 import { usePlaybookStore } from "@/store/usePlaybookStore";
@@ -49,6 +52,8 @@ export function TradeSlideOverDrawer({
   const c = useTranslations("Common");
   const tRisk = useTranslations("Risk");
   const tTrade = useTranslations("Trade");
+  const tHardStop = useTranslations("HardStop");
+  const tPsych = useTranslations("Psych");
   const tTag = useTagTranslation();
 
   const { accounts, activeAccountId } = useAccountStore();
@@ -56,6 +61,10 @@ export function TradeSlideOverDrawer({
   const { playbooks, fetchPlaybooks } = usePlaybookStore();
 
   const activeAccount = accounts.find((a) => a.id === activeAccountId) || accounts[0];
+  const hardStop = useHardStop(tradeToEdit?.accountId ?? activeAccount?.id ?? null);
+  // Locked day: a new trade is blocked; an edit of a trade of the locked day sends only the allow-list.
+  const editRestricted = tradeToEdit ? hardStop.isLockedDay(tradeToEdit.date) : false;
+  const saveBlocked = !tradeToEdit && hardStop.locked;
   // P3 D3: the account 1R is only a SUGGESTION for the input ("" when the account has no risk configured).
   const riskSuggestion = useMemo(() => suggestedRiskInput(activeAccount), [activeAccount]);
 
@@ -71,11 +80,11 @@ export function TradeSlideOverDrawer({
   const [riskBadInput, setRiskBadInput] = useState(false);
   const [tradeDate, setTradeDate] = useState(() => format(new Date(), "yyyy-MM-dd'T'HH:mm"));
   const [session, setSession] = useState<TradingSession>("New York");
-  const [setup, setSetup] = useState<string>("Breakout");
+  const [setup, setSetup] = useState<string>(UNRATED);
   const [checklistResults, setChecklistResults] = useState<Record<string, boolean>>({});
   const [confluences, setConfluences] = useState<string[]>([]);
-  const [emotion, setEmotion] = useState<EmotionTag>("Calm");
-  const [mistake, setMistake] = useState<MistakeTag>("None");
+  const [emotion, setEmotion] = useState<EmotionTag>(UNRATED);
+  const [mistake, setMistake] = useState<MistakeTag>(UNRATED);
   const [notes, setNotes] = useState("");
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [screenshotRemoved, setScreenshotRemoved] = useState(false);
@@ -177,8 +186,8 @@ export function TradeSlideOverDrawer({
         setSetup(tradeToEdit.setup);
         setChecklistResults(tradeToEdit.checklistResults || {});
         setConfluences(tradeToEdit.confluences || []);
-        setEmotion(tradeToEdit.emotion || "Calm");
-        setMistake(tradeToEdit.mistake || "None");
+        setEmotion(tradeToEdit.emotion || UNRATED);
+        setMistake(tradeToEdit.mistake || UNRATED);
         setNotes(tradeToEdit.notes || "");
         setScreenshot(null);
         setExistingScreenshotPath(tradeToEdit.screenshotPath ?? pathFromLegacyUrl(tradeToEdit.screenshotUrl));
@@ -232,11 +241,11 @@ export function TradeSlideOverDrawer({
           const now = new Date();
           setTradeDate(format(now, "yyyy-MM-dd'T'HH:mm"));
           setSession(detectSession(now));
-          setSetup("Breakout");
+          setSetup(UNRATED);
           setChecklistResults({});
           setConfluences([]);
-          setEmotion("Calm");
-          setMistake("None");
+          setEmotion(UNRATED);
+          setMistake(UNRATED);
           setNotes("");
           setScreenshot(null);
         }
@@ -289,8 +298,8 @@ export function TradeSlideOverDrawer({
     setRiskBadInput(false);
     setNotes("");
     setConfluences([]);
-    setEmotion("Calm");
-    setMistake("None");
+    setEmotion(UNRATED);
+    setMistake(UNRATED);
     toast.info(t("toast_draft_cleared"));
   }, [draftKey, riskSuggestion, t]);
 
@@ -449,6 +458,23 @@ export function TradeSlideOverDrawer({
 
     try {
       if (tradeToEdit) {
+        const screenshotPatch = screenshotRemoved ? null : (screenshot && screenshot.startsWith("data:") ? screenshot : undefined);
+        if (editRestricted) {
+          // Locked trading day: only the allow-listed fields (notes/tags/screenshot/checklist).
+          await updateTrade(tradeToEdit.id, {
+            setup: setup as SetupTag,
+            confluences,
+            emotion,
+            mistake,
+            notes,
+            checklistResults,
+            screenshotFile: screenshotPatch,
+          });
+          toast.success(t("toast_saved_success"));
+          onSaved();
+          onClose();
+          return;
+        }
         // Update trade
         await updateTrade(tradeToEdit.id, {
           asset: asset.toUpperCase().trim(),
@@ -464,7 +490,7 @@ export function TradeSlideOverDrawer({
           riskAmount: parsedRisk,
           session,
           checklistResults,
-          screenshotFile: screenshotRemoved ? null : (screenshot && screenshot.startsWith("data:") ? screenshot : undefined),
+          screenshotFile: screenshotPatch,
         });
         toast.success(t("toast_saved_success"));
       } else {
@@ -498,7 +524,9 @@ export function TradeSlideOverDrawer({
       onClose();
     } catch (err: unknown) {
       // Save failed: keep the drawer open with every entered value (and the draft).
-      if (err instanceof SaveTradeError) {
+      if (err instanceof HardStopError) {
+        toast.error(tHardStop("lockedSubmit"));
+      } else if (err instanceof SaveTradeError) {
         toast.error(tTrade("saveError.failed", { detail: err.detail }));
       } else {
         const msg = err instanceof Error ? err.message : "Error saving trade.";
@@ -598,6 +626,14 @@ export function TradeSlideOverDrawer({
                   {t("draft_discard")}
                 </button>
               </div>
+            )}
+
+            {/* Hard Stop: non-dismissable (cooldown below stays dismissable, D-5) */}
+            <HardStopBanner state={hardStop} className="mx-6 mt-3" />
+            {editRestricted && (
+              <p className="mx-6 mt-2 text-[11px] text-rose-300" data-testid="hard-stop-edit-restricted">
+                {tHardStop("editRestricted")}
+              </p>
             )}
 
             {/* Intentional Friction Cooldown Banner */}
@@ -838,6 +874,7 @@ export function TradeSlideOverDrawer({
                       onChange={(e) => setSetup(e.target.value)}
                       className="w-full rounded-xl border border-white/10 bg-gray-900 px-3.5 py-2 text-sm text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all cursor-pointer"
                     >
+                      <option value={UNRATED}>{tPsych("chooseSetup")}</option>
                       {dynamicSetups.map((s) => (
                         <option key={s} value={s}>{tTag(s)}</option>
                       ))}
@@ -928,6 +965,7 @@ export function TradeSlideOverDrawer({
                         onChange={(e) => setEmotion(e.target.value)}
                         className="w-full rounded-xl border border-white/10 bg-gray-900 px-3 py-2 text-xs text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all cursor-pointer"
                       >
+                        <option value={UNRATED}>{tPsych("chooseEmotion")}</option>
                         {DEFAULT_EMOTIONS.map((em) => (
                           <option key={em} value={em}>{tTag(em)}</option>
                         ))}
@@ -943,6 +981,7 @@ export function TradeSlideOverDrawer({
                         onChange={(e) => setMistake(e.target.value)}
                         className="w-full rounded-xl border border-white/10 bg-gray-900 px-3 py-2 text-xs text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all cursor-pointer"
                       >
+                        <option value={UNRATED}>{tPsych("chooseMistake")}</option>
                         {DEFAULT_MISTAKES.map((m) => (
                           <option key={m} value={m}>{tTag(m)}</option>
                         ))}
@@ -1095,7 +1134,7 @@ export function TradeSlideOverDrawer({
                 <button
                   type="submit"
                   form="drawer-trade-form"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || saveBlocked}
                   className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-gray-950 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 flex items-center gap-1.5"
                 >
                   {isSubmitting ? (

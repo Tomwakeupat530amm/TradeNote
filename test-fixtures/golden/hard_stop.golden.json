@@ -1,0 +1,2359 @@
+{
+  "meta": {
+    "version": 2,
+    "description": "Hard Stop decision table (P4 client). P5 adds cases only. Trades use DB-style keys (account_id); before/after use client Trade field names (see fieldToColumn). isFallback cases are client-only (server uses UTC for a NULL tz). status 'off' maps to enforced=false on the server.",
+    "allowedColumns": [
+      "notes",
+      "setup",
+      "confluences",
+      "emotion",
+      "mistake",
+      "checklist_results",
+      "screenshot_url",
+      "screenshot_path",
+      "risk_is_estimated"
+    ],
+    "fieldToColumn": {
+      "notes": "notes",
+      "setup": "setup",
+      "confluences": "confluences",
+      "emotion": "emotion",
+      "mistake": "mistake",
+      "checklistResults": "checklist_results",
+      "screenshotUrl": "screenshot_url",
+      "screenshotPath": "screenshot_path",
+      "screenshotFile": "screenshot_path",
+      "riskIsEstimated": "risk_is_estimated"
+    }
+  },
+  "cases": [
+    {
+      "name": "below-80: add allowed",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t1",
+          "account_id": "acc-A",
+          "pnl": -500,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "add",
+      "after": {
+        "accountId": "acc-A",
+        "pnl": -100,
+        "date": "2026-03-10T14:00:00Z"
+      },
+      "expected": {
+        "configured": true,
+        "state": "ok",
+        "enforced": true,
+        "locked": false,
+        "status": "ok",
+        "dayKey": "2026-03-10",
+        "lossToday": 500,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": null,
+        "allowed": true
+      }
+    },
+    {
+      "name": "at-80: warn, add allowed",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t1",
+          "account_id": "acc-A",
+          "pnl": -800,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "add",
+      "after": {
+        "accountId": "acc-A",
+        "pnl": -100,
+        "date": "2026-03-10T14:00:00Z"
+      },
+      "expected": {
+        "configured": true,
+        "state": "warn",
+        "enforced": true,
+        "locked": false,
+        "status": "warn",
+        "dayKey": "2026-03-10",
+        "lossToday": 800,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": null,
+        "allowed": true
+      }
+    },
+    {
+      "name": "hardstop-add-bypass: at-100 add blocked",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "add",
+      "after": {
+        "accountId": "acc-A",
+        "pnl": -100,
+        "date": "2026-03-10T14:00:00Z"
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": false,
+        "code": "HARD_STOP"
+      }
+    },
+    {
+      "name": "hardstop-add-bypass: winning trade blocked when locked",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "add",
+      "after": {
+        "accountId": "acc-A",
+        "pnl": 500,
+        "date": "2026-03-10T14:00:00Z"
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": false,
+        "code": "HARD_STOP"
+      }
+    },
+    {
+      "name": "hardstop-add-bypass: add without date uses now",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "add",
+      "after": {
+        "accountId": "acc-A",
+        "pnl": 500
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": false,
+        "code": "HARD_STOP"
+      }
+    },
+    {
+      "name": "add for a past trading day allowed while today locked",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "add",
+      "after": {
+        "accountId": "acc-A",
+        "pnl": -50,
+        "date": "2026-03-08T10:00:00Z"
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": true
+      }
+    },
+    {
+      "name": "over-100: loss beyond limit locked",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t1",
+          "account_id": "acc-A",
+          "pnl": -1300,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "add",
+      "after": {
+        "accountId": "acc-A",
+        "pnl": 1
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1300,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": false,
+        "code": "HARD_STOP"
+      }
+    },
+    {
+      "name": "hardstop-edit-bypass: edit pnl of losing trade blocked",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "update",
+      "before": {
+        "id": "t-loss",
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-10T10:00:00Z",
+        "riskAmount": 100,
+        "rMultiple": -10.0,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "after": {
+        "pnl": -10
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": false,
+        "code": "HARD_STOP"
+      }
+    },
+    {
+      "name": "edit notes allowed when locked",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "update",
+      "before": {
+        "id": "t-loss",
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-10T10:00:00Z",
+        "riskAmount": 100,
+        "rMultiple": -10.0,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "after": {
+        "notes": "lesson learned"
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": true
+      }
+    },
+    {
+      "name": "edit tags (setup/confluences/emotion/mistake/checklist) allowed when locked",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "update",
+      "before": {
+        "id": "t-loss",
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-10T10:00:00Z",
+        "riskAmount": 100,
+        "rMultiple": -10.0,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "after": {
+        "setup": "Pullback",
+        "confluences": [
+          "Fibonacci"
+        ],
+        "emotion": "FOMO",
+        "mistake": "Moved SL",
+        "checklistResults": {
+          "a": false
+        }
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": true
+      }
+    },
+    {
+      "name": "full-field patch, pnl/date unchanged -> notes edit allowed",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "update",
+      "before": {
+        "id": "t-loss",
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-10T10:00:00Z",
+        "riskAmount": 100,
+        "rMultiple": -10.0,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "after": {
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "changed",
+        "date": "2026-03-10T10:00:00Z",
+        "riskAmount": 100,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": true
+      }
+    },
+    {
+      "name": "full-field patch, minute-truncated date (seconds lost) on locked day blocked",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "update",
+      "before": {
+        "id": "t-loss",
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-10T10:15:42.000Z",
+        "riskAmount": 100,
+        "rMultiple": -10.0,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "after": {
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "x",
+        "date": "2026-03-10T10:15Z",
+        "riskAmount": 100,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": false,
+        "code": "HARD_STOP"
+      }
+    },
+    {
+      "name": "full-field patch, minute-truncated date equal to stored date allowed",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "update",
+      "before": {
+        "id": "t-loss",
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-10T10:15:00.000Z",
+        "riskAmount": 100,
+        "rMultiple": -10.0,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "after": {
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "x",
+        "date": "2026-03-10T10:15Z",
+        "riskAmount": 100,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": true
+      }
+    },
+    {
+      "name": "legacy lowercase asset + notes edit: no false diff",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "update",
+      "before": {
+        "id": "t-loss",
+        "accountId": "acc-A",
+        "asset": " mnq",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-10T10:00:00Z",
+        "riskAmount": 100,
+        "rMultiple": -10.0,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "after": {
+        "asset": "MNQ",
+        "notes": "ok",
+        "lotSize": "1",
+        "pnl": "-1000"
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": true
+      }
+    },
+    {
+      "name": "riskIsEstimated flip on locked day allowed (D-4)",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "update",
+      "before": {
+        "id": "t-loss",
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-10T10:00:00Z",
+        "riskAmount": 100,
+        "rMultiple": -10.0,
+        "riskIsEstimated": true,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "after": {
+        "riskIsEstimated": false
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": true
+      }
+    },
+    {
+      "name": "screenshotFile set on locked day allowed",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "update",
+      "before": {
+        "id": "t-loss",
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-10T10:00:00Z",
+        "riskAmount": 100,
+        "rMultiple": -10.0,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "after": {
+        "screenshotFile": "data:image/png;base64,AAAA"
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": true
+      }
+    },
+    {
+      "name": "screenshotFile null (remove image) on locked day allowed",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "update",
+      "before": {
+        "id": "t-loss",
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-10T10:00:00Z",
+        "riskAmount": 100,
+        "rMultiple": -10.0,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        },
+        "screenshotPath": "user-1/a.webp"
+      },
+      "after": {
+        "screenshotFile": null
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": true
+      }
+    },
+    {
+      "name": "risk null -> 100 on locked day blocked (no Number(null) trap)",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "update",
+      "before": {
+        "id": "t-loss",
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-10T10:00:00Z",
+        "riskAmount": null,
+        "rMultiple": null,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "after": {
+        "riskAmount": 100
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": false,
+        "code": "HARD_STOP"
+      }
+    },
+    {
+      "name": "risk 100 -> null on locked day blocked",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "update",
+      "before": {
+        "id": "t-loss",
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-10T10:00:00Z",
+        "riskAmount": 100,
+        "rMultiple": -10.0,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "after": {
+        "riskAmount": null
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": false,
+        "code": "HARD_STOP"
+      }
+    },
+    {
+      "name": "risk null -> 0 is unchanged (store stores 0 as null)",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "update",
+      "before": {
+        "id": "t-loss",
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-10T10:00:00Z",
+        "riskAmount": null,
+        "rMultiple": null,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "after": {
+        "riskAmount": 0,
+        "notes": "x"
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": true
+      }
+    },
+    {
+      "name": "date move from past day into locked day blocked",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "update",
+      "before": {
+        "id": "t-old",
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -20,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-08T10:00:00Z",
+        "riskAmount": 100,
+        "rMultiple": -0.2,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "after": {
+        "date": "2026-03-10T09:00:00Z"
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": false,
+        "code": "HARD_STOP"
+      }
+    },
+    {
+      "name": "date move out of locked day blocked",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "update",
+      "before": {
+        "id": "t-loss",
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-10T10:00:00Z",
+        "riskAmount": 100,
+        "rMultiple": -10.0,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "after": {
+        "date": "2026-03-08T09:00:00Z"
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": false,
+        "code": "HARD_STOP"
+      }
+    },
+    {
+      "name": "accountId move on locked day blocked",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "update",
+      "before": {
+        "id": "t-loss",
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-10T10:00:00Z",
+        "riskAmount": 100,
+        "rMultiple": -10.0,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "after": {
+        "accountId": "acc-B"
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": false,
+        "code": "HARD_STOP"
+      }
+    },
+    {
+      "name": "past-day trade pnl edit allowed while today locked",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        },
+        {
+          "id": "t-old",
+          "account_id": "acc-A",
+          "pnl": -20,
+          "date": "2026-03-08T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "update",
+      "before": {
+        "id": "t-old",
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -20,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-08T10:00:00Z",
+        "riskAmount": 100,
+        "rMultiple": -0.2,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "after": {
+        "pnl": -25
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": true
+      }
+    },
+    {
+      "name": "hardstop-delete-bypass: delete losing trade blocked",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "delete",
+      "before": {
+        "id": "t-loss",
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -1000,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-10T10:00:00Z",
+        "riskAmount": 100,
+        "rMultiple": -10.0,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": false,
+        "code": "HARD_STOP"
+      }
+    },
+    {
+      "name": "past-day trade delete allowed while today locked",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        },
+        {
+          "id": "t-old",
+          "account_id": "acc-A",
+          "pnl": -20,
+          "date": "2026-03-08T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "delete",
+      "before": {
+        "id": "t-old",
+        "accountId": "acc-A",
+        "asset": "MNQ",
+        "lotSize": 1,
+        "pnl": -20,
+        "result": "Loss",
+        "setup": "Breakout",
+        "confluences": [
+          "Trendline"
+        ],
+        "emotion": "Calm",
+        "mistake": "None",
+        "notes": "n",
+        "date": "2026-03-08T10:00:00Z",
+        "riskAmount": 100,
+        "rMultiple": -0.2,
+        "riskIsEstimated": false,
+        "session": "London",
+        "checklistResults": {
+          "a": true
+        }
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": true
+      }
+    },
+    {
+      "name": "enableHardStop=false at 100%: off, state breach, not locked",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": false,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "add",
+      "after": {
+        "accountId": "acc-A",
+        "pnl": -1
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": false,
+        "locked": false,
+        "status": "off",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": null,
+        "allowed": true
+      }
+    },
+    {
+      "name": "warn while enableHardStop off (D-9)",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t1",
+          "account_id": "acc-A",
+          "pnl": -800,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "expected": {
+        "configured": true,
+        "state": "warn",
+        "enforced": false,
+        "locked": false,
+        "status": "off",
+        "dayKey": "2026-03-10",
+        "lossToday": 800,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": null
+      }
+    },
+    {
+      "name": "maxDailyLoss missing: not configured",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "expected": {
+        "configured": false,
+        "state": "ok",
+        "enforced": true,
+        "locked": false,
+        "status": "off",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": null,
+        "isFallback": false,
+        "lockedUntilDayKey": null
+      }
+    },
+    {
+      "name": "maxDailyLoss 0: not configured",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 0,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "expected": {
+        "configured": false,
+        "state": "ok",
+        "enforced": true,
+        "locked": false,
+        "status": "off",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": null,
+        "isFallback": false,
+        "lockedUntilDayKey": null
+      }
+    },
+    {
+      "name": "percent limit (2% of 50000 = 1000) locked",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 2,
+          "maxDailyLossType": "%"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11"
+      }
+    },
+    {
+      "name": "dailyLossAlertThreshold 50: warn at 60%",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$",
+          "dailyLossAlertThreshold": 50
+        }
+      },
+      "trades": [
+        {
+          "id": "t1",
+          "account_id": "acc-A",
+          "pnl": -600,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "expected": {
+        "configured": true,
+        "state": "warn",
+        "enforced": true,
+        "locked": false,
+        "status": "warn",
+        "dayKey": "2026-03-10",
+        "lossToday": 600,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": null
+      }
+    },
+    {
+      "name": "dailyLossAlertThreshold 50: ok at 40%",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$",
+          "dailyLossAlertThreshold": 50
+        }
+      },
+      "trades": [
+        {
+          "id": "t1",
+          "account_id": "acc-A",
+          "pnl": -400,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "expected": {
+        "configured": true,
+        "state": "ok",
+        "enforced": true,
+        "locked": false,
+        "status": "ok",
+        "dayKey": "2026-03-10",
+        "lossToday": 400,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": null
+      }
+    },
+    {
+      "name": "net PnL (D-1): wins offset losses, -1500 + 800 = -700 ok",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t1",
+          "account_id": "acc-A",
+          "pnl": -1500,
+          "date": "2026-03-10T10:00:00Z"
+        },
+        {
+          "id": "t2",
+          "account_id": "acc-A",
+          "pnl": 800,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "add",
+      "after": {
+        "accountId": "acc-A",
+        "pnl": -1
+      },
+      "expected": {
+        "configured": true,
+        "state": "ok",
+        "enforced": true,
+        "locked": false,
+        "status": "ok",
+        "dayKey": "2026-03-10",
+        "lossToday": 700,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": null,
+        "allowed": true
+      }
+    },
+    {
+      "name": "net PnL positive day: lossToday 0",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t1",
+          "account_id": "acc-A",
+          "pnl": 500,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "expected": {
+        "configured": true,
+        "state": "ok",
+        "enforced": true,
+        "locked": false,
+        "status": "ok",
+        "dayKey": "2026-03-10",
+        "lossToday": 0,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": null
+      }
+    },
+    {
+      "name": "UTC+7 00:30: yesterday 23:59 local loss does not count",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t1",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-09T16:59:00Z"
+        }
+      ],
+      "now": "2026-03-09T17:30:00Z",
+      "tz": "Asia/Ho_Chi_Minh",
+      "op": "add",
+      "after": {
+        "accountId": "acc-A",
+        "pnl": -1
+      },
+      "expected": {
+        "configured": true,
+        "state": "ok",
+        "enforced": true,
+        "locked": false,
+        "status": "ok",
+        "dayKey": "2026-03-10",
+        "lossToday": 0,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": null,
+        "allowed": true
+      }
+    },
+    {
+      "name": "UTC+7 00:30: 00:10 local loss counts for the new local day",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t1",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-09T17:10:00Z"
+        }
+      ],
+      "now": "2026-03-09T17:30:00Z",
+      "tz": "Asia/Ho_Chi_Minh",
+      "op": "add",
+      "after": {
+        "accountId": "acc-A",
+        "pnl": -1
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": false,
+        "code": "HARD_STOP"
+      }
+    },
+    {
+      "name": "reset 17:00 ET: loss after 17:00 ET yesterday locks before today's reset",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$",
+          "resetTime": "17:00",
+          "resetTz": "America/New_York"
+        }
+      },
+      "trades": [
+        {
+          "id": "t1",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-01-12T23:00:00Z"
+        }
+      ],
+      "now": "2026-01-13T21:30:00Z",
+      "tz": "Asia/Ho_Chi_Minh",
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-01-12",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-01-13"
+      }
+    },
+    {
+      "name": "reset 17:00 ET: new trading day unlocks",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$",
+          "resetTime": "17:00",
+          "resetTz": "America/New_York"
+        }
+      },
+      "trades": [
+        {
+          "id": "t1",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-01-12T23:00:00Z"
+        }
+      ],
+      "now": "2026-01-13T22:05:00Z",
+      "tz": "Asia/Ho_Chi_Minh",
+      "op": "add",
+      "after": {
+        "accountId": "acc-A",
+        "pnl": -1
+      },
+      "expected": {
+        "configured": true,
+        "state": "ok",
+        "enforced": true,
+        "locked": false,
+        "status": "ok",
+        "dayKey": "2026-01-13",
+        "lossToday": 0,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": null,
+        "allowed": true
+      }
+    },
+    {
+      "name": "new UTC day unlocks",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t1",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-09T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "add",
+      "after": {
+        "accountId": "acc-A",
+        "pnl": -1
+      },
+      "expected": {
+        "configured": true,
+        "state": "ok",
+        "enforced": true,
+        "locked": false,
+        "status": "ok",
+        "dayKey": "2026-03-10",
+        "lossToday": 0,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": null,
+        "allowed": true
+      }
+    },
+    {
+      "name": "isFallback (client-only): prefs not loaded -> fail OPEN",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": null,
+      "prefsLoaded": false,
+      "fallbackTz": "UTC",
+      "op": "add",
+      "after": {
+        "accountId": "acc-A",
+        "pnl": -1
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": false,
+        "status": "warn",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": true,
+        "lockedUntilDayKey": null,
+        "allowed": true
+      }
+    },
+    {
+      "name": "isFallback (client-only): loaded but tz missing -> fallback zone, may lock",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": null,
+      "fallbackTz": "UTC",
+      "op": "add",
+      "after": {
+        "accountId": "acc-A",
+        "pnl": -1
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": true,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": false,
+        "code": "HARD_STOP"
+      }
+    },
+    {
+      "name": "isFallback (client-only): loaded but tz invalid -> fallback zone",
+      "account": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "Not/AZone",
+      "fallbackTz": "UTC",
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": true,
+        "lockedUntilDayKey": "2026-03-11"
+      }
+    },
+    {
+      "name": "non-active target account: only the target account's trades count",
+      "account": {
+        "id": "acc-B",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "tb",
+          "account_id": "acc-B",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        },
+        {
+          "id": "ta",
+          "account_id": "acc-A",
+          "pnl": 5000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "add",
+      "after": {
+        "accountId": "acc-B",
+        "pnl": -1
+      },
+      "expected": {
+        "configured": true,
+        "state": "breach",
+        "enforced": true,
+        "locked": true,
+        "status": "locked",
+        "dayKey": "2026-03-10",
+        "lossToday": 1000,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": "2026-03-11",
+        "allowed": false,
+        "code": "HARD_STOP"
+      }
+    },
+    {
+      "name": "non-active target account not locked although the active one is",
+      "account": {
+        "id": "acc-B",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "trades": [
+        {
+          "id": "tb",
+          "account_id": "acc-B",
+          "pnl": -100,
+          "date": "2026-03-10T10:00:00Z"
+        },
+        {
+          "id": "ta",
+          "account_id": "acc-A",
+          "pnl": -5000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "tz": "UTC",
+      "op": "add",
+      "after": {
+        "accountId": "acc-B",
+        "pnl": -1
+      },
+      "expected": {
+        "configured": true,
+        "state": "ok",
+        "enforced": true,
+        "locked": false,
+        "status": "ok",
+        "dayKey": "2026-03-10",
+        "lossToday": 100,
+        "limit": 1000,
+        "isFallback": false,
+        "lockedUntilDayKey": null,
+        "allowed": true
+      }
+    }
+  ]
+}

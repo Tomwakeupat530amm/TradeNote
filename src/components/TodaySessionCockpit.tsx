@@ -25,6 +25,9 @@ import { Link } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
 import { DisciplineShieldModal } from "@/components/DisciplineShieldModal";
 import { DailyExecutiveReportCard } from "@/components/DailyExecutiveReportCard";
+import { useTradingDay } from "@/hooks/useTradingDay";
+import { evaluateHardStop, tradesOfTradingDay } from "@/lib/hardStop";
+import { accountResetOverride } from "@/lib/propRisk";
 
 interface TodaySessionCockpitProps {
   activeAccount: Account;
@@ -49,14 +52,16 @@ export function TodaySessionCockpit({
     setIsShieldOpen(true);
   };
 
-  // Filter today's trades (local midnight to midnight)
-  const todayStr = useMemo(() => new Date().toDateString(), []);
-  
+  // Today's trades = the current TRADING day (user timezone + account reset), shared helper.
+  const tradingDay = useTradingDay();
+  const resetOverride = useMemo(() => accountResetOverride(activeAccount), [activeAccount]);
+  const todayKey = tradingDay.ready ? tradingDay.key(new Date(), resetOverride) : null;
+
   const todayTrades = useMemo(() => {
-    return trades
-      .filter((t) => new Date(t.date).toDateString() === todayStr)
+    if (!todayKey || !tradingDay.tz) return [];
+    return tradesOfTradingDay(trades, todayKey, tradingDay.tz, resetOverride)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [trades, todayStr]);
+  }, [trades, todayKey, tradingDay.tz, resetOverride]);
 
   // Calculations
   const todayPnL = useMemo(() => {
@@ -93,27 +98,30 @@ export function TodaySessionCockpit({
   // 1R and Bullets
   const account1R = useMemo(() => calculateAccount1RRisk(activeAccount), [activeAccount]);
 
-  // Hard Stop & Daily Loss evaluation
-  const dailyLossRule = activeAccount?.rules?.maxDailyLoss;
-  const hasDailyLossRule = Boolean(dailyLossRule && dailyLossRule > 0);
-  const maxLossLimit = useMemo(() => {
-    if (!hasDailyLossRule || !activeAccount) return 0;
-    return activeAccount.rules?.maxDailyLossType === "%"
-      ? activeAccount.initialBalance * ((dailyLossRule || 0) / 100)
-      : (dailyLossRule || 0);
-  }, [hasDailyLossRule, activeAccount, dailyLossRule]);
-
-  const alertThreshold = activeAccount?.rules?.dailyLossAlertThreshold ?? 80;
-  const currentLoss = Math.max(0, -todayPnL);
-  const dailyLossPercent = maxLossLimit > 0 ? (currentLoss / maxLossLimit) * 100 : 0;
+  // Hard Stop & Daily Loss evaluation: same decision as the store guard (evaluateHardStop, D-9).
+  // The warning shows even when enforcement is off; only the lock needs enableHardStop.
+  const hardStop = useMemo(
+    () =>
+      evaluateHardStop({
+        trades,
+        account: activeAccount,
+        tz: tradingDay.tz,
+        prefsLoaded: tradingDay.ready,
+      }),
+    [trades, activeAccount, tradingDay.tz, tradingDay.ready],
+  );
+  const hasDailyLossRule = hardStop.configured;
+  const maxLossLimit = hardStop.limit ?? 0;
+  const currentLoss = hardStop.lossToday;
+  const dailyLossPercent = hardStop.pct;
   const remainingLossBuffer = maxLossLimit > 0 ? Math.max(0, maxLossLimit - currentLoss) : null;
   const bulletsRemaining = useMemo(() => {
     if (remainingLossBuffer === null || account1R.riskDollar <= 0) return null;
     return calculateRemainingBullets(remainingLossBuffer, account1R.riskDollar);
   }, [remainingLossBuffer, account1R.riskDollar]);
 
-  const isHardStopBreached = hasDailyLossRule && currentLoss >= maxLossLimit;
-  const isHardStopWarning = hasDailyLossRule && dailyLossPercent >= alertThreshold && !isHardStopBreached;
+  const isHardStopBreached = hardStop.state === "breach";
+  const isHardStopWarning = hardStop.state === "warn";
 
   // Cool-Down Nudge (2 consecutive losses or 5+ trades high frequency)
   const isConsecutiveLoss = useMemo(() => {

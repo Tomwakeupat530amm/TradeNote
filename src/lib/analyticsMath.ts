@@ -1,6 +1,7 @@
 import type { Trade } from "@/store/useTradeStore";
 import { isRatedForR, rMultiple } from "@/lib/risk";
 import { avgR as statsAvgR, profitFactor as statsProfitFactor, winRate as statsWinRate } from "@/lib/stats";
+import { UNRATED } from "@/lib/psychology";
 import { startOfWeek, startOfMonth, subDays, isAfter, format, parseISO } from "date-fns";
 
 export interface HistoricalDrawdown {
@@ -76,6 +77,8 @@ export interface EmotionGroupPerformance {
 export interface EmotionDisciplineComparison {
   calm: EmotionGroupPerformance;
   emotional: EmotionGroupPerformance;
+  /** P4: trades without a rated emotion (UNRATED / empty), excluded from both groups. */
+  unratedCount: number;
 }
 
 /**
@@ -374,7 +377,7 @@ export function calculateMistakeLeakage(trades: Trade[]): MistakeLeakageResult {
   const map = new Map<string, { totalLoss: number; lossCount: number; totalCount: number; winCount: number; netPnl: number; trades: Trade[] }>();
 
   trades.forEach((t) => {
-    if (!t.mistake || t.mistake.trim() === "" || t.mistake === "None") return;
+    if (!t.mistake || t.mistake.trim() === "" || t.mistake === "None" || t.mistake === UNRATED) return;
     const tag = t.mistake.trim();
     const current = map.get(tag) || { totalLoss: 0, lossCount: 0, totalCount: 0, winCount: 0, netPnl: 0, trades: [] };
     current.trades.push(t);
@@ -426,13 +429,23 @@ export function calculateEmotionBreakdown(trades: Trade[]): EmotionDisciplineCom
   const result: EmotionDisciplineComparison = {
     calm: { totalTrades: 0, winRate: 0, netPnl: 0, wins: 0, losses: 0 },
     emotional: { totalTrades: 0, winRate: 0, netPnl: 0, wins: 0, losses: 0 },
+    unratedCount: 0,
   };
 
   if (!trades || trades.length === 0) return result;
 
+  const calmTrades: Trade[] = [];
+  const emotionalTrades: Trade[] = [];
   trades.forEach((t) => {
-    const isCalm = t.emotion === "Calm" || t.emotion === "Bình tĩnh" || t.emotion === "Disciplined";
+    const emo = t.emotion?.trim();
+    // P4 (D-13): no emotion / UNRATED is excluded (never counted as Calm).
+    if (!emo || emo === UNRATED) {
+      result.unratedCount += 1;
+      return;
+    }
+    const isCalm = emo === "Calm" || emo === "Bình tĩnh" || emo === "Disciplined";
     const target = isCalm ? result.calm : result.emotional;
+    (isCalm ? calmTrades : emotionalTrades).push(t);
 
     target.totalTrades += 1;
     target.netPnl += t.pnl;
@@ -440,14 +453,13 @@ export function calculateEmotionBreakdown(trades: Trade[]): EmotionDisciplineCom
     else if (t.result === "Loss") target.losses += 1;
   });
 
-  const calcWinRate = (group: EmotionGroupPerformance) => {
-    const decisive = group.wins + group.losses;
-    group.winRate = decisive > 0 ? Math.round((group.wins / decisive) * 100) : 0;
+  const finishGroup = (group: EmotionGroupPerformance, items: Trade[]) => {
+    group.winRate = Math.round(statsWinRate(items));
     group.netPnl = Number(group.netPnl.toFixed(2));
   };
 
-  calcWinRate(result.calm);
-  calcWinRate(result.emotional);
+  finishGroup(result.calm, calmTrades);
+  finishGroup(result.emotional, emotionalTrades);
 
   return result;
 }

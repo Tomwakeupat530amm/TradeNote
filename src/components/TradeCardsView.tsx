@@ -9,6 +9,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 import { useTranslations } from "next-intl";
+import { UNRATED } from "@/lib/psychology";
 
 import { Trade } from "@/store/useTradeStore";
 import { detectSession } from "@/lib/sessionUtils";
@@ -218,7 +219,7 @@ export function TradeCardsView({
                   <span className="inline-flex items-center rounded-md bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 text-[11px] font-medium text-purple-300">
                     {tTag(trade.emotion)}
                   </span>
-                  {trade.mistake && trade.mistake !== "None" && (
+                  {trade.mistake && trade.mistake !== "None" && trade.mistake !== UNRATED && (
                     <span className="inline-flex items-center rounded-md bg-orange-500/15 border border-orange-500/30 px-2 py-0.5 text-[11px] font-medium text-orange-300">
                       {tTag(trade.mistake)}
                     </span>

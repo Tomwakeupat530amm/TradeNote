@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from './useAuthStore';
+import { usePreferenceStore } from './usePreferenceStore';
+import { evaluateAccountConfigChange, HardStopError, isAccountConfigChangeRelevant } from '@/lib/hardStop';
 
 export interface AccountRules {
   maxPositions?: number;
@@ -126,6 +128,25 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   },
 
   updateAccount: async (id, updates) => {
+    // D6 config-lock guard (client), BEFORE any write. Fast path: no D6 field changed -> no fetch (E-19).
+    const oldAccount = get().accounts.find(a => a.id === id);
+    if (oldAccount && isAccountConfigChangeRelevant(oldAccount, updates)) {
+      // Lazy import: useTradeStore imports this store (no static cycle).
+      const { loadHardStopTrades } = await import('./useTradeStore');
+      const trades = await loadHardStopTrades([id]);
+      if (trades) {
+        const { preferences, prefsLoaded } = usePreferenceStore.getState();
+        const decision = evaluateAccountConfigChange({
+          oldAccount,
+          updates,
+          trades,
+          tz: preferences?.timezone ?? null,
+          prefsLoaded,
+        });
+        if (!decision.allowed) throw new HardStopError('HARD_STOP_CONFIG_LOCKED');
+      }
+    }
+
     const { error } = await supabase
       .from('accounts')
       .update({

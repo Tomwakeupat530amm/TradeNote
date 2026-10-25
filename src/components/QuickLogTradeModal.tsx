@@ -2,7 +2,10 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useTradeStore, TradeResult, SetupTag, SaveTradeError } from "@/store/useTradeStore";
+import { useTradeStore, TradeResult, SetupTag, SaveTradeError, HardStopError } from "@/store/useTradeStore";
+import { useHardStop } from "@/hooks/useHardStop";
+import { HardStopBanner } from "@/components/HardStopBanner";
+import { UNRATED } from "@/lib/psychology";
 import { useAccountStore } from "@/store/useAccountStore";
 import { usePlaybookStore } from "@/store/usePlaybookStore";
 import { detectSession, TradingSession } from "@/lib/sessionUtils";
@@ -35,11 +38,14 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
   const c = useTranslations("Common");
   const tRisk = useTranslations("Risk");
   const tTrade = useTranslations("Trade");
+  const tHardStop = useTranslations("HardStop");
+  const tPsych = useTranslations("Psych");
   const { accounts, activeAccountId } = useAccountStore();
   const { addTrade } = useTradeStore();
   const { playbooks, fetchPlaybooks } = usePlaybookStore();
 
   const activeAccount = accounts.find((a) => a.id === activeAccountId) || accounts[0];
+  const hardStop = useHardStop(activeAccount?.id ?? null);
 
   // Dynamic setups from Playbook
   const dynamicSetups = useMemo(() => {
@@ -57,7 +63,7 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
     // P3 D3: account 1R only as a suggestion; blank when the account has no risk configured.
     return suggestedRiskInput(activeAccount);
   });
-  const [setup, setSetup] = useState<string>("Breakout");
+  const [setup, setSetup] = useState<string>(UNRATED);
   const [notes, setNotes] = useState("");
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [compressionRatio, setCompressionRatio] = useState<number | null>(null);
@@ -253,8 +259,8 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
         result: derivedResult,
         setup: setup as SetupTag,
         confluences: [],
-        emotion: "Calm",
-        mistake: "None",
+        emotion: UNRATED,
+        mistake: UNRATED,
         notes: notes.trim(),
         screenshotFile: screenshot || undefined,
         riskAmount: parsedRisk,
@@ -273,7 +279,9 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
       onClose();
     } catch (err) {
       // Save failed: keep the modal open with every entered value (no reset here).
-      if (err instanceof SaveTradeError) {
+      if (err instanceof HardStopError) {
+        toast.error(tHardStop("lockedSubmit"));
+      } else if (err instanceof SaveTradeError) {
         toast.error(tTrade("saveError.failed", { detail: err.detail }));
       } else {
         toast.error(c("error"));
@@ -408,6 +416,7 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
 
             {/* Form Body */}
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
+              <HardStopBanner state={hardStop} />
               {/* Asset Selector & Quick Chips */}
               <div>
                 <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
@@ -578,6 +587,9 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
                   onChange={(e) => setSetup(e.target.value)}
                   className="w-full rounded-xl bg-gray-950/80 border border-white/10 px-3.5 py-2.5 text-sm font-semibold text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 >
+                  <option value={UNRATED} className="bg-gray-900 text-gray-400">
+                    {tPsych("chooseSetup")}
+                  </option>
                   {dynamicSetups.map((s) => (
                     <option key={s} value={s} className="bg-gray-900 text-white">
                       {s}
@@ -694,7 +706,7 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
                   </button>
                   <button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || hardStop.locked}
                     className="flex items-center gap-2 px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 rounded-xl transition-all shadow-md shadow-emerald-500/20 disabled:opacity-50 active:scale-[0.97] cursor-pointer"
                   >
                     <Save className="w-3.5 h-3.5" />

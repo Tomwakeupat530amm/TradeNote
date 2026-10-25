@@ -1,6 +1,25 @@
 import type { Trade } from "@/store/useTradeStore";
 import type { Account } from "@/store/useAccountStore";
 import { isRatedForR, rMultiple } from "@/lib/risk";
+import { dailyLossLimit, DEFAULT_DAILY_LOSS_ALERT_THRESHOLD, tradesOfTradingDay } from "@/lib/hardStop";
+import { accountResetOverride } from "@/lib/propRisk";
+import { nowTradingDayKey } from "@/lib/tradingDay";
+import { isRated, UNRATED } from "@/lib/psychology";
+
+const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Trading-day key for the score (P4, D-11). `YYYY-MM-DD` is used as is; a legacy `toDateString`
+ * value ("Mon Oct 05 2026") is still accepted for one release and read as that calendar date.
+ */
+function toDayKey(targetDateStr: string | undefined, tz: string, account?: Account | null): string {
+  if (!targetDateStr) return nowTradingDayKey(tz, accountResetOverride(account ?? null));
+  if (DAY_KEY_RE.test(targetDateStr)) return targetDateStr;
+  const legacy = new Date(targetDateStr);
+  if (Number.isNaN(legacy.getTime())) return targetDateStr;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${legacy.getFullYear()}-${pad(legacy.getMonth() + 1)}-${pad(legacy.getDate())}`;
+}
 
 /** R of a rated trade; null when the trade has no risk (P3: never a 0/1 fallback). */
 function ratedR(t: Trade): number | null {
@@ -25,6 +44,8 @@ export interface DailyDisciplineReport {
   tier: DisciplineTier;
   isRestDay: boolean;
   totalTrades: number;
+  /** P4: trades of the day whose emotion or mistake is UNRATED. */
+  unratedCount: number;
   wins: number;
   losses: number;
   netPnl: number;
@@ -43,16 +64,13 @@ export interface DailyDisciplineReport {
 export function calculateDailyDisciplineScore(
   trades: Trade[],
   account?: Account | null,
-  targetDateStr?: string
+  targetDateStr?: string,
+  tz: string = "UTC"
 ): DailyDisciplineReport {
-  const targetDate = targetDateStr || new Date().toDateString();
+  const dayKey = toDayKey(targetDateStr, tz, account);
 
-  // Filter trades for target calendar day
-  const dayTrades = trades
-    .filter((t) => {
-      const d = new Date(t.date);
-      return !isNaN(d.getTime()) && (d.toDateString() === targetDate || t.date.startsWith(targetDate));
-    })
+  // Trades of the target TRADING day (shared helper: user timezone + account reset).
+  const dayTrades = tradesOfTradingDay(trades, dayKey, tz, accountResetOverride(account ?? null))
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   // Rest Day (0 trades)
@@ -62,6 +80,7 @@ export function calculateDailyDisciplineScore(
       tier: "tier_master",
       isRestDay: true,
       totalTrades: 0,
+      unratedCount: 0,
       wins: 0,
       losses: 0,
       netPnl: 0,
@@ -97,7 +116,7 @@ export function calculateDailyDisciplineScore(
     if (t.checklistResults && Object.keys(t.checklistResults).length > 0) {
       const allChecked = Object.values(t.checklistResults).every(Boolean);
       playbookScoreSum += allChecked ? 100 : 70;
-    } else if (t.setup && t.setup !== "Other" && t.setup !== "Unspecified") {
+    } else if (t.setup && t.setup !== "Other" && t.setup !== "Unspecified" && t.setup !== UNRATED) {
       playbookScoreSum += 75;
     } else {
       playbookScoreSum += 25; // Impulse trade without playbook setup
@@ -131,16 +150,15 @@ export function calculateDailyDisciplineScore(
 
   // 3. Hard Stop Respect (20%)
   let sHardStop = 100;
-  const dailyRule = account?.rules?.maxDailyLoss;
-  if (dailyRule && dailyRule > 0) {
-    const maxLimit = account.rules?.maxDailyLossType === "%"
-      ? account.initialBalance * (dailyRule / 100)
-      : dailyRule;
+  // Same limit and warn threshold as evaluateHardStop (D-11: dailyLossAlertThreshold ?? 80).
+  const maxLimit = account ? dailyLossLimit(account.rules, account.initialBalance) : null;
+  if (maxLimit !== null) {
     const currentLoss = Math.max(0, -netPnl);
+    const threshold = account?.rules?.dailyLossAlertThreshold ?? DEFAULT_DAILY_LOSS_ALERT_THRESHOLD;
 
     if (currentLoss >= maxLimit) {
       sHardStop = 0; // Breached hard stop
-    } else if (currentLoss >= maxLimit * 0.8) {
+    } else if (currentLoss >= maxLimit * (threshold / 100)) {
       sHardStop = 60; // Warned
     } else {
       sHardStop = 100;
@@ -213,6 +231,7 @@ export function calculateDailyDisciplineScore(
     tier,
     isRestDay: false,
     totalTrades: dayTrades.length,
+    unratedCount: dayTrades.filter((t) => !isRated(t)).length,
     wins,
     losses,
     netPnl: Math.round(netPnl * 100) / 100,

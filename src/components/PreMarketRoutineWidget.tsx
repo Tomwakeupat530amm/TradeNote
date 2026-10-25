@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { useAccountStore } from "@/store/useAccountStore";
+import { useTradingDay } from "@/hooks/useTradingDay";
+import { accountResetOverride } from "@/lib/propRisk";
 import { useTranslations, useLocale } from "next-intl";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,7 +23,8 @@ export interface RoutineItem {
 export function PreMarketRoutineWidget() {
   const t = useTranslations("PreMarket");
   const locale = useLocale();
-  const { activeAccountId } = useAccountStore();
+  const { activeAccountId, accounts } = useAccountStore();
+  const tradingDay = useTradingDay();
 
   const defaultRoutineItems: RoutineItem[] = useMemo(() => [
     {
@@ -51,8 +54,11 @@ export function PreMarketRoutineWidget() {
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
 
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const storageKey = `tradenote_premarket_${todayKey}_${activeAccountId || "default"}`;
+  // Trading-day key (user timezone + account reset). The key format is unchanged but the day is now
+  // the trading day, so checks reset once at the switch (D-6 style, noted in the phase report).
+  const activeAccount = accounts.find((a) => a.id === activeAccountId) ?? null;
+  const todayKey = tradingDay.ready ? tradingDay.key(new Date(), accountResetOverride(activeAccount)) : null;
+  const storageKey = todayKey ? `tradenote_premarket_${todayKey}_${activeAccountId || "default"}` : null;
   const customItemsKey = `tradenote_custom_routine_items_${activeAccountId || "default"}`;
   const visibilityKey = `tradenote_show_routine_widget_${activeAccountId || "default"}`;
 
@@ -78,7 +84,7 @@ export function PreMarketRoutineWidget() {
       }
 
       // 3. Load daily completed checks
-      const savedChecks = localStorage.getItem(storageKey);
+      const savedChecks = storageKey ? localStorage.getItem(storageKey) : null;
       if (savedChecks) {
         setCompleted(JSON.parse(savedChecks));
       } else {
@@ -93,7 +99,7 @@ export function PreMarketRoutineWidget() {
     const updated = { ...completed, [id]: !completed[id] };
     setCompleted(updated);
     try {
-      localStorage.setItem(storageKey, JSON.stringify(updated));
+      if (storageKey) localStorage.setItem(storageKey, JSON.stringify(updated));
     } catch {
       // ignore
     }

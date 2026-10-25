@@ -8,6 +8,8 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { supabase } from "@/lib/supabase";
 import { Save, ShieldAlert, Tag, Settings, Trash, Plus, EyeOff, Lock, User, Upload, Key, Mail } from "lucide-react";
 import { toast } from "sonner";
+import { HardStopError } from "@/lib/hardStop";
+import { isReservedTagName } from "@/lib/psychology";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useTranslations } from "next-intl";
@@ -18,6 +20,8 @@ function cn(...inputs: ClassValue[]) {
 
 export default function SettingsPage() {
   const t = useTranslations("Settings");
+  const tHardStop = useTranslations("HardStop");
+  const tPsych = useTranslations("Psych");
   const { user } = useAuthStore();
   const { accounts, activeAccountId, updateAccount } = useAccountStore();
   const { preferences, fetchPreferences, updatePreferences, isLoading: prefsLoading } = usePreferenceStore();
@@ -100,8 +104,12 @@ export default function SettingsPage() {
       });
       toast.success(t('risk_saved', { defaultMessage: "Risk settings saved successfully!" }));
     } catch (error) {
-      console.error(error);
-      toast.error(t('risk_failed', { defaultMessage: "Failed to save risk settings." }));
+      if (error instanceof HardStopError && error.code === "HARD_STOP_CONFIG_LOCKED") {
+        toast.error(tHardStop("configLocked"));
+      } else {
+        console.error(error);
+        toast.error(t('risk_failed', { defaultMessage: "Failed to save risk settings." }));
+      }
     } finally {
       setIsSavingRisk(false);
     }
@@ -113,8 +121,12 @@ export default function SettingsPage() {
     try {
       await updatePreferences({ displayName, timezone, baseCurrency });
       toast.success(t('profile_saved', { defaultMessage: "Profile settings saved!" }));
-    } catch {
-      toast.error(t('profile_failed', { defaultMessage: "Failed to save profile settings." }));
+    } catch (error) {
+      if (error instanceof HardStopError && error.code === "HARD_STOP_CONFIG_LOCKED") {
+        toast.error(tHardStop("configLocked"));
+      } else {
+        toast.error(t('profile_failed', { defaultMessage: "Failed to save profile settings." }));
+      }
     } finally {
       setIsSavingProfile(false);
     }
@@ -192,6 +204,10 @@ export default function SettingsPage() {
   const handleAddPsychTag = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPsychTag.trim() || !preferences) return;
+    if (isReservedTagName(newPsychTag)) {
+      toast.error(tPsych("reservedTag"));
+      return;
+    }
     const tags = [...preferences.psychologyTags, newPsychTag.trim()];
     await updatePreferences({ psychologyTags: tags });
     setNewPsychTag("");
@@ -207,6 +223,10 @@ export default function SettingsPage() {
   const handleAddMistakeTag = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMistakeTag.trim() || !preferences) return;
+    if (isReservedTagName(newMistakeTag)) {
+      toast.error(tPsych("reservedTag"));
+      return;
+    }
     const tags = [...preferences.mistakeTags, newMistakeTag.trim()];
     await updatePreferences({ mistakeTags: tags });
     setNewMistakeTag("");
@@ -222,6 +242,10 @@ export default function SettingsPage() {
   const handleAddConfluenceTag = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newConfluenceTag.trim() || !preferences) return;
+    if (isReservedTagName(newConfluenceTag)) {
+      toast.error(tPsych("reservedTag"));
+      return;
+    }
     const tags = [...preferences.confluenceTags, newConfluenceTag.trim()];
     await updatePreferences({ confluenceTags: tags });
     setNewConfluenceTag("");
