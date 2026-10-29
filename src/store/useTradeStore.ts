@@ -10,6 +10,7 @@ import { rMultiple as computeRMultiple } from '@/lib/risk';
 import { assertMutationAllowed, effectiveLimit, evaluateHardStop, HardStopError, type HardStopTrade } from '@/lib/hardStop';
 import { serverHardStopHint, toServerHardStopError } from '@/lib/hardStopServerError';
 import { isRated } from '@/lib/psychology';
+import { defaultQueueStore, enqueueOrphanPaths, removeStorageObjects } from '@/lib/orphanScreenshots';
 
 // The Hard Stop error lives in the pure lib (E-3); re-exported for the forms.
 export { HardStopError } from '@/lib/hardStop';
@@ -164,6 +165,38 @@ async function guardHardStop(
   return trades;
 }
 
+/**
+ * P6 (E17 MAJOR-1): roll back a freshly uploaded image after a failed write. Remove it now only
+ * when the error carries a non-empty DB/PostgREST code (definitive rejection, incl. P0001
+ * HARD_STOP). A code-less error (network/timeout) is ambiguous - the row may have been committed -
+ * so the path is queued instead; retryOrphanQueue re-checks "not referenced" before removing.
+ */
+async function rollbackUploadedScreenshot(
+  userId: string | undefined,
+  path: string,
+  error: { code?: string | null } | null | undefined,
+): Promise<void> {
+  const definitive = typeof error?.code === 'string' && error.code.trim() !== '';
+  if (definitive) {
+    await removeScreenshotsOrQueue(userId, [path]);
+    return;
+  }
+  if (userId) enqueueOrphanPaths(defaultQueueStore(), userId, [path]);
+}
+
+/**
+ * P6: remove screenshots AFTER the DB write decided their fate. Checks `{ error }` (remove() does
+ * not throw on failure); failed paths go to the per-user orphan queue. Never throws.
+ */
+async function removeScreenshotsOrQueue(userId: string | undefined, paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  const { failedPaths } = await removeStorageObjects(supabase.storage.from(SCREENSHOT_BUCKET), paths);
+  if (failedPaths.length > 0) {
+    console.warn('Could not remove screenshot(s) from storage; queued for cleanup:', failedPaths.length);
+    if (userId) enqueueOrphanPaths(defaultQueueStore(), userId, failedPaths);
+  }
+}
+
 /** Never lets a notification failure escape the trade mutation (B3-v2 c). */
 async function notifySafely(notification: { title: string; message: string; type: 'warning' | 'error' }): Promise<void> {
   try {
@@ -193,80 +226,138 @@ async function hasNotificationKey(key: string): Promise<boolean> {
   return useNotificationStore.getState().notifications.some(n => n.message.includes(tag) || n.title.includes(tag));
 }
 
-/** PostgREST page size; must not exceed the project's max_rows (default 1000). */
-export const TRADES_PAGE_SIZE = 1000;
-/** Safety cap on pages (100k trades) so a misbehaving backend cannot loop forever. */
-const TRADES_MAX_PAGES = 100;
+/** P6: keyset page size; correctness does not depend on the server max_rows (stops on an EMPTY page). */
+export const TRADES_PAGE_SIZE = 500;
+/** Safety cap on pages so a misbehaving backend cannot loop forever; hitting it sets loadError 'TRUNCATED'. */
+export const TRADES_MAX_PAGES = 400;
+
+/** Load error codes: 'TRUNCATED' (page cap hit), 'STALLED' (cursor did not advance) or the DB error code. */
+export type TradesLoadError = string;
+
+/** DB row -> Trade (single mapper for fetch). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapTradeRow(d: any): Trade {
+  return {
+    id: d.id,
+    accountId: d.account_id,
+    asset: d.asset,
+    lotSize: d.lot_size,
+    pnl: d.pnl,
+    result: d.result,
+    setup: d.setup,
+    confluences: d.confluences || [],
+    emotion: d.emotion,
+    mistake: d.mistake,
+    notes: d.notes,
+    screenshotUrl: d.screenshot_url,
+    screenshotPath: d.screenshot_path ?? pathFromLegacyUrl(d.screenshot_url) ?? undefined,
+    date: d.date,
+    ...mapRiskFields(d),
+    session: d.session || 'New York',
+    checklistResults: d.checklist_results || {},
+  };
+}
+
+/**
+ * Keyset cursor `(date, id) < (lastDate, lastId)` for `date desc, id desc`. The date is the RAW
+ * string of the last row (never re-formatted through Date: microseconds/offset stay exact).
+ */
+export function keysetFilter(lastDate: string, lastId: string): string {
+  return `date.lt."${lastDate}",and(date.eq."${lastDate}",id.lt.${lastId})`;
+}
+
+/** Session token: a newer fetchTrades call makes late pages of an older call no-ops. */
+let tradesFetchToken = 0;
+/** Ids inserted by addTrade while a load is running (merged into the loaded list, de-duplicated). */
+const addedDuringLoad = new Map<string, Trade>();
 
 interface TradeState {
   trades: Trade[];
   isLoading: boolean;
+  /** P6: true while pages after the first are being read. */
+  isLoadingMore: boolean;
+  /** P6: null, 'TRUNCATED', 'STALLED' or a DB error code; set when the full history is NOT loaded. */
+  loadError: TradesLoadError | null;
+  /** P6: true only after a load finished with every page (false before the first load and on error). */
+  isFullyLoaded: boolean;
+  /** P6: account whose full history `trades` holds (null until a load succeeded). */
+  loadedAccountId: string | null;
   fetchTrades: (accountId: string) => Promise<void>;
   addTrade: (trade: NewTradeInput) => Promise<void>;
   updateTrade: (id: string, updates: TradeUpdateInput) => Promise<void>;
   deleteTrade: (id: string) => Promise<void>;
 }
 
+/** P6 gate: the full history of `accountId` is loaded (totals / AI Coach / simulator / rename count are exact). */
+export function isHistoryReady(
+  state: Pick<TradeState, 'isLoading' | 'loadError' | 'isFullyLoaded' | 'loadedAccountId'>,
+  accountId: string | null | undefined,
+): boolean {
+  return !!accountId && !state.isLoading && !state.loadError && state.isFullyLoaded && state.loadedAccountId === accountId;
+}
+
 export const useTradeStore = create<TradeState>((set, get) => ({
   trades: [],
   isLoading: false,
+  isLoadingMore: false,
+  loadError: null,
+  isFullyLoaded: false,
+  loadedAccountId: null,
 
   fetchTrades: async (accountId: string) => {
     const user = useAuthStore.getState().user;
     if (!user || !accountId) return;
 
-    set({ isLoading: true });
-    // F-3: paginate so accounts with more than max_rows trades are not silently truncated.
-    // Stable order (date desc, id desc) keeps page boundaries deterministic; RLS + account scope unchanged.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let data: any[] | null = [];
-    let error: unknown = null;
+    const token = ++tradesFetchToken;
+    addedDuringLoad.clear();
+    set({ isLoading: true, isLoadingMore: false, loadError: null, isFullyLoaded: false });
+
+    // P6 keyset (date desc, id desc): stop on an EMPTY page, so a server max_rows below the page
+    // size cannot truncate silently. Rows are kept in a Map (de-dup by id).
+    const loaded = new Map<string, Trade>();
+    let loadError: TradesLoadError | null = null;
+    let complete = false;
+    let cursor: { date: string; id: string } | null = null;
     for (let page = 0; page < TRADES_MAX_PAGES; page++) {
-      const from = page * TRADES_PAGE_SIZE;
-      const res = await supabase
-        .from('trades')
-        .select('*')
-        .eq('account_id', accountId)
+      if (page === 1) set({ isLoadingMore: true });
+      let query = supabase.from('trades').select('*').eq('account_id', accountId);
+      if (cursor) query = query.or(keysetFilter(cursor.date, cursor.id));
+      const res = await query
         .order('date', { ascending: false })
         .order('id', { ascending: false })
-        .range(from, from + TRADES_PAGE_SIZE - 1);
+        .limit(TRADES_PAGE_SIZE);
+      if (token !== tradesFetchToken) return; // a newer load (e.g. account switch) owns the state
       if (res.error) {
-        error = res.error;
-        data = null;
+        console.error('Error fetching trades:', res.error);
+        loadError = res.error.code ? String(res.error.code) : 'UNKNOWN';
         break;
       }
       const rows = res.data ?? [];
-      data.push(...rows);
-      if (rows.length < TRADES_PAGE_SIZE) break;
+      if (rows.length === 0) { complete = true; break; }
+      for (const row of rows) loaded.set(String(row.id), mapTradeRow(row));
+      const last = rows[rows.length - 1];
+      const next = { date: String(last.date), id: String(last.id) };
+      if (cursor && cursor.date === next.date && cursor.id === next.id) {
+        loadError = 'STALLED';
+        break;
+      }
+      cursor = next;
     }
+    if (!complete && !loadError) loadError = 'TRUNCATED';
 
-    if (error) {
-      console.error('Error fetching trades:', error);
-    } else if (data) {
-      const formattedTrades: Trade[] = data.map(d => {
-        return {
-          id: d.id,
-          accountId: d.account_id,
-          asset: d.asset,
-          lotSize: d.lot_size,
-          pnl: d.pnl,
-          result: d.result,
-          setup: d.setup,
-          confluences: d.confluences || [],
-          emotion: d.emotion,
-          mistake: d.mistake,
-          notes: d.notes,
-          screenshotUrl: d.screenshot_url,
-          screenshotPath: d.screenshot_path ?? pathFromLegacyUrl(d.screenshot_url) ?? undefined,
-          date: d.date,
-          ...mapRiskFields(d),
-          session: d.session || 'New York',
-          checklistResults: d.checklist_results || {},
-        };
-      });
-      set({ trades: formattedTrades });
-    }
-    set({ isLoading: false });
+    // Trades inserted while loading are kept (de-duplicated by id).
+    const added = [...addedDuringLoad.values()].filter(t => t.accountId === accountId && !loaded.has(t.id));
+    addedDuringLoad.clear();
+    // Success: set ONCE after all pages. Error: the loaded rows of THIS account only (never another
+    // account's list); a first-page error therefore leaves `trades` empty for this account.
+    set({
+      trades: [...added, ...loaded.values()],
+      isLoading: false,
+      isLoadingMore: false,
+      loadError,
+      isFullyLoaded: loadError === null,
+      loadedAccountId: loadError === null ? accountId : null,
+    });
   },
 
   addTrade: async (trade) => {
@@ -294,11 +385,12 @@ export const useTradeStore = create<TradeState>((set, get) => ({
           upsert: false
         });
 
-      if (uploadError) {
+      if (uploadError || !uploadData) {
+        // P6: never save the trade silently without its image.
         console.error('Upload error:', uploadError);
-      } else if (uploadData) {
-        finalScreenshotPath = filename;
+        throw new SaveTradeError('SCREENSHOT_UPLOAD_FAILED');
       }
+      finalScreenshotPath = filename;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -337,6 +429,8 @@ export const useTradeStore = create<TradeState>((set, get) => ({
 
     if (insertError) {
       console.error('Error adding trade:', insertError.code, insertError.message);
+      // P6: definitive rejection (incl. server HARD_STOP) -> remove the upload; code-less error -> queue it.
+      if (finalScreenshotPath) await rollbackUploadedScreenshot(user.id, finalScreenshotPath, insertError);
       // P5: server Hard Stop (P0001 + HINT HARD_STOP) -> HardStopError; HARD_STOP_CONFIG_LOCKED passes through.
       const serverStop = toServerHardStopError(insertError);
       if (serverStop) throw serverStop;
@@ -365,8 +459,9 @@ export const useTradeStore = create<TradeState>((set, get) => ({
         checklistResults: trade.checklistResults || {},
       };
       
+      if (useTradeStore.getState().isLoading) addedDuringLoad.set(newTrade.id, newTrade);
       set(state => ({
-        trades: [newTrade, ...state.trades]
+        trades: [newTrade, ...state.trades.filter(t => t.id !== newTrade.id)]
       }));
 
       // --- Rule Checking & Notifications (awaited, isolated; never fail the save) ---
@@ -439,11 +534,12 @@ export const useTradeStore = create<TradeState>((set, get) => ({
           upsert: false
         });
 
-      if (uploadError) {
+      if (uploadError || !uploadData) {
+        // P6: fail BEFORE the DB update; state and the old image stay intact.
         console.error('Upload error:', uploadError);
-      } else if (uploadData) {
-        newScreenshotPath = filename;
+        throw new SaveTradeError('SCREENSHOT_UPLOAD_FAILED');
       }
+      newScreenshotPath = filename;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -507,6 +603,8 @@ export const useTradeStore = create<TradeState>((set, get) => ({
 
     if (error) {
       console.error('Error updating trade:', error.code, error.message);
+      // P6: definitive rejection -> drop the new upload; code-less (ambiguous) error -> queue it.
+      if (newScreenshotPath) await rollbackUploadedScreenshot(user.id, newScreenshotPath, error);
       // P5: server Hard Stop rejection -> HardStopError; HARD_STOP_CONFIG_LOCKED passes through.
       const serverStop = toServerHardStopError(error);
       if (serverStop) throw serverStop;
@@ -532,33 +630,18 @@ export const useTradeStore = create<TradeState>((set, get) => ({
       )
     }));
 
-    // GC (best-effort, AFTER the DB update succeeded): drop the replaced/removed file.
+    // GC (AFTER the DB update succeeded): drop the replaced/removed file; failures are queued.
     if (imageChanged && previousPath && previousPath !== payload.screenshot_path) {
-      try {
-        await supabase.storage.from(SCREENSHOT_BUCKET).remove([previousPath]);
-      } catch (storageErr) {
-        console.warn('Could not remove previous screenshot from storage:', storageErr);
-      }
+      await removeScreenshotsOrQueue(user.id, [previousPath]);
     }
   },
 
   deleteTrade: async (id) => {
     const tradeToDelete = get().trades.find(t => t.id === id);
-    // --- Hard Stop guard (FIRST, before storage GC and the delete) ---
+    // --- Hard Stop guard (FIRST, before the delete and any storage GC) ---
     await guardHardStop('delete', tradeToDelete?.accountId, tradeToDelete, undefined);
 
-    // Storage Garbage Collection: Clean up screenshot from Supabase Storage
-    const storagePath = tradeToDelete
-      ? (tradeToDelete.screenshotPath ?? pathFromLegacyUrl(tradeToDelete.screenshotUrl))
-      : null;
-    if (storagePath) {
-      try {
-        await supabase.storage.from(SCREENSHOT_BUCKET).remove([storagePath]);
-      } catch (storageErr) {
-        console.warn('Could not remove screenshot from storage:', storageErr);
-      }
-    }
-
+    // P6 (KG12): the DB row goes FIRST; the image is touched only after the delete succeeded.
     const { error } = await supabase
       .from('trades')
       .delete()
@@ -575,5 +658,11 @@ export const useTradeStore = create<TradeState>((set, get) => ({
     set(state => ({
       trades: state.trades.filter(t => t.id !== id)
     }));
+
+    // Storage GC: remove the screenshot now that the row is gone; failures are queued per user.
+    const storagePath = tradeToDelete
+      ? (tradeToDelete.screenshotPath ?? pathFromLegacyUrl(tradeToDelete.screenshotUrl))
+      : null;
+    if (storagePath) await removeScreenshotsOrQueue(useAuthStore.getState().user?.id, [storagePath]);
   }
 }));

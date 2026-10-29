@@ -7,6 +7,7 @@ import {
   Target, RefreshCw, Bot, Copy, Check, RotateCcw 
 } from "lucide-react";
 import { useTradeStore } from "@/store/useTradeStore";
+import { TradesLoadBanner, useHistoryReady } from "@/components/TradesLoadBanner";
 import { useAccountStore } from "@/store/useAccountStore";
 import { useTranslations, useLocale } from "next-intl";
 import { aggregateTradingHabits } from "@/lib/aiCoachAggregator";
@@ -62,6 +63,8 @@ export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
   const t = useTranslations("AICoach");
   const locale = useLocale();
   const { trades } = useTradeStore();
+  // P6 B4: AI Coach analyses the full history only (isFullyLoaded for the active account).
+  const historyReady = useHistoryReady();
   const { accounts, activeAccountId } = useAccountStore();
   const activeAccount = accounts.find((a) => a.id === activeAccountId) || accounts[0];
 
@@ -239,6 +242,7 @@ export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
 
             {/* Modal Body */}
             <div className="mt-6 space-y-6 overflow-y-auto pr-1 flex-1 custom-scrollbar">
+              <TradesLoadBanner />
               {/* Top Banner / Actions */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-gray-900/60 border border-white/5">
                 <div>
@@ -255,7 +259,8 @@ export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
                   <button
                     type="button"
                     onClick={handleRunAnalysis}
-                    disabled={loading || accountTrades.length === 0}
+                    data-testid="ai-coach-run"
+                    disabled={loading || accountTrades.length === 0 || !historyReady}
                     className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white text-xs font-bold shadow-lg shadow-indigo-500/20 hover:opacity-95 transition-all disabled:opacity-50 cursor-pointer"
                   >
                     <RefreshCw className={clsx("h-4 w-4", loading && "animate-spin")} />

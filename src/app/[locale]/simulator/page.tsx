@@ -22,6 +22,7 @@ import { AnalysisTable } from './components/AnalysisTable';
 import { WorkflowViewer } from './components/WorkflowViewer';
 import { useAccountStore } from '@/store/useAccountStore';
 import { useTradeStore } from '@/store/useTradeStore';
+import { TradesLoadBanner, useHistoryReady } from '@/components/TradesLoadBanner';
 import { RefreshCw, Sparkles, ArrowLeft } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 import { toast } from 'sonner';
@@ -34,6 +35,8 @@ export default function SimulatorPage() {
   const t = useTranslations('Simulator');
   const { accounts, activeAccountId } = useAccountStore();
   const { trades } = useTradeStore();
+  // P6 B4: simulator runs only on the full history of the active account.
+  const historyReady = useHistoryReady();
   const activeAccount = accounts.find(a => a.id === activeAccountId) || accounts[0];
   const accountTrades = trades.filter(t => t.accountId === activeAccountId);
 
@@ -429,6 +432,7 @@ export default function SimulatorPage() {
               <button
                 type="button"
                 onClick={handleSyncFromAccount}
+                disabled={!historyReady}
                 className="w-full py-1.5 px-3 rounded-lg bg-indigo-600/80 hover:bg-indigo-600 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition-all border border-indigo-400/30"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -504,7 +508,8 @@ export default function SimulatorPage() {
               <input type="number" value={minDays} onChange={e => setMinDays(+e.target.value)} />
             </div>
 
-            <button className={styles['btn-run']} onClick={handleRun} disabled={isCalculating}>
+            <TradesLoadBanner compact />
+            <button className={styles['btn-run']} data-testid="simulator-run" onClick={handleRun} disabled={isCalculating || !historyReady}>
               {isCalculating ? t('btnRunning', { p: progress }) : t('btnRun')}
             </button>
             {isCalculating && (

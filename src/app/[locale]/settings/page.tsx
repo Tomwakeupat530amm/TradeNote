@@ -13,6 +13,7 @@ import { isReservedTagName } from "@/lib/psychology";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useTranslations } from "next-intl";
+import OrphanCleanupCard from "@/components/OrphanCleanupCard";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -718,6 +719,9 @@ export default function SettingsPage() {
               )}
             </div>
           )}
+
+          {/* P6: orphan screenshot cleanup (dry-run scan; delete only after an irreversible-action confirm) */}
+          <OrphanCleanupCard />
 
         </div>
       </div>

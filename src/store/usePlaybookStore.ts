@@ -3,6 +3,16 @@ import { supabase } from '@/lib/supabase';
 import { useAuthStore } from './useAuthStore';
 import { compressScreenshot } from '@/lib/imageCompressor';
 import { pathFromLegacyUrl } from '@/lib/screenshotStorage';
+import { defaultQueueStore, enqueueOrphanPaths, removeStorageObjects } from '@/lib/orphanScreenshots';
+
+/** P6: remove playbook images only after the DB write; `{ error }` is checked, failures queued per user. */
+async function removePlaybookImageOrQueue(userId: string | undefined, path: string): Promise<void> {
+  const { failedPaths } = await removeStorageObjects(supabase.storage.from('trade-screenshots'), [path]);
+  if (failedPaths.length > 0) {
+    console.warn('Could not remove playbook image from storage; queued for cleanup');
+    if (userId) enqueueOrphanPaths(defaultQueueStore(), userId, failedPaths);
+  }
+}
 
 export interface Playbook {
   id: string;
@@ -123,6 +133,8 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
     if (!user) return;
 
     let finalImageUrl = updates.imageUrl;
+    const existing = get().playbooks.find(p => p.id === id);
+    const previousPath = existing ? (existing.imagePath ?? pathFromLegacyUrl(existing.imageUrl)) : null;
 
     if (updates.imageFile && typeof updates.imageFile === 'string' && updates.imageFile.startsWith('data:image')) {
       const compressed = await compressScreenshot(updates.imageFile);
@@ -167,6 +179,12 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
       throw error;
     }
 
+    // P6: the old image is removed only AFTER the DB update succeeded, and only when it changed.
+    if (previousPath && Object.prototype.hasOwnProperty.call(payload, 'image_url')
+      && pathFromLegacyUrl(payload.image_url) !== previousPath) {
+      await removePlaybookImageOrQueue(user.id, previousPath);
+    }
+
     set(state => ({
       playbooks: state.playbooks.map(p => 
         p.id === id 
@@ -186,14 +204,8 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
     const storagePath = playbookToDelete
       ? (playbookToDelete.imagePath ?? pathFromLegacyUrl(playbookToDelete.imageUrl))
       : null;
-    if (storagePath) {
-      try {
-        await supabase.storage.from('trade-screenshots').remove([storagePath]);
-      } catch (storageErr) {
-        console.warn('Could not remove playbook image from storage:', storageErr);
-      }
-    }
 
+    // P6: DB row FIRST; the image is removed only after the delete succeeded.
     const { error } = await supabase
       .from('playbooks')
       .delete()
@@ -207,5 +219,7 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
     set(state => ({
       playbooks: state.playbooks.filter(p => p.id !== id)
     }));
+
+    if (storagePath) await removePlaybookImageOrQueue(useAuthStore.getState().user?.id, storagePath);
   }
 }));

@@ -578,7 +578,11 @@
     "stat_avg_r_sub": "R-Multiple / lệnh",
     "tab_view_table": "Bảng Lệnh",
     "tab_view_calendar": "Lịch Tháng",
-    "tab_playbook_setups": "Chiến Lược Playbook"
+    "tab_playbook_setups": "Chiến Lược Playbook",
+    "renameNewOnlyTitle": "Đổi tên chỉ áp dụng cho lệnh mới",
+    "renameNewOnlyBody": "Đổi tên \"{oldTitle}\" thành \"{newTitle}\" không sửa các lệnh cũ. Ít nhất {count} lệnh cũ trong tài khoản đang chọn sẽ không còn gắn với playbook này.",
+    "renameNewOnlyLoading": "Đang tải toàn bộ lịch sử lệnh của tài khoản đang chọn... Nút xác nhận sẽ bật khi tải xong.",
+    "renameNewOnlyConfirm": "Đổi tên"
   },
   "EconomicCalendar": {
     "title": "Lịch Kinh tế Trực tiếp",
@@ -632,7 +636,11 @@
     "n_a": "N/A",
     "delete": "Xóa",
     "cancel": "Hủy",
-    "saving": "Đang lưu..."
+    "saving": "Đang lưu...",
+    "loadingFullHistory": "Đang tải toàn bộ lịch sử lệnh...",
+    "tradesLoadError": "Không tải được toàn bộ lịch sử lệnh (lỗi {code}). Số liệu tổng có thể chưa đủ.",
+    "tradesLoadTruncated": "Lịch sử lệnh quá lớn, không tải hết được. Số liệu tổng có thể chưa đủ.",
+    "retryLoad": "Thử tải lại"
   },
   "Simulator": {
     "title": "Elite Quant Optimizer",
@@ -1450,5 +1458,27 @@
   },
   "Preferences": {
     "loadFailed": "Không tải được tùy chọn của bạn. Tạm thời hiển thị giá trị mặc định."
+  },
+  "OrphanCleanup": {
+    "title": "Dọn ảnh mồ côi",
+    "desc": "Tìm ảnh chụp lệnh trong bộ nhớ không còn lệnh nào dùng (cũ hơn 24 giờ). Quét chỉ liệt kê; không xóa gì cho đến khi bạn xác nhận.",
+    "scan": "Quét",
+    "scanning": "Đang xử lý...",
+    "delete": "Xóa ảnh mồ côi",
+    "none": "Không tìm thấy ảnh mồ côi.",
+    "found": "Tìm thấy {count} ảnh mồ côi.",
+    "confirmTitle": "Xóa ảnh mồ côi?",
+    "confirmBody": "{count} tệp sẽ bị xóa vĩnh viễn. Thao tác này KHÔNG thể hoàn tác.",
+    "confirmDelete": "Xóa vĩnh viễn",
+    "cancel": "Hủy",
+    "deleted": "Đã xóa {count} tệp.",
+    "failed": "Không xóa được {count} tệp.",
+    "scanError": "Đã hủy quét: không xác minh được dữ liệu. Không có gì bị xóa.",
+    "queueRetried": "Đã dọn {count} ảnh còn sót."
+  },
+  "Presets": {
+    "source": "Nguồn",
+    "recordedOn": "Ghi nhận {date}",
+    "unverified": "Nguồn tham khảo - chưa kiểm tra"
   }
 }

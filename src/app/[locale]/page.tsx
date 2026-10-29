@@ -14,6 +14,7 @@ import { isRatedForR, rMultiple } from "@/lib/risk";
 import { avgR, formatAvgR, winRate as computeWinRate } from "@/lib/stats";
 import { computeConsistency, computePropRiskSnapshot, resolveDrawdownMode } from "@/lib/propRisk";
 import { useTradingDay } from "@/hooks/useTradingDay";
+import { TradesLoadBanner } from "@/components/TradesLoadBanner";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -102,6 +103,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-10">
+      <TradesLoadBanner />
       <div className="flex items-center justify-between">
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
           <h2 className="text-3xl font-bold tracking-tight text-white">

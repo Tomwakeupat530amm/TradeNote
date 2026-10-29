@@ -14,6 +14,9 @@ import { useTranslations } from "next-intl";
 import clsx from "clsx";
 import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
 import { useSignedUrl } from "@/hooks/useSignedUrl";
+import { isPlaybookRename, tradesForPlaybook } from "@/lib/playbookMatch";
+import { PlaybookRenameDialog } from "@/components/PlaybookRenameDialog";
+import { useHistoryReady } from "@/components/TradesLoadBanner";
 
 function playbookImagePath(playbook: Playbook): string | null {
   return playbook.imagePath ?? pathFromLegacyUrl(playbook.imageUrl);
@@ -57,8 +60,8 @@ export default function PlaybookPage() {
 
   // Edge stats calculator per setup title
   const getPlaybookStats = useCallback((title: string) => {
-    const normTitle = title.trim().toLowerCase();
-    const setupTrades = accountTrades.filter(t => t.setup && t.setup.trim().toLowerCase() === normTitle);
+    // P6 D1: shared trim+lowercase matcher (same one the rename dialog counts with).
+    const setupTrades = tradesForPlaybook(accountTrades, title);
     const total = setupTrades.length;
     const wins = setupTrades.filter(t => t.result === 'Win').length;
     const losses = setupTrades.filter(t => t.result === 'Loss').length;
@@ -80,6 +83,9 @@ export default function PlaybookPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [viewingPlaybook, setViewingPlaybook] = useState<Playbook | null>(null);
+  // P6 D2: rename affects new trades only; confirm with the old-trade count (lower bound, active account).
+  const [renameConfirmOpen, setRenameConfirmOpen] = useState(false);
+  const historyReady = useHistoryReady();
 
   const openAddModal = () => {
     setEditingPlaybook(null);
@@ -102,6 +108,7 @@ export default function PlaybookPage() {
   };
 
   const closeModal = () => {
+    setRenameConfirmOpen(false);
     setIsModalOpen(false);
     setEditingPlaybook(null);
   };
@@ -142,7 +149,14 @@ export default function PlaybookPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title) return toast.error(t('title_required', { defaultMessage: "Title is required" }));
+    if (editingPlaybook && isPlaybookRename(editingPlaybook.title, title)) {
+      setRenameConfirmOpen(true);
+      return;
+    }
+    await savePlaybook();
+  };
 
+  const savePlaybook = async () => {
     setIsSubmitting(true);
     try {
       const cleanRules = rules.filter(r => r.trim() !== "");
@@ -575,6 +589,16 @@ export default function PlaybookPage() {
           </div>
         )}
       </AnimatePresence>
+      {renameConfirmOpen && editingPlaybook && (
+        <PlaybookRenameDialog
+          oldTitle={editingPlaybook.title}
+          newTitle={title}
+          count={tradesForPlaybook(accountTrades, editingPlaybook.title).length}
+          ready={historyReady}
+          onCancel={() => setRenameConfirmOpen(false)}
+          onConfirm={() => { setRenameConfirmOpen(false); void savePlaybook(); }}
+        />
+      )}
     </div>
   );
 }

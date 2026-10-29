@@ -29,6 +29,7 @@ import { useTagTranslation } from "@/hooks/useTagTranslation";
 import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
 import { ESTIMATED_RISK_PARAM, isEstimatedRiskFilterOn, isEstimatedTrade } from "@/lib/estimatedRisk";
 import { EstimatedRiskBadge } from "@/components/EstimatedRiskBadge";
+import { TradesLoadBanner } from "@/components/TradesLoadBanner";
 
 const SETUPS: SetupTag[] = ["Breakout", "Pullback", "Reversal", "Continuation", "Other"];
 const SESSIONS: TradingSession[] = ["Asian", "London", "London-NY Overlap", "New York"];
@@ -36,6 +37,7 @@ const SESSIONS: TradingSession[] = ["Asian", "London", "London-NY Overlap", "New
 function JournalContent() {
   const { accounts, activeAccountId } = useAccountStore();
   const { trades, deleteTrade } = useTradeStore();
+  const tradesLoading = useTradeStore(s => s.isLoading);
   const { fetchPreferences } = usePreferenceStore();
   const { playbooks, fetchPlaybooks } = usePlaybookStore();
   const [isAdding, setIsAdding] = useState(false);
@@ -156,8 +158,8 @@ function JournalContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 30;
 
-  // Auto reset to page 1 on filter change
-  const filterKey = `${searchQuery}_${filterSetup}_${filterResult}_${filterSession}_${filterMistake}_${filterTimeframe}_${estimatedOnly}`;
+  // Auto reset to page 1 on filter change, account switch or a (re)load of the full history (P6 B5)
+  const filterKey = `${searchQuery}_${filterSetup}_${filterResult}_${filterSession}_${filterMistake}_${filterTimeframe}_${estimatedOnly}_${activeAccountId}_${tradesLoading}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
 
   if (filterKey !== prevFilterKey) {
@@ -275,6 +277,7 @@ function JournalContent() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
+      <TradesLoadBanner />
       <div className="flex items-center justify-between">
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
           <h2 className="text-3xl font-bold tracking-tight text-white">
@@ -763,8 +766,9 @@ function JournalContent() {
             {/* Pagination Controls */}
             {totalPages > 1 && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-4 bg-gray-900/50 backdrop-blur-md rounded-2xl border border-white/5 text-xs text-gray-400">
-                <div>
+                <div className="flex items-center gap-2">
                   {t('pagination_showing', { start: (currentPage - 1) * pageSize + 1, end: Math.min(currentPage * pageSize, filteredTrades.length), total: filteredTrades.length })}
+                  <TradesLoadBanner compact />
                 </div>
                 <div className="flex items-center gap-2">
                   <button

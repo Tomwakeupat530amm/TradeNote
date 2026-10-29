@@ -4461,6 +4461,96 @@ it("39r: sidecar has 0 skip; prefs-not-loaded, legacy-asset and the decimal-perc
 });
 // ===== END Section 39 =====
 
+// ===== BEGIN Section 40 (P6 hardening: data consistency - UI wiring static guards, i18n merge, rename) =====
+console.log("\n--- Section 40: P6 UI wiring static guards (preset picker, orphan card, load banners, journal B5, rename, i18n) ---");
+const S40_ROOT = path.resolve(__dirname, '..');
+const s40Read = (rel) => fs.readFileSync(path.resolve(S40_ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
+const s40En = JSON.parse(s40Read('messages/en.json'));
+const s40Vi = JSON.parse(s40Read('messages/vi.json'));
+const s40Flat = (o, p = '') => Object.entries(o).flatMap(([k, v]) => (v && typeof v === 'object' ? s40Flat(v, `${p}${k}.`) : [`${p}${k}`]));
+/** Keys used through t("key") / t('key') in a file with a single translator namespace binding. */
+const s40Keys = (src, fn) => [...src.matchAll(new RegExp(`\\b${fn}\\(\\s*["']([\\w.]+)["']`, 'g'))].map((m) => m[1]);
+
+it("40a: preset picker link has rel=\"noopener noreferrer\" + target=_blank and renders source / recordedOn / unverified", () => {
+  const src = s40Read('src/app/[locale]/accounts/page.tsx');
+  assert.ok(/target="_blank"\s+rel="noopener noreferrer"|rel="noopener noreferrer"[\s\S]{0,80}target="_blank"/.test(src) || (src.includes('target="_blank"') && src.includes('rel="noopener noreferrer"')), 'picker link target/rel');
+  for (const k of ['source', 'recordedOn', 'unverified']) assert.ok(src.includes(`tPresets('${k}'`), `Presets.${k} rendered`);
+  assert.ok(src.includes('useTranslations("Presets")'), 'Presets namespace');
+});
+
+it("40b: E21(ii) storage literals still present in the stores (P1/P6)", () => {
+  const ts = s40Read('src/store/useTradeStore.ts');
+  for (const lit of ['screenshotPath ?? pathFromLegacyUrl(', 'screenshot_path: finalScreenshotPath', 'payload.screenshot_path = null']) assert.ok(ts.includes(lit), lit);
+  assert.ok(!ts.includes('getPublicUrl'), 'no getPublicUrl in useTradeStore');
+  assert.ok(s40Read('src/store/usePlaybookStore.ts').includes('getPublicUrl'), 'playbook store keeps getPublicUrl');
+});
+
+it("40c: AI Coach send and simulator run/sync are gated by useHistoryReady (isFullyLoaded + loaded account)", () => {
+  const ai = s40Read('src/components/AICoachModal.tsx');
+  assert.ok(ai.includes('useHistoryReady()') && ai.includes('!historyReady'), 'AICoach gate');
+  const sim = s40Read('src/app/[locale]/simulator/page.tsx');
+  assert.ok(sim.includes('useHistoryReady()') && /disabled=\{isCalculating \|\| !historyReady\}/.test(sim), 'simulator run gate');
+  const banner = s40Read('src/components/TradesLoadBanner.tsx');
+  assert.ok(banner.includes('isFullyLoaded') && banner.includes('isHistoryReady('), 'hook reads isFullyLoaded via isHistoryReady');
+});
+
+it("40d: orphan card - Scan separate from Delete, Delete only behind an alertdialog confirm, queue retry on open", () => {
+  const src = s40Read('src/components/OrphanCleanupCard.tsx');
+  assert.ok(src.includes('t("scan")') && src.includes('t("delete")'), 'two buttons');
+  assert.ok(src.includes('role="alertdialog"') && src.includes('t("confirmBody"'), 'confirm dialog');
+  const delIdx = src.indexOf('data-testid="orphan-confirm-delete"');
+  assert.ok(delIdx > src.indexOf('{confirmOpen && ('), 'final delete only inside the confirm');
+  assert.ok(/useEffect\(\(\) => \{[\s\S]{0,200}retryOrphanQueue\(/.test(src), 'retryOrphanQueue runs in a mount effect');
+  assert.ok(s40Read('src/app/[locale]/settings/page.tsx').includes('<OrphanCleanupCard'), 'settings renders the card');
+  assert.ok(/not be undone|cannot be undone/i.test(s40En.OrphanCleanup.confirmBody) && /KHÔNG thể hoàn tác/.test(s40Vi.OrphanCleanup.confirmBody), 'irreversible wording EN/VI');
+});
+
+it("40e: load-error banner on every reading page (dashboard, analytics, daily-review, journal, CommandPalette, AICoach, simulator)", () => {
+  for (const f of ['src/app/[locale]/page.tsx', 'src/app/[locale]/analytics/page.tsx', 'src/app/[locale]/daily-review/page.tsx', 'src/app/[locale]/journal/page.tsx', 'src/components/CommandPaletteModal.tsx', 'src/components/AICoachModal.tsx', 'src/app/[locale]/simulator/page.tsx']) {
+    const src = s40Read(f);
+    assert.ok(src.includes('from "@/components/TradesLoadBanner"') || src.includes("from '@/components/TradesLoadBanner'"), `${f} imports banner`);
+    assert.ok(/<TradesLoadBanner(\s+compact)?\s*\/>/.test(src), `${f} renders banner`);
+  }
+});
+
+it("40f: journal B5 - classic pagination kept, page reset key includes account + load state, filters run over all trades", () => {
+  const src = s40Read('src/app/[locale]/journal/page.tsx');
+  assert.ok(/const pageSize = 30;/.test(src), 'pageSize kept');
+  const key = (src.match(/const filterKey = `([^`]*)`/) || [])[1] || '';
+  assert.ok(key.includes('${activeAccountId}') && key.includes('${tradesLoading}'), 'reset key covers account + reload');
+  assert.ok(/if \(filterKey !== prevFilterKey\) \{[\s\S]{0,80}setCurrentPage\(1\)/.test(src), 'reset to page 1');
+  assert.ok(/filteredTrades\.slice\(start, start \+ pageSize\)/.test(src), 'pagination slices the filtered full list');
+  assert.ok(src.includes('<TradesLoadBanner compact />'), 'loading label near the total');
+});
+
+it("40g: rename - shared matcher used by edge stats and rename count; rename dialog gated by useHistoryReady; no trades update", () => {
+  const page = s40Read('src/app/[locale]/playbook/page.tsx');
+  assert.ok(page.includes('from "@/lib/playbookMatch"'), 'imports shared matcher');
+  assert.ok(!/setup\.trim\(\)\.toLowerCase\(\)/.test(page), 'no inline duplicate matcher');
+  assert.ok(page.includes('ready={historyReady}') && page.includes('isPlaybookRename('), 'dialog gated');
+  assert.ok(!/from\(['"]trades['"]\)/.test(s40Read('src/store/usePlaybookStore.ts')), 'playbook store never touches trades');
+  assert.ok(s40En.Playbook.renameNewOnlyBody.includes('in the active account') && s40Vi.Playbook.renameNewOnlyBody.includes('trong tài khoản đang chọn'), 'scope wording');
+});
+
+it("40h: i18n EN = VI parity (100%) and every key used by the P6 components exists in both", () => {
+  const en = s40Flat(s40En); const vi = s40Flat(s40Vi);
+  assert.deepStrictEqual(en.filter((k) => !vi.includes(k)), [], 'missing in vi');
+  assert.deepStrictEqual(vi.filter((k) => !en.includes(k)), [], 'missing in en');
+  const uses = [
+    ['OrphanCleanup', s40Keys(s40Read('src/components/OrphanCleanupCard.tsx'), 't')],
+    ['Common', s40Keys(s40Read('src/components/TradesLoadBanner.tsx'), 't')],
+    ['Presets', s40Keys(s40Read('src/app/[locale]/accounts/page.tsx'), 'tPresets')],
+    ['Playbook', s40Keys(s40Read('src/components/PlaybookRenameDialog.tsx'), 't')],
+  ];
+  const missing = [];
+  for (const [ns, keys] of uses) {
+    assert.ok(keys.length > 0, `${ns} keys found`);
+    for (const k of keys) for (const [lang, m] of [['en', s40En], ['vi', s40Vi]]) if (!(m[ns] && typeof m[ns][k] === 'string')) missing.push(`${lang}:${ns}.${k}`);
+  }
+  assert.deepStrictEqual(missing, []);
+});
+// ===== END Section 40 =====
+
 
 console.log("\n-------------------------------------------------------");
 console.log(`TOTAL: ${total} | PASSED: ${passed} | FAILED: ${total - passed}`);

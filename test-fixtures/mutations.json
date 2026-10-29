@@ -163,10 +163,10 @@
     },
     {
       "id": "M21-fetch-no-pagination",
-      "description": "F-3: fetchTrades stops after the first page (silent truncation)",
+      "description": "F-3/P6: fetchTrades keyset stops after the first page and reports complete (silent truncation)",
       "file": "src/store/useTradeStore.ts",
-      "find": "      if (rows.length < TRADES_PAGE_SIZE) break;",
-      "replace": "      break;",
+      "find": "      if (rows.length === 0) { complete = true; break; }",
+      "replace": "      complete = true; break;",
       "test": "src/store/__tests__/useTradeStore.test.ts"
     },
     {
@@ -280,6 +280,62 @@
       "find": "const locked = enforced && state === \"breach\" && input.prefsLoaded !== false;",
       "replace": "const locked = enforced && state === \"breach\";",
       "test": "src/lib/__tests__/hardStop.test.ts"
+    },
+    {
+      "id": "P6-M1-delete-storage-before-db",
+      "description": "P6 (KG12): deleteTrade removes the screenshot BEFORE the DB delete (order reversed)",
+      "file": "src/store/useTradeStore.ts",
+      "find": "    // P6 (KG12): the DB row goes FIRST; the image is touched only after the delete succeeded.\n",
+      "replace": "    { const early = tradeToDelete ? (tradeToDelete.screenshotPath ?? pathFromLegacyUrl(tradeToDelete.screenshotUrl)) : null; if (early) await removeScreenshotsOrQueue(useAuthStore.getState().user?.id, [early]); }\n",
+      "test": "src/store/__tests__/tradeStoreDelete.test.ts"
+    },
+    {
+      "id": "P6-M2-keyset-no-id-tiebreak",
+      "description": "P6: keyset cursor drops the id tie-breaker (date.lt only), so rows sharing the cursor date are skipped",
+      "file": "src/store/useTradeStore.ts",
+      "find": "  return `date.lt.\"${lastDate}\",and(date.eq.\"${lastDate}\",id.lt.${lastId})`;",
+      "replace": "  return `date.lt.\"${lastDate}\"` + (lastId ? \"\" : \"\");",
+      "test": "src/store/__tests__/largeHistory.test.ts"
+    },
+    {
+      "id": "P6-M3-stop-on-short-page",
+      "description": "P6: fetchTrades stops when a page is shorter than the page size (not on an empty page), so a server max_rows < 500 truncates silently (distinct from M21, which stops after the first page unconditionally)",
+      "file": "src/store/useTradeStore.ts",
+      "find": "      if (rows.length === 0) { complete = true; break; }",
+      "replace": "      if (rows.length < TRADES_PAGE_SIZE) { for (const row of rows) loaded.set(String(row.id), mapTradeRow(row)); complete = true; break; }",
+      "test": "src/store/__tests__/largeHistory.test.ts"
+    },
+    {
+      "id": "P6-M4-orphan-no-age-filter",
+      "description": "P6: findOrphans drops the >= 24h age filter (fresh uploads become candidates)",
+      "file": "src/lib/orphanScreenshots.ts",
+      "find": "    if (!Number.isFinite(created) || now - created < minAgeMs) continue;",
+      "replace": "    if (!Number.isFinite(created) && minAgeMs < 0) continue;",
+      "test": "src/lib/__tests__/orphanScreenshots.test.ts"
+    },
+    {
+      "id": "P6-M5-used-set-error-not-cancel",
+      "description": "P6: a playbooks (in-use set) query error no longer cancels the scan; the partial used-set is returned",
+      "file": "src/lib/orphanScreenshots.ts",
+      "find": "  if (playbooks.error || !playbooks.data) throw new OrphanScanError('playbooks query failed');",
+      "replace": "  if (playbooks.error || !playbooks.data) return used;",
+      "test": "src/lib/__tests__/orphanScreenshots.test.ts"
+    },
+    {
+      "id": "P6-M6-avatar-playbook-as-orphan",
+      "description": "P6: the trade-file name allow-list is dropped; any object under {userId}/ (avatar, playbook_*, legacy) can be an orphan",
+      "file": "src/lib/orphanScreenshots.ts",
+      "find": "    if (!isTradeScreenshotPath(obj.path, userId)) continue;",
+      "replace": "    if (typeof obj.path !== 'string' || !obj.path.startsWith(`${userId}/`)) continue;",
+      "test": "src/lib/__tests__/orphanScreenshots.test.ts"
+    },
+    {
+      "id": "P6-M7-rename-updates-trades",
+      "description": "P6 (AC4): updatePlaybook rename bulk-updates trades.setup via from('trades').update",
+      "file": "src/store/usePlaybookStore.ts",
+      "find": "      console.error('Error updating playbook:', error);\n      throw error;\n    }\n",
+      "replace": "      console.error('Error updating playbook:', error);\n      throw error;\n    }\n    if (payload.title !== undefined) await supabase.from('trades').update({ setup: payload.title }).eq('setup', existing?.title ?? '');\n",
+      "test": "src/store/__tests__/tagRenameStore.test.ts"
     }
   ]
 }

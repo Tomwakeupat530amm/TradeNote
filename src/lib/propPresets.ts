@@ -6,8 +6,20 @@ export interface PropFirmPreset {
   badgeColor: string;
   accountSize: number;
   label: string;
+  /** Firm rule page found by web search (https), or null when there is no public source (self-defined account). */
+  source: string | null;
+  /**
+   * YYYY-MM-DD date the preset was RECORDED in TradeNote, NOT the firm's own
+   * rule effective date. Firms change rules without notice.
+   */
+  effectiveDate: string;
+  /** true only after a human checked the source page against `rules`. Default false. */
+  verified: boolean;
   rules: AccountRules;
 }
+
+/** Date the source URLs were recorded (P6 C0). Not the firms' rule effective date. */
+export const PRESET_RECORDED_ON = "2026-10-29";
 
 export const PROP_FIRM_PRESETS: PropFirmPreset[] = [
   // --- TOPSTEP ---
@@ -17,6 +29,9 @@ export const PROP_FIRM_PRESETS: PropFirmPreset[] = [
     badgeColor: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400",
     accountSize: 50000,
     label: "Topstep 50k (EOD)",
+    source: "https://help.topstep.com/en/articles/8284099-topstep-program-overview",
+    effectiveDate: PRESET_RECORDED_ON,
+    verified: false,
     rules: {
       trailingMaxDrawdown: 2000,
       drawdownMode: "End of Day",
@@ -38,6 +53,9 @@ export const PROP_FIRM_PRESETS: PropFirmPreset[] = [
     badgeColor: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400",
     accountSize: 100000,
     label: "Topstep 100k (EOD)",
+    source: "https://help.topstep.com/en/articles/8284099-topstep-program-overview",
+    effectiveDate: PRESET_RECORDED_ON,
+    verified: false,
     rules: {
       trailingMaxDrawdown: 3000,
       drawdownMode: "End of Day",
@@ -59,6 +77,9 @@ export const PROP_FIRM_PRESETS: PropFirmPreset[] = [
     badgeColor: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400",
     accountSize: 150000,
     label: "Topstep 150k (EOD)",
+    source: "https://help.topstep.com/en/articles/8284099-topstep-program-overview",
+    effectiveDate: PRESET_RECORDED_ON,
+    verified: false,
     rules: {
       trailingMaxDrawdown: 4500,
       drawdownMode: "End of Day",
@@ -82,6 +103,9 @@ export const PROP_FIRM_PRESETS: PropFirmPreset[] = [
     badgeColor: "border-amber-500/40 bg-amber-500/10 text-amber-400",
     accountSize: 50000,
     label: "Apex 50k (Intraday)",
+    source: "https://apextraderfunding.com/help-center/intraday-trailing-drawdown-accounts/intraday-trailing-drawdown-explained/",
+    effectiveDate: PRESET_RECORDED_ON,
+    verified: false,
     rules: {
       trailingMaxDrawdown: 2500,
       drawdownMode: "Intraday",
@@ -100,6 +124,9 @@ export const PROP_FIRM_PRESETS: PropFirmPreset[] = [
     badgeColor: "border-amber-500/40 bg-amber-500/10 text-amber-400",
     accountSize: 100000,
     label: "Apex 100k (Intraday)",
+    source: "https://apextraderfunding.com/help-center/intraday-trailing-drawdown-accounts/intraday-trailing-drawdown-explained/",
+    effectiveDate: PRESET_RECORDED_ON,
+    verified: false,
     rules: {
       trailingMaxDrawdown: 3000,
       drawdownMode: "Intraday",
@@ -120,6 +147,9 @@ export const PROP_FIRM_PRESETS: PropFirmPreset[] = [
     badgeColor: "border-sky-500/40 bg-sky-500/10 text-sky-400",
     accountSize: 50000,
     label: "FTMO 50k",
+    source: "https://ftmo.com/en/trading-objectives/",
+    effectiveDate: PRESET_RECORDED_ON,
+    verified: false,
     rules: {
       trailingMaxDrawdown: 5000, // 10%
       drawdownMode: "End of Day",
@@ -140,6 +170,9 @@ export const PROP_FIRM_PRESETS: PropFirmPreset[] = [
     badgeColor: "border-sky-500/40 bg-sky-500/10 text-sky-400",
     accountSize: 100000,
     label: "FTMO 100k",
+    source: "https://ftmo.com/en/trading-objectives/",
+    effectiveDate: PRESET_RECORDED_ON,
+    verified: false,
     rules: {
       trailingMaxDrawdown: 10000, // 10%
       drawdownMode: "End of Day",
@@ -162,6 +195,9 @@ export const PROP_FIRM_PRESETS: PropFirmPreset[] = [
     badgeColor: "border-purple-500/40 bg-purple-500/10 text-purple-400",
     accountSize: 10000,
     label: "Personal Account",
+    source: null,
+    effectiveDate: PRESET_RECORDED_ON,
+    verified: false,
     rules: {
       trailingMaxDrawdown: 2000,
       drawdownMode: "Intraday",

@@ -27,6 +27,27 @@ export interface DbError {
   details?: string;
 }
 
+/** Byte-wise string compare (no Date parsing: microsecond `+00:00` strings stay exact). */
+function cmpStr(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/** Sort `date desc, id desc` on the RAW strings (same as PostgREST on text-ordered ISO columns). */
+export function sortKeysetDesc(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+  return [...rows].sort((x, y) => cmpStr(String(y.date), String(x.date)) || cmpStr(String(y.id), String(x.id)));
+}
+
+const KEYSET_OR = /^date\.lt\."([^"]*)",and\(date\.eq\."([^"]*)",id\.lt\.([^)]+)\)$/;
+
+/** Evaluate the keyset cursor `date.lt."<d>",and(date.eq."<d>",id.lt.<id>)`; throws on any other shape. */
+export function keysetCursorMatches(filter: string, row: Record<string, unknown>): boolean {
+  const m = KEYSET_OR.exec(filter);
+  if (!m || m[1] !== m[2]) throw new Error(`unsupported .or() filter in mock: ${filter}`);
+  const d = String(row.date);
+  const c = cmpStr(d, m[1]);
+  return c < 0 || (c === 0 && cmpStr(String(row.id), m[3]) < 0);
+}
+
 /** Call-counting Supabase mock: `.from().insert().select().single()` and `.from().update().eq()`. */
 export function createSupabaseMock() {
   const state = {
@@ -54,6 +75,22 @@ export function createSupabaseMock() {
     windowThrows: false,
     deleteCalls: [] as string[],
     storageRemoveCalls: [] as string[][],
+    /** P6 A0: keyset terminal = `.limit(n)` on a chain WITHOUT `.in()` (the Hard Stop window always calls `.in()`). */
+    keysetCalls: [] as { columns: string; or: string | null; eqs: [string, unknown][]; limit: number }[],
+    /** P6 A0: server `max_rows` cap applied to every keyset page (Infinity = no cap). */
+    maxRows: Infinity,
+    /** P6 A0: 1-based keyset call index that returns `keysetError` (0 = never). */
+    keysetErrorAtCall: 0,
+    keysetError: { code: "500", message: "page failed" } as DbError,
+    /** P6 A0: storage stubs; defaults keep the previous behaviour. */
+    storageUploadCalls: [] as string[],
+    uploadResult: { data: null as unknown, error: null as DbError | null },
+    removeError: null as DbError | null,
+    removeThrows: false,
+    storageListCalls: [] as { prefix: string; offset: number; limit: number }[],
+    /** Objects returned by `storage.list(prefix, { limit, offset })`, sliced per page. */
+    storageObjects: [] as { name: string; id: string | null; created_at: string }[],
+    storageListError: null as DbError | null,
   };
   const client = {
     from: vi.fn((table: string) => {
@@ -75,8 +112,17 @@ export function createSupabaseMock() {
       },
       select: (columns = "*") => {
         const win = { columns, inColumn: "", ids: [] as unknown[], gte: undefined as unknown, lte: undefined as unknown, limit: 0 };
+        const eqs: [string, unknown][] = [];
+        let orFilter: string | null = null;
         const chain = {
-          eq: () => chain,
+          eq: (col: string, v: unknown) => {
+            eqs.push([col, v]);
+            return chain;
+          },
+          or: (filter: string) => {
+            orFilter = filter;
+            return chain;
+          },
           in: (col: string, ids: unknown[]) => {
             win.inColumn = col;
             win.ids = ids;
@@ -91,6 +137,20 @@ export function createSupabaseMock() {
             return chain;
           },
           limit: async (n: number) => {
+            if (win.inColumn === "") {
+              // Keyset page (no `.in()`): filter by eq + cursor, sort desc, cap by max_rows.
+              state.keysetCalls.push({ columns, or: orFilter, eqs: [...eqs], limit: n });
+              if (state.keysetErrorAtCall > 0 && state.keysetCalls.length === state.keysetErrorAtCall) {
+                return { data: null, error: state.keysetError };
+              }
+              const f = orFilter;
+              const rows = sortKeysetDesc(
+                state.selectRows.filter(
+                  (r) => eqs.every(([c, v]) => !(c in r) || r[c] === v) && (f === null || keysetCursorMatches(f, r)),
+                ),
+              );
+              return { data: rows.slice(0, Math.min(n, state.maxRows)), error: null };
+            }
             win.limit = n;
             state.windowCalls.push(win);
             if (state.windowThrows) throw new Error("network down");
@@ -120,10 +180,24 @@ export function createSupabaseMock() {
     }),
     storage: {
       from: () => ({
-        upload: async () => ({ data: null, error: null }),
+        upload: async (path: string) => {
+          state.storageUploadCalls.push(path);
+          return state.uploadResult;
+        },
         remove: async (paths: string[]) => {
           state.storageRemoveCalls.push(paths);
-          return { error: null };
+          if (state.removeThrows) throw new Error("storage down");
+          return { data: null, error: state.removeError };
+        },
+        getPublicUrl: (path: string) => ({
+          data: { publicUrl: `https://mock.supabase.co/storage/v1/object/public/trade-screenshots/${path}` },
+        }),
+        list: async (prefix: string, opts: { limit?: number; offset?: number } = {}) => {
+          const limit = opts.limit ?? 100;
+          const offset = opts.offset ?? 0;
+          state.storageListCalls.push({ prefix, offset, limit });
+          if (state.storageListError) return { data: null, error: state.storageListError };
+          return { data: state.storageObjects.slice(offset, offset + limit), error: null };
         },
       }),
     },

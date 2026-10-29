@@ -578,7 +578,11 @@
     "stat_avg_r_sub": "R-Multiple / trade",
     "tab_view_table": "Trades Table",
     "tab_view_calendar": "Calendar PnL",
-    "tab_playbook_setups": "Playbook Setups"
+    "tab_playbook_setups": "Playbook Setups",
+    "renameNewOnlyTitle": "Rename applies to new trades only",
+    "renameNewOnlyBody": "Renaming \"{oldTitle}\" to \"{newTitle}\" does not change past trades. At least {count} older trade(s) in the active account will no longer be linked to this playbook.",
+    "renameNewOnlyLoading": "Loading the full trade history of the active account... Confirm is available once it is loaded.",
+    "renameNewOnlyConfirm": "Rename"
   },
   "EconomicCalendar": {
     "title": "Live Economic Calendar",
@@ -632,7 +636,11 @@
     "n_a": "N/A",
     "delete": "Delete",
     "cancel": "Cancel",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "loadingFullHistory": "Loading full trade history...",
+    "tradesLoadError": "Could not load the full trade history (error {code}). Totals may be incomplete.",
+    "tradesLoadTruncated": "Trade history is too large to load completely. Totals may be incomplete.",
+    "retryLoad": "Retry"
   },
   "Simulator": {
     "title": "Elite Quant Optimizer",
@@ -1450,5 +1458,27 @@
   },
   "Preferences": {
     "loadFailed": "Could not load your preferences. Defaults are shown for now."
+  },
+  "OrphanCleanup": {
+    "title": "Clean up orphan screenshots",
+    "desc": "Find trade screenshots in storage that no trade uses anymore (older than 24 hours). Scanning only lists them; nothing is deleted until you confirm.",
+    "scan": "Scan",
+    "scanning": "Working...",
+    "delete": "Delete orphans",
+    "none": "No orphan screenshots found.",
+    "found": "{count} orphan screenshot(s) found.",
+    "confirmTitle": "Delete orphan screenshots?",
+    "confirmBody": "{count} file(s) will be permanently deleted. This cannot be undone.",
+    "confirmDelete": "Delete permanently",
+    "cancel": "Cancel",
+    "deleted": "{count} file(s) deleted.",
+    "failed": "{count} file(s) could not be deleted.",
+    "scanError": "Scan cancelled: data could not be verified. Nothing was deleted.",
+    "queueRetried": "Cleaned up {count} leftover screenshot(s)."
+  },
+  "Presets": {
+    "source": "Source",
+    "recordedOn": "Recorded {date}",
+    "unverified": "Reference source - not verified"
   }
 }

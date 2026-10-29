@@ -45,6 +45,7 @@ import { detectSession } from "@/lib/sessionUtils";
 import { MatrixCorrelationAnalytics } from "@/components/MatrixCorrelationAnalytics";
 import clsx from "clsx";
 import { UNRATED } from "@/lib/psychology";
+import { TradesLoadBanner } from "@/components/TradesLoadBanner";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -282,6 +283,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-10">
+      <TradesLoadBanner />
       {/* Header & Filter Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>

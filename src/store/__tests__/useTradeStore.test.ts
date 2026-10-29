@@ -172,20 +172,18 @@ function dbRow(i: number, overrides: Record<string, unknown> = {}) {
   return { id: `r-${i}`, account_id: ACCOUNT.id, pnl: 100, risk_amount: 50, r_multiple: 2, risk_is_estimated: false, date: "2026-10-01T00:00:00Z", ...overrides };
 }
 
-describe("fetchTrades-pagination (F-3)", () => {
-  it("pages with range() until a short page: 2500 rows -> 3 calls, all rows kept, stable order date then id", async () => {
+describe("fetchTrades-pagination (F-3, P6 keyset)", () => {
+  it("keyset pages until an EMPTY page: 1200 rows -> 4 calls, all rows kept, order date then id", async () => {
     const { useTradeStore, db } = await loadStores();
     const { TRADES_PAGE_SIZE } = await import("@/store/useTradeStore");
-    db.selectRows = Array.from({ length: 2 * TRADES_PAGE_SIZE + 500 }, (_, i) => dbRow(i));
+    db.selectRows = Array.from({ length: 2 * TRADES_PAGE_SIZE + 200 }, (_, i) => dbRow(i, { id: `r-${String(i).padStart(5, "0")}` }));
     await useTradeStore.getState().fetchTrades(ACCOUNT.id);
-    expect(db.rangeCalls).toEqual([
-      [0, TRADES_PAGE_SIZE - 1],
-      [TRADES_PAGE_SIZE, 2 * TRADES_PAGE_SIZE - 1],
-      [2 * TRADES_PAGE_SIZE, 3 * TRADES_PAGE_SIZE - 1],
-    ]);
+    expect(db.keysetCalls).toHaveLength(4);
+    expect(db.keysetCalls[0].or).toBeNull();
+    expect(db.keysetCalls.every(c => c.limit === TRADES_PAGE_SIZE)).toBe(true);
     expect(db.orderCalls.slice(0, 2)).toEqual(["date", "id"]);
-    expect(useTradeStore.getState().trades).toHaveLength(2 * TRADES_PAGE_SIZE + 500);
-    expect(useTradeStore.getState().isLoading).toBe(false);
+    expect(useTradeStore.getState().trades).toHaveLength(2 * TRADES_PAGE_SIZE + 200);
+    expect(useTradeStore.getState()).toMatchObject({ isLoading: false, loadError: null, isFullyLoaded: true });
   });
 
   it("exact multiple of the page size fetches one extra (empty) page and stops", async () => {
@@ -193,18 +191,19 @@ describe("fetchTrades-pagination (F-3)", () => {
     const { TRADES_PAGE_SIZE } = await import("@/store/useTradeStore");
     db.selectRows = Array.from({ length: TRADES_PAGE_SIZE }, (_, i) => dbRow(i));
     await useTradeStore.getState().fetchTrades(ACCOUNT.id);
-    expect(db.rangeCalls).toHaveLength(2);
+    expect(db.keysetCalls).toHaveLength(2);
     expect(useTradeStore.getState().trades).toHaveLength(TRADES_PAGE_SIZE);
   });
 
-  it("a page error keeps the previous state (no partial list)", async () => {
+  // P6 (rewritten from "a page error keeps the previous state"): pinned rule = a load error sets
+  // the loaded rows of THIS account (first-page error -> empty), loadError, isFullyLoaded=false.
+  it("a first-page error drops the previous list: trades = [] for this account, loadError set, not fully loaded", async () => {
     const { useTradeStore, db } = await loadStores();
-    const before = [existing()];
-    useTradeStore.setState({ trades: before });
-    db.selectError = { code: "500", message: "boom" };
+    useTradeStore.setState({ trades: [existing({ accountId: "other-acc" })] });
+    db.keysetErrorAtCall = 1;
     await useTradeStore.getState().fetchTrades(ACCOUNT.id);
-    expect(useTradeStore.getState().trades).toBe(before);
-    expect(useTradeStore.getState().isLoading).toBe(false);
+    expect(useTradeStore.getState().trades).toEqual([]);
+    expect(useTradeStore.getState()).toMatchObject({ isLoading: false, loadError: "500", isFullyLoaded: false });
   });
 });
 
@@ -213,7 +212,9 @@ describe("risk-mapping-nulls (F-6, F-7)", () => {
     const { useTradeStore, db } = await loadStores();
     db.selectRows = [dbRow(1, { risk_amount: null, r_multiple: 3 }), dbRow(2)];
     await useTradeStore.getState().fetchTrades(ACCOUNT.id);
-    const [a, b] = useTradeStore.getState().trades;
+    const all = useTradeStore.getState().trades;
+    const a = all.find(t => t.id === "r-1");
+    const b = all.find(t => t.id === "r-2");
     expect(a).toMatchObject({ riskAmount: null, rMultiple: null });
     expect(b).toMatchObject({ riskAmount: 50, rMultiple: 2 });
   });

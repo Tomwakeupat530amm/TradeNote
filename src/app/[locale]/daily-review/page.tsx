@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import clsx from "clsx";
 import { useTranslations } from "next-intl";
 import { useTradingDay } from "@/hooks/useTradingDay";
+import { TradesLoadBanner } from "@/components/TradesLoadBanner";
 
 function ReviewsContent() {
   const searchParams = useSearchParams();
@@ -93,6 +94,7 @@ function ReviewsContent() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-10">
+      <TradesLoadBanner />
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
           <h1 className="text-3xl font-bold text-white tracking-tight">{t('trading_reviews')}</h1>

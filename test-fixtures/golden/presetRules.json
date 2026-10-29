@@ -1,0 +1,126 @@
+{
+  "topstep-50k": {
+    "accountSize": 50000,
+    "rules": {
+      "trailingMaxDrawdown": 2000,
+      "drawdownMode": "End of Day",
+      "maxDailyLoss": 1000,
+      "maxDailyLossType": "$",
+      "profitTarget": 3000,
+      "maxPositions": 5,
+      "consistencyPercent": 50,
+      "defaultRiskType": "$",
+      "defaultRiskValue": 150,
+      "riskBase": "drawdown",
+      "enableHardStop": true,
+      "dailyLossAlertThreshold": 80
+    }
+  },
+  "topstep-100k": {
+    "accountSize": 100000,
+    "rules": {
+      "trailingMaxDrawdown": 3000,
+      "drawdownMode": "End of Day",
+      "maxDailyLoss": 2000,
+      "maxDailyLossType": "$",
+      "profitTarget": 6000,
+      "maxPositions": 10,
+      "consistencyPercent": 50,
+      "defaultRiskType": "$",
+      "defaultRiskValue": 250,
+      "riskBase": "drawdown",
+      "enableHardStop": true,
+      "dailyLossAlertThreshold": 80
+    }
+  },
+  "topstep-150k": {
+    "accountSize": 150000,
+    "rules": {
+      "trailingMaxDrawdown": 4500,
+      "drawdownMode": "End of Day",
+      "maxDailyLoss": 3000,
+      "maxDailyLossType": "$",
+      "profitTarget": 9000,
+      "maxPositions": 15,
+      "consistencyPercent": 50,
+      "defaultRiskType": "$",
+      "defaultRiskValue": 350,
+      "riskBase": "drawdown",
+      "enableHardStop": true,
+      "dailyLossAlertThreshold": 80
+    }
+  },
+  "apex-50k": {
+    "accountSize": 50000,
+    "rules": {
+      "trailingMaxDrawdown": 2500,
+      "drawdownMode": "Intraday",
+      "profitTarget": 3000,
+      "maxPositions": 10,
+      "consistencyPercent": 30,
+      "defaultRiskType": "$",
+      "defaultRiskValue": 200,
+      "riskBase": "drawdown",
+      "enableHardStop": false
+    }
+  },
+  "apex-100k": {
+    "accountSize": 100000,
+    "rules": {
+      "trailingMaxDrawdown": 3000,
+      "drawdownMode": "Intraday",
+      "profitTarget": 6000,
+      "maxPositions": 14,
+      "consistencyPercent": 30,
+      "defaultRiskType": "$",
+      "defaultRiskValue": 250,
+      "riskBase": "drawdown",
+      "enableHardStop": false
+    }
+  },
+  "ftmo-50k": {
+    "accountSize": 50000,
+    "rules": {
+      "trailingMaxDrawdown": 5000,
+      "drawdownMode": "End of Day",
+      "maxDailyLoss": 2500,
+      "maxDailyLossType": "$",
+      "profitTarget": 5000,
+      "maxPositions": 10,
+      "defaultRiskType": "%",
+      "defaultRiskValue": 1,
+      "riskBase": "balance",
+      "enableHardStop": true,
+      "dailyLossAlertThreshold": 80
+    }
+  },
+  "ftmo-100k": {
+    "accountSize": 100000,
+    "rules": {
+      "trailingMaxDrawdown": 10000,
+      "drawdownMode": "End of Day",
+      "maxDailyLoss": 5000,
+      "maxDailyLossType": "$",
+      "profitTarget": 10000,
+      "maxPositions": 20,
+      "defaultRiskType": "%",
+      "defaultRiskValue": 1,
+      "riskBase": "balance",
+      "enableHardStop": true,
+      "dailyLossAlertThreshold": 80
+    }
+  },
+  "personal-standard": {
+    "accountSize": 10000,
+    "rules": {
+      "trailingMaxDrawdown": 2000,
+      "drawdownMode": "Intraday",
+      "maxDailyLoss": 500,
+      "maxDailyLossType": "$",
+      "defaultRiskType": "%",
+      "defaultRiskValue": 1,
+      "riskBase": "balance",
+      "enableHardStop": false
+    }
+  }
+}

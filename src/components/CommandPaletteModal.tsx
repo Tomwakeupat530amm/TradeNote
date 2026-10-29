@@ -29,6 +29,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import clsx from "clsx";
+import { TradesLoadBanner } from "@/components/TradesLoadBanner";
 
 export interface PaletteItem {
   id: string;
@@ -402,6 +403,7 @@ export function CommandPaletteModal({
             className="relative w-full max-w-2xl bg-gray-900/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] backdrop-blur-2xl z-10"
             onClick={(e) => e.stopPropagation()}
           >
+            <div className="px-4 pt-2 empty:hidden"><TradesLoadBanner compact /></div>
             {/* Header / Input Field */}
             <div className="relative flex items-center border-b border-white/10 px-4 py-3.5 bg-white/[0.02]">
               <Search className="w-5 h-5 text-blue-400 shrink-0 ml-1" />

@@ -27,6 +27,7 @@ export default function AccountsPage() {
   const locale = useLocale();
   const tRisk = useTranslations("Risk");
   const tHardStop = useTranslations("HardStop");
+  const tPresets = useTranslations("Presets");
   const estimatedCounts = useEstimatedRiskCounts(accounts.map((a) => a.id));
   const totalEstimated = Object.values(estimatedCounts).reduce((sum, n) => sum + n, 0);
 
@@ -237,17 +238,34 @@ export default function AccountsPage() {
               </div>
               <div className="flex flex-wrap gap-2">
                 {PROP_FIRM_PRESETS.map((preset) => (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => handleApplyPreset(preset)}
-                    className={clsx(
-                      "px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all hover:scale-[1.02] active:scale-[0.98]",
-                      preset.badgeColor
-                    )}
-                  >
-                    {preset.id === 'personal-standard' ? t('preset_personal') : preset.label}
-                  </button>
+                  <div key={preset.id} className="flex flex-col gap-1" data-testid={`preset-${preset.id}`}>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyPreset(preset)}
+                      className={clsx(
+                        "px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all hover:scale-[1.02] active:scale-[0.98]",
+                        preset.badgeColor
+                      )}
+                    >
+                      {preset.id === 'personal-standard' ? t('preset_personal') : preset.label}
+                    </button>
+                    <div className="flex flex-wrap items-center gap-x-1.5 text-[10px] text-gray-500">
+                      {preset.source && (
+                        <a
+                          href={preset.source}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline hover:text-gray-300"
+                        >
+                          {tPresets('source')}
+                        </a>
+                      )}
+                      <span>{tPresets('recordedOn', { date: preset.effectiveDate })}</span>
+                      {!preset.verified && (
+                        <span className="text-amber-400/80">{tPresets('unverified')}</span>
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
