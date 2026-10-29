@@ -4,6 +4,7 @@ import { useAuthStore } from './useAuthStore';
 import { fallbackTimeZone } from '@/lib/tradingDay';
 import { useAccountStore } from './useAccountStore';
 import { effectiveLimit, evaluatePrefsConfigChange, HardStopError } from '@/lib/hardStop';
+import { toServerConfigLockedError } from '@/lib/hardStopServerError';
 
 export interface UserPreferences {
   displayName?: string;
@@ -99,6 +100,35 @@ export const usePreferenceStore = create<PreferenceState>((set, get) => ({
         .select()
         .single();
 
+      // P5 B2: patch 051 may have created the row concurrently (UNIQUE(user_id) -> 23505).
+      // Keep the plain insert; on 23505 re-select the existing row and use it.
+      if (insertError && insertError.code === '23505') {
+        const { data: existing, error: reselectError } = await supabase
+          .from('user_preferences')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+        if (!reselectError && existing) {
+          set({
+            preferences: {
+              displayName: existing.display_name,
+              avatarUrl: existing.avatar_url,
+              timezone: existing.timezone || DEFAULT_PREFERENCES.timezone,
+              baseCurrency: existing.base_currency || DEFAULT_PREFERENCES.baseCurrency,
+              psychologyTags: existing.psychology_tags || DEFAULT_PREFERENCES.psychologyTags,
+              mistakeTags: existing.mistake_tags || DEFAULT_PREFERENCES.mistakeTags,
+              confluenceTags: existing.confluence_tags || DEFAULT_PREFERENCES.confluenceTags,
+              privacyMode: existing.privacy_mode ?? DEFAULT_PREFERENCES.privacyMode,
+              theme: existing.theme || DEFAULT_PREFERENCES.theme
+            },
+            isLoading: false,
+            prefsLoaded: true
+          });
+          return;
+        }
+        console.error('Error re-reading preferences after 23505:', reselectError?.code);
+      }
+
       if (!insertError && newData) {
          set({ 
           preferences: {
@@ -172,6 +202,9 @@ export const usePreferenceStore = create<PreferenceState>((set, get) => ({
       console.error('Error updating preferences:', error);
       // Revert if error
       set({ preferences: currentPrefs });
+      // P5: server config-lock (P0001 + HINT HARD_STOP_CONFIG_LOCKED) -> HardStopError; never swallowed.
+      const configLocked = toServerConfigLockedError(error);
+      if (configLocked) throw configLocked;
       throw error;
     }
   }

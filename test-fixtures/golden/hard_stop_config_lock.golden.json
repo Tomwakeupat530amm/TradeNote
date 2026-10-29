@@ -933,6 +933,193 @@
         "allowed": false,
         "code": "HARD_STOP_CONFIG_LOCKED"
       }
+    },
+    {
+      "name": "P5 new trading day: raising maxDailyLoss allowed (lock expired)",
+      "kind": "account",
+      "old": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "new": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 5000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "oldTz": "UTC",
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-09T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "expected": {
+        "allowed": true,
+        "code": null
+      }
+    },
+    {
+      "name": "P5 maxDailyLoss -> non-number string while locked",
+      "kind": "account",
+      "old": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$"
+        }
+      },
+      "new": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": "5000",
+          "maxDailyLossType": "$"
+        }
+      },
+      "oldTz": "UTC",
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "expected": {
+        "allowed": false,
+        "code": "HARD_STOP_CONFIG_LOCKED"
+      }
+    },
+    {
+      "name": "P5 reset 17:00 ET: locked yesterday-session, new session after 17:00 ET allows loosening",
+      "kind": "account",
+      "old": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 1000,
+          "maxDailyLossType": "$",
+          "resetTime": "17:00",
+          "resetTz": "America/New_York"
+        }
+      },
+      "new": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 5000,
+          "maxDailyLossType": "$",
+          "resetTime": "17:00",
+          "resetTz": "America/New_York"
+        }
+      },
+      "oldTz": "UTC",
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-01-13T15:00:00Z"
+        }
+      ],
+      "now": "2026-01-13T22:30:00Z",
+      "expected": {
+        "allowed": true,
+        "code": null
+      }
+    },
+    {
+      "name": "P5 prefs timezone change on the next day (lock expired) allowed",
+      "kind": "prefs",
+      "accounts": [
+        {
+          "id": "acc-A",
+          "initial_balance": 50000,
+          "rules": {
+            "trailingMaxDrawdown": 2000,
+            "enableHardStop": true,
+            "maxDailyLoss": 1000,
+            "maxDailyLossType": "$"
+          }
+        }
+      ],
+      "oldTz": "UTC",
+      "newTz": "Asia/Ho_Chi_Minh",
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-09T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "expected": {
+        "allowed": true,
+        "code": null
+      }
+    },
+    {
+      "name": "P5 percent: initial_balance lowered to 0 while locked (limit <= 0 = removed) blocked",
+      "kind": "account",
+      "old": {
+        "id": "acc-A",
+        "initial_balance": 50000,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 2,
+          "maxDailyLossType": "%"
+        }
+      },
+      "new": {
+        "id": "acc-A",
+        "initial_balance": 0,
+        "rules": {
+          "trailingMaxDrawdown": 2000,
+          "enableHardStop": true,
+          "maxDailyLoss": 2,
+          "maxDailyLossType": "%"
+        }
+      },
+      "oldTz": "UTC",
+      "trades": [
+        {
+          "id": "t-loss",
+          "account_id": "acc-A",
+          "pnl": -1000,
+          "date": "2026-03-10T10:00:00Z"
+        }
+      ],
+      "now": "2026-03-10T15:00:00Z",
+      "expected": {
+        "allowed": false,
+        "code": "HARD_STOP_CONFIG_LOCKED"
+      }
     }
   ]
 }

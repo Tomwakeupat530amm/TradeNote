@@ -22,6 +22,9 @@ export function memoryStorage(): Storage {
 export interface DbError {
   code: string;
   message: string;
+  /** P5: PostgREST `hint` / `details` (server Hard Stop contract). */
+  hint?: string;
+  details?: string;
 }
 
 /** Call-counting Supabase mock: `.from().insert().select().single()` and `.from().update().eq()`. */
@@ -38,6 +41,10 @@ export function createSupabaseMock() {
     orderCalls: [] as string[],
     /** Result of `.select().eq().single()` (e.g. user_preferences lookup). */
     singleResult: { data: null as unknown, error: null as DbError | null },
+    /** P5: optional queue for successive `.single()` reads; falls back to `singleResult` when empty. */
+    singleQueue: [] as { data: unknown; error: DbError | null }[],
+    /** P5: error returned by `.delete().eq()`. */
+    deleteError: null as DbError | null,
     /** P4: every `.from(table)` call, in order. */
     fromCalls: [] as string[],
     /** P4: bounded Hard Stop window select `.select(cols).in(col, ids).gte().lte().limit(n)`. */
@@ -94,7 +101,7 @@ export function createSupabaseMock() {
             state.orderCalls.push(col);
             return chain;
           },
-          single: async () => state.singleResult,
+          single: async () => state.singleQueue.shift() ?? state.singleResult,
           range: async (from: number, to: number) => {
             state.rangeCalls.push([from, to]);
             if (state.selectError) return { data: null, error: state.selectError };
@@ -106,7 +113,7 @@ export function createSupabaseMock() {
       delete: () => ({
         eq: async (_col: string, id: string) => {
           state.deleteCalls.push(id);
-          return { error: null };
+          return { error: state.deleteError };
         },
       }),
       };

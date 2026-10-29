@@ -84,6 +84,59 @@ Lùi (route fail closed, nên thứ tự quan trọng): (1) revert route (git) v
 - Harness `npm run test:rls` có kịch bản `backfill-flag-migration` (cần TEST project đã áp 030; không có -> SKIPPED, residual `backfill-flag-migration-test-project`).
 - KHÔNG chạy lại `legacy/supabase_patch_enhancements.sql` (COALESCE risk_amount 500).
 
+## Phase 05 (050-053): Hard Stop phía server
+
+ĐÃ ÁP TRÊN PROD 29-10-26 (`schema_migrations` có 050, 051, 052, 053) bằng `scripts/p5_prod_apply.mjs --stage 0..6`
+(evidence đã che secret: `process/.../hardening-security-data-integrity_11-10-26/harness/p5/gd*-prod.txt`).
+
+- `050_trading_day_fn`: `public.trading_day(timestamptz, text, time, text)` - ngày giao dịch (cùng quy ước `src/lib/tradingDay.ts`).
+- `051_user_preferences_ensure_row`: trigger `trg_user_preferences_ensure_row` AFTER INSERT ON `auth.users` tạo dòng `user_preferences` (timezone `'UTC'`, KG8: user mới bắt đầu ở UTC cho tới khi đổi trong Cài đặt) + backfill. Hàm không bao giờ chặn đăng ký (`RAISE WARNING`). Lúc áp: 0 user thiếu dòng (backfill no-op).
+- `052_hard_stop_trigger`: `trg_hard_stop` BEFORE INSERT/UPDATE/DELETE ON `public.trades`; chặn ghi vào NGÀY GIAO DỊCH HIỆN TẠI khi đã khóa (`P0001`, HINT `HARD_STOP`, DETAIL JSON `dayKey/lossToday/limit`). Notes/tag/ảnh vẫn sửa được.
+- `053_hard_stop_config_lock`: `trg_hard_stop_config_accounts` (accounts) + `trg_hard_stop_config_prefs` (user_preferences, UPDATE/DELETE): nới lỏng cấu hình khi đang khóa -> `HARD_STOP_CONFIG_LOCKED`.
+- Mọi hàm: `SET search_path = ''`, `REVOKE ALL ... FROM PUBLIC, anon, authenticated` (không gọi được qua RPC). Chỉ mục `(account_id, date)` đã có sẵn (`idx_trades_account_date`) -> không tạo thêm.
+- Thứ tự áp: 050 -> 051 -> 052 -> 053. Thứ tự gỡ: **053 -> 052 -> 051 -> 050** (plpgsql không tạo phụ thuộc nên gỡ sai thứ tự không báo lỗi nhưng làm trigger hỏng). Gỡ toàn bộ tự động: `node scripts/p5_prod_apply.mjs --confirm-prod --rollback-all` (DISABLE trigger trước rồi `.down.sql`).
+- Smoke lại (idempotent, tự dọn, user thử `p5-probe-*@example.invalid`): `node scripts/p5_prod_smoke.mjs --confirm-prod --suite all` (env `PROD_DB_URL`, `PG_MODULE_PATH`).
+
+### Công tắc khẩn (không cần gỡ patch)
+
+`DISABLE/ENABLE TRIGGER` cần quyền **owner của bảng** -> chạy bằng role `postgres` trong SQL Editor. Đặt `lock_timeout` trước để không treo sau một giao dịch dài đang giữ khóa bảng.
+
+```sql
+SET lock_timeout = '3s';
+ALTER TABLE public.trades DISABLE TRIGGER trg_hard_stop;
+ALTER TABLE public.accounts DISABLE TRIGGER trg_hard_stop_config_accounts;
+ALTER TABLE public.user_preferences DISABLE TRIGGER trg_hard_stop_config_prefs;
+-- bật lại (cùng tên):
+ALTER TABLE public.trades ENABLE TRIGGER trg_hard_stop;
+ALTER TABLE public.accounts ENABLE TRIGGER trg_hard_stop_config_accounts;
+ALTER TABLE public.user_preferences ENABLE TRIGGER trg_hard_stop_config_prefs;
+-- Kiểm tra:
+SELECT tgname, tgenabled FROM pg_trigger
+WHERE tgname IN ('trg_hard_stop','trg_hard_stop_config_accounts','trg_hard_stop_config_prefs','trg_user_preferences_ensure_row');
+-- 'O' = bật, 'D' = tắt
+```
+
+Tắt `trg_user_preferences_ensure_row` (051): `auth.users` thuộc `supabase_auth_admin`, nên `postgres` KHÔNG DISABLE được (`42501 must be owner of table users`, diễn tập PROD 29-10-26). Cách tắt: `DROP TRIGGER IF EXISTS trg_user_preferences_ensure_row ON auth.users;` hoặc chạy `patches/051_user_preferences_ensure_row.down.sql`. Bật lại: chạy lại patch 051. Diễn tập công tắc khẩn trong giao dịch tự ROLLBACK: `node scripts/p5_prod_apply.mjs --confirm-prod --rehearse-disable`.
+
+Hành vi theo loại lỗi: lỗi chờ khóa `lock_not_available` (`55P03`) bên trong hàm trigger bị bắt bởi khối fail-open -> **cho ghi** (`RAISE WARNING`); `statement_timeout` (`57014`, hủy câu lệnh) **không** fail-open -> câu lệnh ghi bị hủy (fail-closed).
+
+CẢNH BÁO: chạy lại patch 051/052/053 (DROP TRIGGER IF EXISTS + CREATE TRIGGER) sẽ BẬT LẠI trigger đang DISABLE.
+
+### Giới hạn đã biết
+
+- Bypass quản trị (D5): khi `auth.uid() IS NULL` (SQL Editor, `service_role`, migration/backfill) trigger bỏ qua và `RAISE NOTICE` (ồn log). Lộ `service_role` key là sự cố riêng.
+- C9: lệnh ghi bù ngày quá khứ / ngày tương lai không bị chặn (chỉ ngày giao dịch hiện tại bị khóa).
+- Client cũ (chưa có ánh xạ P5) nhận lỗi `P0001` thô.
+- Tạo account MỚI khi account khác đang khóa không bị chặn.
+- Xóa account đang khóa cascade xóa luôn lệnh của ngày khóa (P5-AC5, chủ đích); xóa user cũng cascade được.
+- DELETE dòng `user_preferences` khi có account (có limit) đang khóa bị chặn.
+- Fail-open khi lỗi nội bộ (`RAISE WARNING`, cho ghi); riêng deadlock `40P01` ở 052 được re-raise. 053 vẫn fail-open.
+- `maxDailyLoss` chỉ nhận số JSON > 0 (chuỗi = chưa cấu hình, D-3); `%` với `initial_balance <= 0` = chưa cấu hình. Probe 50 lúc áp: `hard_stop_non_numeric_limit = 0`, `hard_stop_percent_nonpositive_balance = 0` (không sửa dữ liệu user).
+- Biên `%` thập phân: client float vs server numeric có thể khác đúng tại biên (ca sidecar `serverExpected`, KG1).
+- Múi giờ: PG POSIX tz vs `Intl` (KG2); viết tắt kiểu `EST` Postgres nhận còn `Intl` không (D-1). JS `trim` vs SQL `btrim` khác với tab/khoảng trắng Unicode.
+- Không kiểm qua HTTP PostgREST/GoTrue (KG3): smoke mô phỏng phiên bằng `SET LOCAL ROLE authenticated` + `request.jwt.claims`.
+- P5 KHÔNG áp patch 090 (DROP COLUMN, thuộc P7). Điều kiện tiên quyết cho P7: backup đầy đủ + mọi hàng có ảnh đã có `screenshot_path`.
+
 ## Project TEST (cho harness 2 user)
 
 1. Tạo một Supabase project MỚI (không phải production).

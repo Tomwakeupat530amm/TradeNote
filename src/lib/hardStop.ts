@@ -98,7 +98,9 @@ export function dailyLossLimit(rules: HardStopRules | null | undefined, initialB
   if (rules?.maxDailyLossType === "%") {
     const base = Number(initialBalance);
     if (!Number.isFinite(base)) return null;
-    return (base * max) / 100;
+    const limit = (base * max) / 100;
+    // P5 (M2): a non-positive limit (e.g. initialBalance <= 0) is "not configured", same as server 052.
+    return limit > 0 ? limit : null;
   }
   return max;
 }

@@ -1436,6 +1436,8 @@
     "editRestricted": "Locked day: only notes, tags and screenshot can be edited.",
     "deleteBlocked": "Hard Stop is active: trades of the locked trading day cannot be deleted.",
     "lockedSubmit": "Hard Stop is active: this change is blocked until the next trading day.",
+    "serverRejected": "The server rejected this change: Hard Stop is active for today.",
+    "serverRejectedHint": "The lock is calculated on the server clock and lifts when server trading day {dayKey} ends (at the start of the next trading day). If your device clock differs, wait for the server's next trading day.",
     "timezoneEstimated": "Timezone estimated (preferences not available)."
   },
   "Psych": {
@@ -1445,5 +1447,8 @@
     "chooseMistake": "Choose mistake",
     "chooseSetup": "Choose setup",
     "reservedTag": "\"Unrated\" is a reserved name."
+  },
+  "Preferences": {
+    "loadFailed": "Could not load your preferences. Defaults are shown for now."
   }
 }

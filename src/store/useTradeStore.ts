@@ -8,6 +8,7 @@ import { compressScreenshot } from '@/lib/imageCompressor';
 import { SCREENSHOT_BUCKET, buildScreenshotPath, pathFromLegacyUrl } from '@/lib/screenshotStorage';
 import { rMultiple as computeRMultiple } from '@/lib/risk';
 import { assertMutationAllowed, effectiveLimit, evaluateHardStop, HardStopError, type HardStopTrade } from '@/lib/hardStop';
+import { serverHardStopHint, toServerHardStopError } from '@/lib/hardStopServerError';
 import { isRated } from '@/lib/psychology';
 
 // The Hard Stop error lives in the pure lib (E-3); re-exported for the forms.
@@ -336,6 +337,10 @@ export const useTradeStore = create<TradeState>((set, get) => ({
 
     if (insertError) {
       console.error('Error adding trade:', insertError.code, insertError.message);
+      // P5: server Hard Stop (P0001 + HINT HARD_STOP) -> HardStopError; HARD_STOP_CONFIG_LOCKED passes through.
+      const serverStop = toServerHardStopError(insertError);
+      if (serverStop) throw serverStop;
+      if (serverHardStopHint(insertError) === 'HARD_STOP_CONFIG_LOCKED') throw insertError;
       throw toSaveTradeError(insertError);
     }
 
@@ -502,6 +507,10 @@ export const useTradeStore = create<TradeState>((set, get) => ({
 
     if (error) {
       console.error('Error updating trade:', error.code, error.message);
+      // P5: server Hard Stop rejection -> HardStopError; HARD_STOP_CONFIG_LOCKED passes through.
+      const serverStop = toServerHardStopError(error);
+      if (serverStop) throw serverStop;
+      if (serverHardStopHint(error) === 'HARD_STOP_CONFIG_LOCKED') throw error;
       throw toSaveTradeError(error);
     }
 
@@ -557,6 +566,9 @@ export const useTradeStore = create<TradeState>((set, get) => ({
 
     if (error) {
       console.error('Error deleting trade:', error);
+      // P5: server Hard Stop rejection -> HardStopError; any other error is rethrown unchanged.
+      const serverStop = toServerHardStopError(error);
+      if (serverStop) throw serverStop;
       throw error;
     }
 

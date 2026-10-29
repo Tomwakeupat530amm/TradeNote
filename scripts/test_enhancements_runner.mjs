@@ -4181,6 +4181,286 @@ it(`P4 self-test: every Section 38 check is RED on the pre-P4 baseline (git show
 });
 // ===== END Section 38 =====
 
+// ===== BEGIN Section 39 (P5 hardening: Hard Stop server - patches 050-053, golden generator, grants matrix) =====
+console.log("\n--- Section 39: P5 Hard Stop server static guards (patches 050-053, golden SQL generator, grants matrix) ---");
+const { execFileSync: s39Exec } = await import('node:child_process');
+const s39Os = await import('node:os');
+const S39_ROOT = path.resolve(__dirname, '..');
+const S39_HARNESS = path.resolve(S39_ROOT, '../process/general-plans/active/hardening-security-data-integrity_11-10-26/harness/p5');
+const s39Read = (rel) => fs.readFileSync(path.resolve(S39_ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
+const s39Code = (sql) => sql.replace(/\/\*[\s\S]*?\*\//g, ' ').split('\n').map((l) => l.replace(/--.*$/, '')).join('\n');
+const S39_PATCHES = ['050_trading_day_fn', '051_user_preferences_ensure_row', '052_hard_stop_trigger', '053_hard_stop_config_lock'];
+const s39Up = Object.fromEntries(S39_PATCHES.map((p) => [p, s39Read(`supabase/patches/${p}.sql`)]));
+const s39Down = Object.fromEntries(S39_PATCHES.map((p) => [p, s39Read(`supabase/patches/${p}.down.sql`)]));
+const s39P052 = s39Code(s39Up['052_hard_stop_trigger']);
+const s39P053 = s39Code(s39Up['053_hard_stop_config_lock']);
+/** CREATE FUNCTION blocks: { name, header (up to AS $fn$), body } */
+function s39Functions(code) {
+  const out = [];
+  const re = /CREATE OR REPLACE FUNCTION public\.(\w+)\s*\(([\s\S]*?)\)\s*RETURNS([\s\S]*?)AS \$fn\$([\s\S]*?)\$fn\$;/g;
+  let m;
+  while ((m = re.exec(code))) out.push({ name: m[1], header: m[3], body: m[4] });
+  return out;
+}
+const s39AllFns = S39_PATCHES.flatMap((p) => s39Functions(s39Code(s39Up[p])).map((f) => ({ ...f, patch: p })));
+const s39Bodyof = (name) => (s39AllFns.find((f) => f.name === name) || {}).body || '';
+const S39_EXPECTED_FNS = [
+  'trading_day', 'user_preferences_ensure_row', 'hard_stop_decide', 'hard_stop_evaluate', 'hard_stop_trades_trg',
+  'hard_stop_config_decide', 'hard_stop_prefs_config_decide', 'hard_stop_config_accounts_trg', 'hard_stop_config_prefs_trg',
+];
+
+it("39a: patch 052 raises only HARD_STOP with ERRCODE 'P0001' + HINT 'HARD_STOP'; patch 053 only HARD_STOP_CONFIG_LOCKED", () => {
+  assert.ok(/ERRCODE = 'P0001'/.test(s39P052) && /HINT = 'HARD_STOP',/.test(s39P052), "052 ERRCODE/HINT HARD_STOP");
+  assert.ok(/ERRCODE = 'P0001'/.test(s39P053) && /HINT = 'HARD_STOP_CONFIG_LOCKED'/.test(s39P053), "053 HINT HARD_STOP_CONFIG_LOCKED");
+  assert.deepStrictEqual([...s39P052.matchAll(/RAISE EXCEPTION '([^']*)'/g)].map((m) => m[1]), ['HARD_STOP']);
+  assert.deepStrictEqual([...new Set([...s39P053.matchAll(/RAISE EXCEPTION '([^']*)'/g)].map((m) => m[1]))], ['HARD_STOP_CONFIG_LOCKED']);
+  for (const [p, re] of [['052', /IF SQLSTATE = 'P0001' AND v_hint = 'HARD_STOP' THEN\s+RAISE;/], ['053', /IF SQLSTATE = 'P0001' AND v_hint = 'HARD_STOP_CONFIG_LOCKED' THEN\s+RAISE;/]]) {
+    assert.ok(re.test(p === '052' ? s39P052 : s39P053), `${p}: internal errors fail open but the contract error is re-raised`);
+  }
+});
+
+it("39b: every new function has SET search_path = '' and REVOKE ALL ... FROM PUBLIC, anon, authenticated (D-5)", () => {
+  assert.deepStrictEqual(s39AllFns.map((f) => f.name).sort(), [...S39_EXPECTED_FNS].sort(), "function set of patches 050-053");
+  const problems = [];
+  for (const f of s39AllFns) {
+    if (!/SET search_path = ''/.test(f.header)) problems.push(`${f.name}: search_path`);
+    const code = s39Code(s39Up[f.patch]);
+    if (!new RegExp(`REVOKE ALL ON FUNCTION public\\.${f.name}\\([^)]*\\) FROM PUBLIC, anon, authenticated;`).test(code)) problems.push(`${f.name}: REVOKE`);
+    if (new RegExp(`GRANT EXECUTE ON FUNCTION public\\.${f.name}\\b`).test(code)) problems.push(`${f.name}: GRANT EXECUTE`);
+  }
+  assert.deepStrictEqual(problems, []);
+});
+
+it("39c: trading_day is STABLE PARALLEL UNSAFE (not IMMUTABLE / STRICT / PARALLEL SAFE); hard_stop_evaluate is VOLATILE SECURITY DEFINER", () => {
+  const h = s39AllFns.find((f) => f.name === 'trading_day').header;
+  assert.ok(/\bSTABLE\b/.test(h) && /PARALLEL UNSAFE/.test(h), "STABLE PARALLEL UNSAFE");
+  assert.ok(!/IMMUTABLE|\bSTRICT\b|RETURNS NULL ON NULL INPUT|PARALLEL SAFE/.test(h), "no IMMUTABLE/STRICT/PARALLEL SAFE");
+  const ev = s39AllFns.find((f) => f.name === 'hard_stop_evaluate').header;
+  assert.ok(/VOLATILE/.test(ev) && /SECURITY DEFINER/.test(ev), "evaluate VOLATILE (fresh snapshot after advisory lock) + DEFINER");
+  for (const t of ['hard_stop_trades_trg', 'hard_stop_config_accounts_trg', 'hard_stop_config_prefs_trg', 'user_preferences_ensure_row']) {
+    assert.ok(/SECURITY DEFINER/.test(s39AllFns.find((f) => f.name === t).header), `${t} SECURITY DEFINER`);
+  }
+});
+
+it("39d: patches 050-053 (+ .down) have no transaction statements / CONCURRENTLY; each up records schema_migrations 05x", () => {
+  const problems = [];
+  for (const p of S39_PATCHES) {
+    for (const [kind, sql] of [['up', s39Up[p]], ['down', s39Down[p]]]) {
+      const code = s39Code(sql);
+      if (/^\s*(BEGIN|COMMIT|ROLLBACK|START\s+TRANSACTION|END\s+(TRANSACTION|WORK))\s*(TRANSACTION|WORK)?\s*;/im.test(code)) problems.push(`${p} ${kind}: transaction statement`);
+      if (/CONCURRENTLY/i.test(code)) problems.push(`${p} ${kind}: CONCURRENTLY`);
+    }
+    const v = p.slice(0, 3);
+    if (!new RegExp(`INSERT INTO public\\.schema_migrations \\(version, name\\)\\s*VALUES \\('${v}'`).test(s39Code(s39Up[p]))) problems.push(`${p}: schema_migrations ${v}`);
+    if (!new RegExp(`DELETE FROM public\\.schema_migrations WHERE version = '${v}'`).test(s39Code(s39Down[p]))) problems.push(`${p} down: schema_migrations ${v}`);
+  }
+  assert.deepStrictEqual(problems, []);
+});
+
+it("39e: trg_hard_stop DELETE branches RETURN OLD (never NEW); trigger is BEFORE INSERT OR UPDATE OR DELETE on public.trades", () => {
+  const body = s39Bodyof('hard_stop_trades_trg');
+  const branches = [...body.matchAll(/TG_OP = 'DELETE'[^\n]*THEN\s*\n\s*RETURN (\w+);/g)].map((m) => m[1]);
+  assert.ok(branches.length >= 4, `expected >= 4 DELETE return branches, got ${branches.length}`);
+  assert.deepStrictEqual([...new Set(branches)], ['OLD']);
+  assert.ok(/CREATE TRIGGER trg_hard_stop\s+BEFORE INSERT OR UPDATE OR DELETE ON public\.trades\s+FOR EACH ROW EXECUTE FUNCTION public\.hard_stop_trades_trg\(\);/.test(s39P052));
+  assert.ok(/IF pg_trigger_depth\(\) > 1 THEN/.test(body), "cascade exemption pg_trigger_depth() > 1");
+  assert.ok(/IF v_uid IS NULL THEN\s+RAISE NOTICE/.test(body), "D5 admin bypass with NOTICE");
+});
+
+it("39f: every allowed-column array in patch 052 equals hard_stop.golden.json meta.allowedColumns (single source)", () => {
+  const meta = JSON.parse(s39Read('test-fixtures/golden/hard_stop.golden.json')).meta.allowedColumns;
+  const arrays = [...s39P052.matchAll(/c_allowed\s+CONSTANT text\[\] := ARRAY\[([^\]]*)\]/g)].map((m) => [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]));
+  assert.strictEqual(arrays.length, 2, "decide + trigger arrays");
+  for (const a of arrays) assert.deepStrictEqual(a, meta);
+  assert.ok(meta.includes('risk_is_estimated') && !meta.includes('pnl') && !meta.includes('date') && !meta.includes('account_id'));
+});
+
+it("39g: S13 no cross-user oracle: triggers pass p_user := auth.uid() (never NEW/OLD.user_id) and return early for foreign rows", () => {
+  const problems = [];
+  for (const t of ['hard_stop_trades_trg', 'hard_stop_config_accounts_trg', 'hard_stop_config_prefs_trg']) {
+    const body = s39Bodyof(t);
+    if (!/v_uid\s+uuid := auth\.uid\(\);/.test(body)) problems.push(`${t}: v_uid := auth.uid()`);
+    const calls = [...body.matchAll(/public\.hard_stop_evaluate\(([^,]+),/g)].map((m) => m[1].trim());
+    if (calls.length === 0 || calls.some((c) => c !== 'v_uid')) problems.push(`${t}: hard_stop_evaluate first arg ${JSON.stringify(calls)}`);
+    if (/hard_stop_evaluate\(\s*(NEW|OLD)\.user_id/.test(body)) problems.push(`${t}: user_id from row`);
+    if (!/(OLD|NEW)\.user_id IS DISTINCT FROM v_uid/.test(body)) problems.push(`${t}: early return for foreign rows`);
+  }
+  if (!/WHERE a\.id = p_account AND a\.user_id = p_user;/.test(s39Bodyof('hard_stop_evaluate'))) problems.push('hard_stop_evaluate: account scoped to p_user');
+  if (!/t\.user_id = p_user/.test(s39Bodyof('hard_stop_evaluate'))) problems.push('hard_stop_evaluate: trades scoped to p_user');
+  if (/'STATUS'[\s\S]*?pg_advisory_xact_lock/.test(s39Bodyof('hard_stop_evaluate').split("IF v_op IN ('INSERT', 'UPDATE', 'DELETE') THEN")[0])) problems.push('STATUS path takes a lock');
+  assert.deepStrictEqual(problems, []);
+});
+
+it("39h: patch 051 never blocks signup (ON CONFLICT DO NOTHING + EXCEPTION WHEN OTHERS THEN RAISE WARNING, no RAISE EXCEPTION)", () => {
+  const code = s39Code(s39Up['051_user_preferences_ensure_row']);
+  const body = s39Bodyof('user_preferences_ensure_row');
+  assert.ok(/ON CONFLICT \(user_id\) DO NOTHING/.test(body) && /EXCEPTION WHEN OTHERS THEN\s+RAISE WARNING/.test(body));
+  assert.ok(!/RAISE EXCEPTION/.test(code));
+  assert.ok(/AFTER INSERT ON auth\.users/.test(code), "trigger AFTER INSERT ON auth.users");
+  assert.ok(!/DELETE FROM public\.user_preferences/.test(s39Code(s39Down['051_user_preferences_ensure_row'])), "down keeps rows");
+});
+
+it("39i: every .down.sql drops every function and trigger its patch creates; harness apply file ends with ROLLBACK and never COMMITs", () => {
+  const problems = [];
+  for (const p of S39_PATCHES) {
+    const up = s39Code(s39Up[p]);
+    const down = s39Code(s39Down[p]);
+    for (const m of up.matchAll(/CREATE OR REPLACE FUNCTION public\.(\w+)/g)) if (!new RegExp(`DROP FUNCTION IF EXISTS public\\.${m[1]}\\(`).test(down)) problems.push(`${p}: ${m[1]}`);
+    for (const m of up.matchAll(/CREATE TRIGGER (\w+)/g)) if (!new RegExp(`DROP TRIGGER IF EXISTS ${m[1]} `).test(down)) problems.push(`${p}: ${m[1]}`);
+  }
+  assert.deepStrictEqual(problems, []);
+  const apply = fs.readFileSync(path.join(S39_HARNESS, 'apply_050_053_with_golden.sql'), 'utf8').replace(/\r\n/g, '\n');
+  const lines = s39Code(apply).split('\n').map((l) => l.trim()).filter(Boolean);
+  assert.strictEqual(lines[0], 'BEGIN;');
+  assert.strictEqual(lines[lines.length - 1], 'ROLLBACK;');
+  assert.ok(!/^\s*COMMIT\s*;/im.test(s39Code(apply)), "no COMMIT");
+  assert.ok(!/051_user_preferences_ensure_row|auth\.users/.test(s39Code(apply)), "051 is applied separately (stage 3)");
+});
+
+it("39j: gen_sql_golden --check is green; generated SQL carries hash + n and RAISEs on mismatch", () => {
+  const out = s39Exec(process.execPath, [path.join(S39_ROOT, 'scripts/gen_sql_golden.mjs'), '--check'], { encoding: 'utf8' });
+  assert.ok(/--check: OK/.test(out), out);
+  const counts = /hard_stop (\d+) cases \(run (\d+), override (\d+), skip (\d+)\)/.exec(out);
+  assert.ok(counts && Number(counts[1]) === Number(counts[2]) + Number(counts[3]) + Number(counts[4]), "every case classified");
+  for (const [f, golden] of [['trading_day', 'trading_day'], ['hard_stop', 'hard_stop'], ['hard_stop_config_lock', 'hard_stop_config_lock']]) {
+    const sql = s39Read(`supabase/tests/${f}_golden.generated.sql`);
+    const n = JSON.parse(s39Read(`test-fixtures/golden/${golden}.golden.json`)).cases.length;
+    assert.ok(/-- source-sha256: [0-9a-f]{64}/.test(sql), `${f}: hash`);
+    assert.ok(new RegExp(`-- cases: ${n}\\b`).test(sql), `${f}: n = ${n}`);
+    assert.ok(/RAISE EXCEPTION '\w+ golden FAIL/.test(sql) && /RAISE NOTICE '\w+ golden PASS %\/%'/.test(sql), `${f}: RAISE on mismatch, PASS n/n`);
+  }
+});
+
+it("39k: gen_sql_golden --check FAILS on an unclassified golden case and on hash drift (self-test in a temp copy)", () => {
+  const tmp = fs.mkdtempSync(path.join(s39Os.tmpdir(), 'p5-golden-'));
+  try {
+    const gdir = path.join(tmp, 'golden');
+    fs.mkdirSync(gdir);
+    for (const f of ['trading_day.golden.json', 'hard_stop.golden.json', 'hard_stop.server_overrides.json', 'hard_stop_config_lock.golden.json']) {
+      fs.copyFileSync(path.join(S39_ROOT, 'test-fixtures/golden', f), path.join(gdir, f));
+    }
+    const run = () => {
+      try {
+        s39Exec(process.execPath, [path.join(S39_ROOT, 'scripts/gen_sql_golden.mjs'), '--check', '--golden-dir', gdir, '--harness-dir', path.join(tmp, 'no', 'harness')], { encoding: 'utf8', stdio: 'pipe' });
+        return { code: 0, out: '' };
+      } catch (e) {
+        return { code: e.status, out: `${e.stdout}${e.stderr}` };
+      }
+    };
+    assert.strictEqual(run().code, 0, "unchanged copy passes");
+    const sidePath = path.join(gdir, 'hard_stop.server_overrides.json');
+    const side = JSON.parse(fs.readFileSync(sidePath, 'utf8'));
+    const first = Object.keys(side.cases)[0];
+    delete side.cases[first];
+    fs.writeFileSync(sidePath, JSON.stringify(side, null, 2));
+    const r1 = run();
+    assert.ok(r1.code === 1 && /unclassified golden case/.test(r1.out), `unclassified -> exit 1: ${r1.out}`);
+    fs.copyFileSync(path.join(S39_ROOT, 'test-fixtures/golden/hard_stop.server_overrides.json'), sidePath);
+    const tdPath = path.join(gdir, 'trading_day.golden.json');
+    const td = JSON.parse(fs.readFileSync(tdPath, 'utf8'));
+    td.cases[0].expected = '1999-01-01';
+    fs.writeFileSync(tdPath, JSON.stringify(td, null, 2));
+    const r2 = run();
+    assert.ok(r2.code === 1 && /stale generated file/.test(r2.out), `hash drift -> exit 1: ${r2.out}`);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+it("39l: grants matrix knows every new function (PUBLIC/anon/authenticated = false); version and 35i pin unchanged; probe 11 scans pg_proc", () => {
+  const expected = JSON.parse(s39Read('supabase/tests/grants_matrix.expected.json'));
+  assert.strictEqual(expected.version, 'p2-after-020');
+  const sigs = [
+    'trading_day(timestamp with time zone,text,time without time zone,text)',
+    'user_preferences_ensure_row()',
+    'hard_stop_decide(jsonb,jsonb,text,text,jsonb,jsonb,timestamp with time zone)',
+    'hard_stop_evaluate(uuid,uuid,text,jsonb,jsonb,timestamp with time zone)',
+    'hard_stop_trades_trg()',
+    'hard_stop_config_decide(jsonb,jsonb,boolean)',
+    'hard_stop_prefs_config_decide(text,text,boolean)',
+    'hard_stop_config_accounts_trg()',
+    'hard_stop_config_prefs_trg()',
+  ];
+  assert.strictEqual(sigs.length, S39_EXPECTED_FNS.length);
+  for (const s of sigs) assert.deepStrictEqual(expected.functions[s], { PUBLIC: false, anon: false, authenticated: false }, s);
+  const probe = s39Read('supabase/probes/11_p1_grants_matrix.sql');
+  assert.ok(/FROM pg_proc p/.test(probe) && /n\.nspname = 'public'/.test(probe), "probe 11 scans pg_proc (no fixed function list)");
+});
+
+it("39m: schema.snapshot.sql has the P5 functions + triggers AFTER the bulk GRANT, with explicit REVOKEs", () => {
+  const snap = s39Read('supabase/schema.snapshot.sql');
+  const grantIdx = snap.indexOf('ON ALL TABLES IN SCHEMA public TO authenticated');
+  assert.ok(grantIdx > 0);
+  for (const f of S39_EXPECTED_FNS) {
+    const c = snap.indexOf(`CREATE OR REPLACE FUNCTION public.${f}(`);
+    const r = snap.indexOf(`REVOKE ALL ON FUNCTION public.${f}(`);
+    assert.ok(c > grantIdx && r > c, `${f}: created + revoked after the bulk grant`);
+  }
+  for (const t of ['trg_hard_stop', 'trg_hard_stop_config_accounts', 'trg_hard_stop_config_prefs', 'trg_user_preferences_ensure_row']) {
+    assert.ok(snap.includes(`CREATE TRIGGER ${t}\n`), t);
+  }
+  assert.ok(!/schema_migrations/.test(snap), "snapshot has no schema_migrations rows");
+});
+
+it("39n: probe 50 is read-only and checks name collisions, auth.users trigger privilege, non-numeric maxDailyLoss and the (account_id, date) index by definition", () => {
+  const code = s39Code(s39Read('supabase/probes/50_p5_pre_checks.sql'));
+  assert.ok(!/\b(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|GRANT|REVOKE|TRUNCATE)\b/i.test(code.replace(/'[^']*'/g, "''")), "read-only");
+  for (const needle of ["'trg_hard_stop'", "'auth.users', 'TRIGGER'", "'maxDailyLoss'", 'indkey[0]', 'indkey[1]', "'authenticated', 'MEMBER'"]) {
+    assert.ok(code.includes(needle), needle);
+  }
+});
+it("39o: fix leg (M1) prefs config lock covers DELETE: BEFORE UPDATE OR DELETE, DELETE returns OLD, D5 + cascade bypass kept", () => {
+  assert.ok(/CREATE TRIGGER trg_hard_stop_config_prefs\s+BEFORE UPDATE OR DELETE ON public\.user_preferences\s+FOR EACH ROW EXECUTE FUNCTION public\.hard_stop_config_prefs_trg\(\);/.test(s39P053));
+  const body = s39Bodyof('hard_stop_config_prefs_trg');
+  const branches = [...body.matchAll(/TG_OP = 'DELETE'[^\n]*THEN\s*\n\s*RETURN (\w+);/g)].map((m) => m[1]);
+  assert.ok(branches.length >= 3, `expected >= 3 DELETE return branches, got ${branches.length}`);
+  assert.deepStrictEqual([...new Set(branches)], ['OLD']);
+  assert.ok(/IF v_uid IS NULL THEN\s+RAISE NOTICE/.test(body), "D5 admin bypass");
+  assert.ok(/IF pg_trigger_depth\(\) > 1 THEN/.test(body), "cascade (delete user/account) bypass");
+  assert.ok(body.indexOf('IF v_uid IS NULL') < body.indexOf('pg_trigger_depth()'), "D5 checked first");
+});
+
+it("39p: fix leg (M2/m1/m2/m3/m5): limit <= 0 is off; deadlock re-raised; prefs decide STABLE; 051 trigger before backfill + re-apply warning; probe 50 counts '%' with balance <= 0", () => {
+  const decide = s39Bodyof('hard_stop_decide');
+  assert.ok(/IF v_limit_x100 IS NOT NULL AND v_limit_x100 <= 0 THEN\s+v_limit_x100 := NULL;/.test(decide), "052 non-positive limit -> NULL (off)");
+  const trg = s39Bodyof('hard_stop_trades_trg');
+  const dl = trg.indexOf("IF SQLSTATE = '40P01' THEN");
+  assert.ok(dl > 0 && /IF SQLSTATE = '40P01' THEN\s+RAISE;/.test(trg) && dl < trg.indexOf("RAISE WARNING 'hard_stop: internal error"), "deadlock re-raised before fail-open");
+  const h = s39AllFns.find((f) => f.name === 'hard_stop_prefs_config_decide').header;
+  assert.ok(/\bSTABLE\b/.test(h) && !/IMMUTABLE/.test(h), "prefs decide STABLE");
+  const p051 = s39Up['051_user_preferences_ensure_row'];
+  const c051 = s39Code(p051);
+  assert.ok(c051.indexOf('CREATE TRIGGER trg_user_preferences_ensure_row') < c051.indexOf('INSERT INTO public.user_preferences (user_id)\nSELECT'), "051 trigger created before backfill");
+  assert.ok(/CẢNH BÁO: chạy lại patch này sẽ BẬT LẠI trigger/.test(p051), "051 re-apply warning");
+  assert.ok(s39Code(s39Read('supabase/probes/50_p5_pre_checks.sql')).includes("'hard_stop_percent_nonpositive_balance'"), "probe 50 count");
+});
+
+it("39q: schema.snapshot.sql P5 blocks equal the patch bodies verbatim (header comments + schema_migrations row excluded)", () => {
+  const snap = s39Read('supabase/schema.snapshot.sql');
+  const marks = S39_PATCHES.map((p) => snap.indexOf(`-- ---- patch ${p.slice(0, 3)}:`));
+  marks.forEach((m, i) => assert.ok(m > 0, `${S39_PATCHES[i]} marker`));
+  const problems = [];
+  S39_PATCHES.forEach((p, i) => {
+    const seg = snap.slice(snap.indexOf('\n', marks[i]) + 1, i < 3 ? marks[i + 1] : snap.length).trimEnd();
+    const lines = s39Up[p].split('\n');
+    let k = 0;
+    while (k < lines.length && (lines[k].startsWith('--') || lines[k].trim() === '')) k++;
+    const rest = lines.slice(k).join('\n');
+    const body = rest.slice(0, rest.indexOf('INSERT INTO public.schema_migrations')).trimEnd();
+    if (seg !== body) problems.push(p);
+  });
+  assert.deepStrictEqual(problems, []);
+});
+
+it("39r: sidecar has 0 skip; prefs-not-loaded, legacy-asset and the decimal-percent boundary are serverExpected with reason", () => {
+  const side = JSON.parse(s39Read('test-fixtures/golden/hard_stop.server_overrides.json')).cases;
+  const groups = Object.values(side).map((e) => e.group);
+  assert.strictEqual(groups.filter((g) => g === 'skip').length, 0);
+  const se = Object.entries(side).filter(([, e]) => e.group === 'serverExpected').map(([n]) => n);
+  for (const needle of ['prefs not loaded', 'legacy lowercase asset', 'decimal boundary']) assert.ok(se.some((n) => n.includes(needle)), needle);
+});
+// ===== END Section 39 =====
+
 
 console.log("\n-------------------------------------------------------");
 console.log(`TOTAL: ${total} | PASSED: ${passed} | FAILED: ${total - passed}`);

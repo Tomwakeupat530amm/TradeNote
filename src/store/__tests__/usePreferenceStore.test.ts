@@ -66,3 +66,45 @@ describe("F-2 new preferences row seeds the browser timezone", () => {
     expect(usePreferenceStore.getState().preferences).toBeNull();
   });
 });
+
+describe("P5 B2 ensure-row race + E11 config-lock mapping", () => {
+  it("insert 23505 (row created by patch 051) -> re-select and use the existing row, insert kept", async () => {
+    const { usePreferenceStore, db } = await load("Asia/Ho_Chi_Minh");
+    db.singleQueue = [
+      { data: null, error: { code: "PGRST116", message: "not found" } },
+      { data: { timezone: "UTC", base_currency: "EUR" }, error: null },
+    ];
+    db.insertResult = { data: null, error: { code: "23505", message: "duplicate key" } };
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await usePreferenceStore.getState().fetchPreferences();
+    expect(db.insertCalls).toHaveLength(1);
+    expect((db.insertCalls[0] as Record<string, unknown>[])[0].timezone).toBe("Asia/Ho_Chi_Minh");
+    const prefs = usePreferenceStore.getState().preferences;
+    expect(prefs?.timezone).toBe("UTC");
+    expect(prefs?.baseCurrency).toBe("EUR");
+    expect(usePreferenceStore.getState().prefsLoaded).toBe(true);
+  });
+
+  it("updatePreferences: server P0001 + HINT HARD_STOP_CONFIG_LOCKED -> HardStopError, prefs reverted", async () => {
+    const { usePreferenceStore, db } = await load("UTC");
+    const { HardStopError } = await import("@/lib/hardStop");
+    const current = { timezone: "UTC", baseCurrency: "USD", psychologyTags: [], mistakeTags: [], confluenceTags: [], privacyMode: false, theme: "dark" };
+    usePreferenceStore.setState({ preferences: current, prefsLoaded: true });
+    db.updateResult = { error: { code: "P0001", message: "HARD_STOP_CONFIG_LOCKED", hint: "HARD_STOP_CONFIG_LOCKED", details: "{}" } };
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const err = await usePreferenceStore.getState().updatePreferences({ theme: "light" }).then(() => null, (e: unknown) => e);
+    expect(err).toBeInstanceOf(HardStopError);
+    expect((err as InstanceType<typeof HardStopError>).code).toBe("HARD_STOP_CONFIG_LOCKED");
+    expect(usePreferenceStore.getState().preferences).toBe(current);
+  });
+
+  it("updatePreferences: other errors are rethrown unchanged", async () => {
+    const { usePreferenceStore, db } = await load("UTC");
+    const current = { timezone: "UTC", baseCurrency: "USD", psychologyTags: [], mistakeTags: [], confluenceTags: [], privacyMode: false, theme: "dark" };
+    usePreferenceStore.setState({ preferences: current, prefsLoaded: true });
+    const other = { code: "42501", message: "denied" };
+    db.updateResult = { error: other };
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await usePreferenceStore.getState().updatePreferences({ theme: "light" }).then(() => null, (e: unknown) => e)).toBe(other);
+  });
+});

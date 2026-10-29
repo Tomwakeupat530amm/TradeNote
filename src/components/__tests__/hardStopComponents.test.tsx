@@ -291,12 +291,13 @@ describe("no-default-psychology", () => {
 
   it("Drawer (new trade) starts with emotion, mistake and setup UNRATED", async () => {
     await renderDrawer();
-    // The Drawer resets the active tab in a setTimeout(0) after opening; re-click until the
-    // psychology tab sticks so the assertion does not race that reset.
-    await waitFor(() => {
-      fireEvent.click(screen.getAllByText("SlideOverDrawer.tab_psychology")[0]);
-      expect(screen.getByDisplayValue("Psych.chooseEmotion")).toBeInTheDocument();
+    // The Drawer resets the active tab in a deferred setTimeout(0) after opening
+    // (TradeSlideOverDrawer setActiveTab("execution")). Let that settle first, then click once.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
     });
+    fireEvent.click(screen.getAllByText("SlideOverDrawer.tab_psychology")[0]);
+    expect(screen.getByDisplayValue("Psych.chooseEmotion")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Psych.chooseSetup")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Psych.chooseMistake")).toBeInTheDocument();
   });

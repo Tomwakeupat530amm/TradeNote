@@ -1436,6 +1436,8 @@
     "editRestricted": "Ngày bị khóa: chỉ sửa được ghi chú, thẻ và ảnh.",
     "deleteBlocked": "Hard Stop đang bật: không thể xóa lệnh của ngày giao dịch bị khóa.",
     "lockedSubmit": "Hard Stop đang bật: thay đổi này bị chặn đến ngày giao dịch kế tiếp.",
+    "serverRejected": "Máy chủ đã từ chối thay đổi này: Hard Stop đang khóa hôm nay.",
+    "serverRejectedHint": "Khóa được tính theo giờ máy chủ và mở khi ngày giao dịch {dayKey} của máy chủ kết thúc (lúc bắt đầu ngày giao dịch kế tiếp). Nếu đồng hồ thiết bị lệch, hãy đợi ngày giao dịch kế tiếp của máy chủ.",
     "timezoneEstimated": "Múi giờ ước tính (chưa có cài đặt)."
   },
   "Psych": {
@@ -1445,5 +1447,8 @@
     "chooseMistake": "Chọn lỗi",
     "chooseSetup": "Chọn setup",
     "reservedTag": "\"Unrated\" là tên dành riêng."
+  },
+  "Preferences": {
+    "loadFailed": "Không tải được tùy chọn của bạn. Tạm thời hiển thị giá trị mặc định."
   }
 }
