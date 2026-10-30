@@ -204,7 +204,33 @@ export function enterGuestMode(opts: GuestNavigationOptions = {}): void {
     safeSet(storage, FLAG_KEY, "1");
   }
   resetGuestFlagCache();
-  (opts.reload ?? defaultReload)();
+  setEnglishLocaleCookie();
+  if (opts.reload) {
+    opts.reload();
+    return;
+  }
+  reloadOrSwitchToEnglish();
+}
+
+/** Guest mode starts in English: write the locale cookie (only here, never on later loads). */
+function setEnglishLocaleCookie(): void {
+  try {
+    if (typeof document === "undefined") return;
+    document.cookie = "NEXT_LOCALE=en; path=/; max-age=31536000; SameSite=Lax";
+  } catch {
+    // ignore: cookies may be blocked
+  }
+}
+
+/** Default navigation: `/vi/...` becomes `/en/...`, any other path is reloaded. */
+function reloadOrSwitchToEnglish(): void {
+  if (typeof window === "undefined") return;
+  const { pathname, search, hash } = window.location;
+  if (typeof pathname === "string" && (pathname === "/vi" || pathname.startsWith("/vi/"))) {
+    window.location.replace(`/en${pathname.slice(3)}${search ?? ""}${hash ?? ""}`);
+    return;
+  }
+  defaultReload();
 }
 
 /**

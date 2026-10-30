@@ -153,6 +153,19 @@ describe("enterGuestMode", () => {
     expect(stash.fixed.tradeNoteActiveAccount).toBe(REAL_ACC);
     expect(storage.getItem("tradeNoteActiveAccount")).toBeNull();
   });
+
+  it("sets the NEXT_LOCALE=en cookie when a document exists", () => {
+    const doc = { cookie: "" };
+    vi.stubGlobal("document", doc);
+    enterGuestMode({ reload: vi.fn() });
+    expect(doc.cookie).toContain("NEXT_LOCALE=en");
+    expect(doc.cookie).toContain("max-age=31536000");
+  });
+
+  it("does not throw without a document", () => {
+    vi.stubGlobal("document", undefined);
+    expect(() => enterGuestMode({ reload: vi.fn() })).not.toThrow();
+  });
 });
 
 describe("exitGuestMode", () => {
