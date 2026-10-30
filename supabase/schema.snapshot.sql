@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS public.trades (
     emotion TEXT NOT NULL,
     mistake TEXT NOT NULL,
     notes TEXT,
-    screenshot_url TEXT,
+    -- P7 (patch 090): cột screenshot_url đã DROP (áp PROD 30-10-26)
     screenshot_path TEXT, -- P1 (patch 012): đường dẫn trong bucket private, nguồn đọc ưu tiên
     date TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     -- P3 (patch 030): cột rủi ro nullable, KHÔNG default 500; không có created_at (khớp PROD)
