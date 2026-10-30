@@ -137,6 +137,13 @@ CẢNH BÁO: chạy lại patch 051/052/053 (DROP TRIGGER IF EXISTS + CREATE TRI
 - Không kiểm qua HTTP PostgREST/GoTrue (KG3): smoke mô phỏng phiên bằng `SET LOCAL ROLE authenticated` + `request.jwt.claims`.
 - P5 KHÔNG áp patch 090 (DROP COLUMN, thuộc P7). Điều kiện tiên quyết cho P7: backup đầy đủ + mọi hàng có ảnh đã có `screenshot_path`.
 
+## Phase 07 (090): bỏ cột `trades.screenshot_url` - ĐÃ VIẾT, CHƯA ÁP TRÊN PROD
+
+- Trạng thái (29-10-26): `patches/090_drop_trades_screenshot_url.sql` (+ `.down.sql`), probe 90 và `scripts/p7_prod_apply.mjs` đã có; PROD vẫn ở `schema_migrations` = 000, 001, 010-013, 020, 030, 031, 050-053. Chưa áp vì K1 INCONCLUSIVE (hook chặn đọc env PROD trong phiên agent).
+- Client đã ngừng đọc/ghi `screenshot_url` (chỉ dùng `screenshot_path`), nên áp 090 sau khi bản client mới đã deploy; áp trước thì client cũ lỗi.
+- Patch có guard phá hủy (dừng nếu còn hàng có url mà thiếu path) và cần backup đầy đủ trước khi chạy.
+- Điều kiện áp, cửa sổ rollout và lệnh chính xác: `process/general-plans/active/hardening-security-data-integrity_11-10-26/harness/p7/prod-commands.txt`. Bằng chứng cục bộ (PGlite 31/31): `harness/p7/local-pglite-verification.txt`.
+
 ## Project TEST (cho harness 2 user)
 
 1. Tạo một Supabase project MỚI (không phải production).

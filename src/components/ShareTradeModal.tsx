@@ -8,7 +8,7 @@ import clsx from "clsx";
 import { toast } from "sonner";
 import { useTagTranslation } from "@/hooks/useTagTranslation";
 import { useSignedUrl } from "@/hooks/useSignedUrl";
-import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
+import { useFormOverlayRegistration } from "@/store/useFormOverlayStore";
 
 interface ShareCardData {
   asset: string;
@@ -165,13 +165,14 @@ interface ShareTradeModalProps {
 }
 
 export function ShareTradeModal({ isOpen, onClose, trade }: ShareTradeModalProps) {
+  useFormOverlayRegistration("share-trade", isOpen && !!trade);
   const t = useTranslations("ShareModal");
   const tTag = useTagTranslation();
   const [hideDollarAmount, setHideDollarAmount] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
   const [exporting, setExporting] = useState(false);
   const tShot = useTranslations("Screenshots");
-  const screenshotPath = trade ? (trade.screenshotPath ?? pathFromLegacyUrl(trade.screenshotUrl)) : null;
+  const screenshotPath = trade ? (trade.screenshotPath ?? null) : null;
   const signedShot = useSignedUrl(isOpen ? screenshotPath : null);
 
   if (!isOpen || !trade) return null;

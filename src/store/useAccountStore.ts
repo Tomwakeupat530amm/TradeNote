@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuthStore } from './useAuthStore';
 import { usePreferenceStore } from './usePreferenceStore';
 import { evaluateAccountConfigChange, HardStopError, isAccountConfigChangeRelevant } from '@/lib/hardStop';
+import { toServerConfigLockedError } from '@/lib/hardStopServerError';
 
 export interface AccountRules {
   maxPositions?: number;
@@ -159,6 +160,10 @@ export const useAccountStore = create<AccountState>((set, get) => ({
 
     if (error) {
       console.error('Error updating account:', error);
+      // P7 (KG10): server config-lock (P0001 + HINT HARD_STOP_CONFIG_LOCKED, trigger 053) -> HardStopError
+      // so accounts/page.tsx shows the localized HardStop message; never swallowed. State is untouched (no optimistic write).
+      const configLocked = toServerConfigLockedError(error);
+      if (configLocked) throw configLocked;
       throw error;
     }
 

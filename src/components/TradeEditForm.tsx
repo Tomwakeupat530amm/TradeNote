@@ -12,7 +12,6 @@ import clsx from "clsx";
 import { useTagTranslation } from "@/hooks/useTagTranslation";
 import { useTranslations } from "next-intl";
 import { processClipboardImage } from "@/lib/imageCompressor";
-import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
 import { useSignedUrl } from "@/hooks/useSignedUrl";
 
 const RESULTS: TradeResult[] = ["Win", "Loss", "Break Even"];
@@ -57,7 +56,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
   const [screenshot, setScreenshot] = useState<string | null>(null);
   // Existing image is referenced by storage path only; the signed URL is display-only (never saved back).
   const [screenshotPath, setScreenshotPath] = useState<string | null>(
-    trade.screenshotPath ?? pathFromLegacyUrl(trade.screenshotUrl)
+    trade.screenshotPath ?? null
   );
   const [screenshotRemoved, setScreenshotRemoved] = useState(false);
   const [compressionRatio, setCompressionRatio] = useState<number | null>(null);

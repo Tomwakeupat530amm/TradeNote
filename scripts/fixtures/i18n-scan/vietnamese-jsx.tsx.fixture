@@ -1,0 +1,5 @@
+// Fixture: two Vietnamese strings must be caught (JSX text + string literal).
+export function A() {
+  const label = "Hủy";
+  return <div title={label}>Xóa giao dịch</div>;
+}

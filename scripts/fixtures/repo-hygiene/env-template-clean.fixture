@@ -1,0 +1,9 @@
+# Clean env template fixture (placeholders only)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+OPENROUTER_API_KEY=<your-openrouter-api-key>
+OPENROUTER_MODEL=
+# PROD_DB_URL=postgresql://user:password@host:5432/postgres
+# PG_MODULE_PATH=<absolute path to an installed "pg" package directory>

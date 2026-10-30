@@ -1,0 +1,9 @@
+// Fixture: hard-coded English in JSX text and in a placeholder prop must be caught.
+export function B() {
+  return (
+    <div>
+      <button>Cancel order</button>
+      <input placeholder="Type a note here" />
+    </div>
+  );
+}

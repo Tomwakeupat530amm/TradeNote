@@ -274,7 +274,6 @@ async function suiteDryrun(db) {
          FROM storage.objects o WHERE o.bucket_id = $1
        ), used AS (
          SELECT screenshot_path AS p FROM public.trades WHERE screenshot_path IS NOT NULL
-         UNION SELECT regexp_replace(screenshot_url, '^.*/${BUCKET}/', '') FROM public.trades WHERE screenshot_url IS NOT NULL
          UNION SELECT regexp_replace(image_url, '^.*/${BUCKET}/', '') FROM public.playbooks WHERE image_url IS NOT NULL
        )
        SELECT o.name, o.created_at, o.owner_dir,
@@ -293,8 +292,8 @@ async function suiteDryrun(db) {
     // E17 MINOR-5: the SQL `candidate` flag is cross-checked against an INDEPENDENT used set (separate
     // query, JS-side legacy mapping) and the JS allow-list, so a wrong SQL candidate can actually FAIL.
     const usedRows = await db.query(
-      `SELECT screenshot_path AS p, screenshot_url AS u FROM public.trades
-        WHERE screenshot_path IS NOT NULL OR screenshot_url IS NOT NULL
+      `SELECT screenshot_path AS p, NULL AS u FROM public.trades
+        WHERE screenshot_path IS NOT NULL
        UNION ALL SELECT NULL, image_url FROM public.playbooks WHERE image_url IS NOT NULL`);
     const marker = `/${BUCKET}/`;
     const usedSet = new Set();

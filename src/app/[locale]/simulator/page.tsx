@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
+import { winRate as statsWinRate } from '@/lib/stats';
 import { Chart, registerables } from 'chart.js';
 import styles from './simulator.module.css';
 import {
@@ -75,7 +76,8 @@ export default function SimulatorPage() {
 
     const wins = accountTrades.filter(t => t.result === 'Win');
     const losses = accountTrades.filter(t => t.result === 'Loss');
-    const actualWinrate = Math.round((wins.length / accountTrades.length) * 100);
+    // P7 (winrate-display-sweep): single win rate from @/lib/stats (break-even excluded).
+    const actualWinrate = Math.round(statsWinRate(accountTrades));
 
     const totalWinPnl = wins.reduce((s, t) => s + t.pnl, 0);
     const totalLossPnl = Math.abs(losses.reduce((s, t) => s + t.pnl, 0));

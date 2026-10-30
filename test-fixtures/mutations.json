@@ -286,7 +286,7 @@
       "description": "P6 (KG12): deleteTrade removes the screenshot BEFORE the DB delete (order reversed)",
       "file": "src/store/useTradeStore.ts",
       "find": "    // P6 (KG12): the DB row goes FIRST; the image is touched only after the delete succeeded.\n",
-      "replace": "    { const early = tradeToDelete ? (tradeToDelete.screenshotPath ?? pathFromLegacyUrl(tradeToDelete.screenshotUrl)) : null; if (early) await removeScreenshotsOrQueue(useAuthStore.getState().user?.id, [early]); }\n",
+      "replace": "    { const early = tradeToDelete ? (tradeToDelete.screenshotPath ?? null) : null; if (early) await removeScreenshotsOrQueue(useAuthStore.getState().user?.id, [early]); }\n",
       "test": "src/store/__tests__/tradeStoreDelete.test.ts"
     },
     {
@@ -336,6 +336,78 @@
       "find": "      console.error('Error updating playbook:', error);\n      throw error;\n    }\n",
       "replace": "      console.error('Error updating playbook:', error);\n      throw error;\n    }\n    if (payload.title !== undefined) await supabase.from('trades').update({ setup: payload.title }).eq('setup', existing?.title ?? '');\n",
       "test": "src/store/__tests__/tagRenameStore.test.ts"
+    },
+    {
+      "id": "P7-M3-n-opens-second-form",
+      "description": "P7 (AC1a): the N hotkey ignores the open-form guard, so N opens Quick Log on top of an open form",
+      "file": "src/lib/hotkeys.ts",
+      "find": "  if (isAnyOpen) return false;\n",
+      "replace": "",
+      "test": "src/lib/__tests__/hotkeys.test.ts"
+    },
+    {
+      "id": "P7-M4-non-data-draft-persisted",
+      "description": "P7 (AC1b): the drawer draft persists any screenshot string (signed/http/blob URL) instead of data: images only",
+      "file": "src/lib/draftScreenshotHolder.ts",
+      "find": "  const screenshot = sanitizeDraftScreenshot(draft.screenshot);\n",
+      "replace": "  const screenshot = typeof draft.screenshot === \"string\" ? draft.screenshot : null;\n",
+      "test": "src/lib/__tests__/draftScreenshotHolder.test.ts"
+    },
+    {
+      "id": "P7-M1-vietnamese-literal-reinserted",
+      "description": "P7 (AC2): a hard-coded Vietnamese label is re-inserted into a scanned component (TodaySessionCockpit), so the i18n scan must fail",
+      "file": "src/components/TodaySessionCockpit.tsx",
+      "find": "<span>{t(\"activate_shield\")}</span>",
+      "replace": "<span>Kích hoạt Khiên</span>",
+      "test": "src/lib/__tests__/i18nScan.test.ts"
+    },
+    {
+      "id": "P7-M2-meta-key-missing-vi",
+      "description": "P7 (AC2): Meta.description is removed from messages/vi.json, so the Meta parity check must fail",
+      "file": "messages/vi.json",
+      "find": "    \"titleTemplate\": \"%s | TradeNote\",\n    \"description\": \"Nhật ký giao dịch cho prop firm với bộ máy rủi ro, Hard Stop và phân tích kỷ luật.\"\n",
+      "replace": "    \"titleTemplate\": \"%s | TradeNote\"\n",
+      "test": "src/lib/__tests__/i18nScan.test.ts"
+    },
+    {
+      "id": "P7-M5-legacy-url-not-protected",
+      "description": "P7 (E2 defence): before patch 090 the legacy screenshot URL of a row without a path is no longer added to the in-use set, so its file becomes an orphan candidate",
+      "file": "src/lib/orphanScreenshots.ts",
+      "find": "      if (withLegacy) addPath(used, r[LEGACY_URL_COLUMN], mapLegacyUrl);\n",
+      "replace": "",
+      "test": "src/lib/__tests__/orphanScreenshots.test.ts"
+    },
+    {
+      "id": "P7-M6-env-secret-always-passes",
+      "description": "P7 C5: the env template secret check is skipped, so a JWT/password/random token value passes",
+      "file": "scripts/repo_hygiene_check.mjs",
+      "find": "    if (why) errors.push(`${e.key}: value ${why}`);\n",
+      "replace": "",
+      "test": "src/lib/__tests__/repoHygiene.test.ts"
+    },
+    {
+      "id": "P7-M7-gitignore-negation-not-checked",
+      "description": "P7 C5: the .gitignore negation for the env template is no longer required",
+      "file": "scripts/repo_hygiene_check.mjs",
+      "find": "  if (!lines.includes(`!${ENV_TEMPLATE}`)) errors.push(`.gitignore must keep the negation \\`!${ENV_TEMPLATE}\\``);\n",
+      "replace": "",
+      "test": "src/lib/__tests__/repoHygiene.test.ts"
+    },
+    {
+      "id": "P7-M8-overlay-id-not-per-instance",
+      "description": "P7 fix leg (E17 m6): useFormOverlayRegistration drops the useId suffix, so Header and MobileBottomNav share one quick-log id",
+      "file": "src/store/useFormOverlayStore.ts",
+      "find": "  const id = overlayInstanceId(prefix, instanceId);\n",
+      "replace": "  const id = prefix || instanceId;\n",
+      "test": "src/components/__tests__/overlayRegistration.test.tsx"
+    },
+    {
+      "id": "P7-M9-gd2-matrix-precheck-skipped",
+      "description": "P7 fix leg (E17 m3): apply090 skips the before-matrix precheck, so a drifted grants matrix would still run the DROP",
+      "file": "scripts/p7_prod_apply.mjs",
+      "find": "    if (precheck) {\n",
+      "replace": "    if (false && precheck) {\n",
+      "test": "src/lib/__tests__/p7ProdApplyPrecheck.test.ts"
     }
   ]
 }

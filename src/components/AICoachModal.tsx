@@ -15,6 +15,7 @@ import type { AiCoachPayload } from "@/lib/aiCoachSchema";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import clsx from "clsx";
+import { useFormOverlayRegistration } from "@/store/useFormOverlayStore";
 
 interface AICoachModalProps {
   isOpen: boolean;
@@ -60,6 +61,7 @@ export function toAiCoachErrorCode(value: unknown): AiCoachErrorCode {
 }
 
 export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
+  useFormOverlayRegistration("ai-coach", isOpen);
   const t = useTranslations("AICoach");
   const locale = useLocale();
   const { trades } = useTradeStore();

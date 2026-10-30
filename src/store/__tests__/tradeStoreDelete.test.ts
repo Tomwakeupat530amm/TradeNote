@@ -122,12 +122,13 @@ describe("delete-trade-image-consistency: deleteTrade (KG12)", () => {
     expect(queue(s.storage)).toEqual([]);
   });
 
-  it("legacy screenshot_url maps to its path for removal", async () => {
-    const s = await loadStores({
-      trades: [trade({ screenshotPath: undefined, screenshotUrl: "https://x.supabase.co/storage/v1/object/public/trade-screenshots/user-A/old.png" })],
-    });
+  it("P7 E1: a row without screenshotPath removes no image (a stray legacy URL is ignored)", async () => {
+    // `screenshotUrl` is no longer a Trade field; a stale object carrying it must not drive storage removal.
+    const legacy = { ...trade({ screenshotPath: undefined }), screenshotUrl: "https://x.supabase.co/storage/v1/object/public/trade-screenshots/user-A/old.png" } as Trade;
+    const s = await loadStores({ trades: [legacy] });
     await s.useTradeStore.getState().deleteTrade("t-1");
-    expect(s.db.storageRemoveCalls).toEqual([["user-A/old.png"]]);
+    expect(s.db.deleteCalls).toEqual(["t-1"]);
+    expect(s.db.storageRemoveCalls).toHaveLength(0);
   });
 
   it("(b) DB ok, storage returns { error } -> row gone, path queued for the user", async () => {
@@ -259,7 +260,8 @@ describe("delete-trade-image-consistency: updateTrade", () => {
       return { ...q, update: (p: Record<string, unknown>) => { order.push("update"); return q.update(p); } };
     });
     await s.useTradeStore.getState().updateTrade("t-1", { screenshotFile: null });
-    expect(s.db.updateCalls[0]).toMatchObject({ screenshot_path: null, screenshot_url: null });
+    expect(s.db.updateCalls[0]).toMatchObject({ screenshot_path: null });
+    expect(s.db.updateCalls[0]).not.toHaveProperty("screenshot_url");
     expect(order).toEqual(["update", "remove"]);
     expect(s.db.storageRemoveCalls).toEqual([["user-A/1700000000000-aabbccdd.webp"]]);
     expect(s.useTradeStore.getState().trades[0].screenshotPath).toBeUndefined();
@@ -335,5 +337,46 @@ describe("delete-trade-image-consistency: updateTrade", () => {
     const err = await rejection(s.useTradeStore.getState().updateTrade("t-1", { screenshotFile: IMG }));
     expect((err as InstanceType<typeof s.SaveTradeError>).detail).toBe("SCREENSHOT_UPLOAD_FAILED");
     expect(s.db.updateCalls).toHaveLength(0);
+  });
+});
+
+describe("P7 E1: client never reads or writes trades.screenshot_url", () => {
+  it("addTrade insert payload has no screenshot_url (with and without an image)", async () => {
+    const s = await loadStores({ trades: [] });
+    s.db.uploadResult = { data: { path: "ok" }, error: null };
+    s.db.insertResult = { data: { id: "t-new", account_id: "acc-A", pnl: 100, date: NOW }, error: null };
+    await s.useTradeStore.getState().addTrade({ ...NEW_TRADE, screenshotFile: IMG });
+    await s.useTradeStore.getState().addTrade({ ...NEW_TRADE });
+    // insertCalls also records non-trade inserts (e.g. notifications); trade rows carry screenshot_path.
+    const tradeRows = s.db.insertCalls.map((c) => c[0] as Record<string, unknown>).filter((r) => "screenshot_path" in r);
+    expect(tradeRows).toHaveLength(2);
+    for (const call of s.db.insertCalls) expect(call[0]).not.toHaveProperty("screenshot_url");
+  });
+
+  it("updateTrade payload has no screenshot_url (new image, removal, plain edit)", async () => {
+    const s = await loadStores();
+    s.db.uploadResult = { data: { path: "ok" }, error: null };
+    await s.useTradeStore.getState().updateTrade("t-1", { screenshotFile: IMG });
+    await s.useTradeStore.getState().updateTrade("t-1", { screenshotFile: null });
+    await s.useTradeStore.getState().updateTrade("t-1", { notes: "n" });
+    expect(s.db.updateCalls).toHaveLength(3);
+    for (const call of s.db.updateCalls) expect(call).not.toHaveProperty("screenshot_url");
+    expect(s.useTradeStore.getState().trades[0]).not.toHaveProperty("screenshotUrl");
+  });
+
+  it("fetchTrades keeps select('*') and maps the image from screenshot_path only", async () => {
+    const s = await loadStores({ trades: [] });
+    const base = { account_id: "acc-A", asset: "MNQ", lot_size: 1, pnl: 100, result: "Win", setup: "Breakout", confluences: [], emotion: "Calm", mistake: "None", notes: "" };
+    s.db.selectRows = [
+      { ...base, id: "r-1", date: "2026-03-08T10:00:00.000Z", screenshot_path: "user-A/1700000000000-aabbccdd.webp", screenshot_url: "https://x/storage/v1/object/public/trade-screenshots/user-A/other.png" },
+      { ...base, id: "r-2", date: "2026-03-07T10:00:00.000Z", screenshot_path: null, screenshot_url: "https://x/storage/v1/object/public/trade-screenshots/user-A/old.png" },
+    ];
+    await s.useTradeStore.getState().fetchTrades("acc-A");
+    expect(s.db.keysetCalls.length).toBeGreaterThan(0);
+    for (const c of s.db.keysetCalls) expect(c.columns).toBe("*");
+    const byId = new Map(s.useTradeStore.getState().trades.map((t) => [t.id, t]));
+    expect(byId.get("r-1")?.screenshotPath).toBe("user-A/1700000000000-aabbccdd.webp");
+    expect(byId.get("r-2")?.screenshotPath).toBeUndefined();
+    for (const t of byId.values()) expect(t).not.toHaveProperty("screenshotUrl");
   });
 });

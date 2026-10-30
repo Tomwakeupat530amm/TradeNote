@@ -1,0 +1,15 @@
+// Fixture: nothing here may be reported.
+// Comment in Vietnamese: Bình tĩnh, Hủy, Xóa
+/* Block comment: Xác nhận xóa? */
+export function C({ t }: { t: (k: string) => string }) {
+  return (
+    <div>
+      {/* JSX comment: Kích hoạt Khiên */}
+      <span>// sidebar divider</span>
+      <span>2 × 3</span>
+      <span>{t("Cancel")}</span>
+      <span>R</span>
+      <span>PnL</span>
+    </div>
+  );
+}

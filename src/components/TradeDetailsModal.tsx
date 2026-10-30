@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { TradeEditForm } from "./TradeEditForm";
 import { TradeViewDetails } from "./TradeViewDetails";
+import { useFormOverlayRegistration } from "@/store/useFormOverlayStore";
 
 interface TradeDetailsModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ interface TradeDetailsModalProps {
 }
 
 export default function TradeDetailsModal({ isOpen, onClose, trade }: TradeDetailsModalProps) {
+  useFormOverlayRegistration("trade-details", isOpen && !!trade);
   const { deleteTrade } = useTradeStore();
   const { fetchPreferences } = usePreferenceStore();
 

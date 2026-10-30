@@ -6,7 +6,8 @@ import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/routing";
 import { 
   LayoutDashboard, Users, Activity, Settings, LogOut, ReceiptText, Quote,
-  TrendingUp, Target, Award, PanelLeftClose, PanelLeftOpen, BookOpen
+  TrendingUp, Target, Award, PanelLeftClose, PanelLeftOpen, BookOpen,
+  Notebook, ClipboardCheck, CalendarDays, Dices
 } from "lucide-react";
 import clsx from "clsx";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -14,10 +15,16 @@ import { useSidebarStore } from "@/store/useSidebarStore";
 import { useGuideStore } from "@/store/useGuideStore";
 import { motion } from "framer-motion";
 
+// P7 A (D3): order matches MobileBottomNav coverage; `/calendar` intentionally omitted
+// (duplicates Journal calendar view; backlog note calendar-route-not-in-nav).
 const navigation = [
   { id: "dashboard", href: "/", icon: LayoutDashboard, color: "text-blue-400" },
   { id: "journal", href: "/journal", icon: ReceiptText, color: "text-green-400" },
   { id: "analytics", href: "/analytics", icon: Activity, color: "text-pink-400" },
+  { id: "playbook", href: "/playbook", icon: Notebook, color: "text-violet-400" },
+  { id: "daily_review", href: "/daily-review", icon: ClipboardCheck, color: "text-cyan-400" },
+  { id: "economic_calendar", href: "/economic-calendar", icon: CalendarDays, color: "text-amber-400" },
+  { id: "simulator", href: "/simulator", icon: Dices, color: "text-indigo-400" },
   { id: "accounts", href: "/accounts", icon: Users, color: "text-orange-400" },
 ];
 

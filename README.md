@@ -23,6 +23,9 @@ Runs ESLint across the codebase using `eslint.config.mjs`.
 ### `npm run test:api` / `npm run test:rls` / `npm run lint:sql`
 AI Coach route contract (live cases need a dev server and a throwaway-user token, else SKIPPED), RLS two-user harness (SKIPPED without a TEST project), and SQL patch lint.
 
+### `npm run test:unit` / `npm run test:i18n` / `npm run test:hygiene`
+Vitest suite (libs, stores, RTL component tests), AST scan for hard-coded UI strings (allow-list in `scripts/i18n_hardcoded_allowlist.json`), and repo hygiene check (env ignore rules, `.gitattributes`, no CRLF, no orphan component).
+
 ### `node scripts/test_enhancements_runner.mjs`
 Runs the comprehensive unit testing suite (see `process/context/tests/all-tests.md` for measured totals):
 - Prop firm risk engine & 1R bullet calculations
@@ -45,7 +48,7 @@ Runs the comprehensive unit testing suite (see `process/context/tests/all-tests.
 
 ## Environment Variables
 
-Ensure `.env.local` is created with:
+Copy `.env.example` to `.env.local` (the template holds variable names only) and set:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key

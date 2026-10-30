@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { useFormOverlayRegistration } from "@/store/useFormOverlayStore";
 
 /**
  * P6 D2: confirm a playbook rename. Renaming affects NEW trades only: old trades keep their
@@ -23,6 +24,8 @@ export function PlaybookRenameDialog({
   onCancel: () => void;
 }) {
   const t = useTranslations("Playbook");
+  // Rendered only while the confirm is open.
+  useFormOverlayRegistration("playbook-rename", true);
   return (
     <div role="dialog" aria-modal="true" data-testid="playbook-rename-dialog" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-gray-900 p-6 space-y-4">

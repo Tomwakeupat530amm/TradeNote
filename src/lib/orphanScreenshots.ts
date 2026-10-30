@@ -31,6 +31,8 @@ export interface KeyValueStore {
 
 export interface StorageError {
   message?: string;
+  /** PostgREST / Postgres error code when present (e.g. '42703' undefined_column). */
+  code?: string;
 }
 
 export interface OrphanBucket {
@@ -196,6 +198,17 @@ export async function listUserObjects(client: OrphanClient, userId: string): Pro
   throw new OrphanScanError('storage list did not terminate');
 }
 
+/** Legacy column dropped by patch 090 (P7b). Read ONLY here, defensively, until the column is gone. */
+const LEGACY_URL_COLUMN = 'screenshot_url';
+
+/** True when the error says the legacy column does not exist (Postgres 42703 / PostgREST message). */
+export function isMissingLegacyColumn(error: StorageError | null | undefined): boolean {
+  if (!error) return false;
+  if (error.code === '42703') return true;
+  const msg = String(error.message ?? '');
+  return msg.includes(LEGACY_URL_COLUMN) && /does not exist/i.test(msg);
+}
+
 function addPath(set: Set<string>, value: unknown, mapLegacyUrl: LegacyUrlMapper): void {
   if (typeof value !== 'string' || !value) return;
   set.add(value);
@@ -212,10 +225,23 @@ export async function loadUsedPaths(client: OrphanClient, userId: string, mapLeg
   let seen = 0;
   let cursor: { date: string; id: string } | null = null;
   let finished = false;
+  // P7 E2 defence: while the legacy column still exists (patch 090 not applied), a row that has a
+  // legacy URL but no path keeps its file protected (mapped path joins the in-use set). After 090
+  // drops the column the select fails with 42703 -> fall back to path-only (the post-drop state).
+  // Any other error still cancels the scan.
+  let withLegacy = true;
   for (let page = 0; page < MAX_PAGES; page++) {
-    let q = client.from('trades').select('id, date, screenshot_path, screenshot_url').eq('user_id', userId);
-    if (cursor) q = q.or(`date.lt."${cursor.date}",and(date.eq."${cursor.date}",id.lt.${cursor.id})`);
-    const { data, error } = await q.order('date', { ascending: false }).order('id', { ascending: false }).limit(USED_PAGE_SIZE);
+    const pageQuery = (columns: string) => {
+      let q = client.from('trades').select(columns).eq('user_id', userId);
+      if (cursor) q = q.or(`date.lt."${cursor.date}",and(date.eq."${cursor.date}",id.lt.${cursor.id})`);
+      return q.order('date', { ascending: false }).order('id', { ascending: false }).limit(USED_PAGE_SIZE);
+    };
+    let res = await pageQuery(withLegacy ? `id, date, screenshot_path, ${LEGACY_URL_COLUMN}` : 'id, date, screenshot_path');
+    if (withLegacy && res.error && isMissingLegacyColumn(res.error)) {
+      withLegacy = false;
+      res = await pageQuery('id, date, screenshot_path');
+    }
+    const { data, error } = res;
     if (error || !data) throw new OrphanScanError('trades query failed');
     if (data.length === 0) {
       finished = true;
@@ -223,7 +249,7 @@ export async function loadUsedPaths(client: OrphanClient, userId: string, mapLeg
     }
     for (const r of data) {
       addPath(used, r.screenshot_path, mapLegacyUrl);
-      addPath(used, r.screenshot_url, mapLegacyUrl);
+      if (withLegacy) addPath(used, r[LEGACY_URL_COLUMN], mapLegacyUrl);
     }
     seen += data.length;
     const last = data[data.length - 1];

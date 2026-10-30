@@ -28,6 +28,7 @@ import { DailyExecutiveReportCard } from "@/components/DailyExecutiveReportCard"
 import { useTradingDay } from "@/hooks/useTradingDay";
 import { evaluateHardStop, tradesOfTradingDay } from "@/lib/hardStop";
 import { accountResetOverride } from "@/lib/propRisk";
+import { winRate as statsWinRate } from "@/lib/stats";
 
 interface TodaySessionCockpitProps {
   activeAccount: Account;
@@ -71,7 +72,8 @@ export function TodaySessionCockpit({
   const todayWins = useMemo(() => todayTrades.filter((t) => t.pnl > 0).length, [todayTrades]);
   const todayLosses = useMemo(() => todayTrades.filter((t) => t.pnl < 0).length, [todayTrades]);
   const todayBE = useMemo(() => todayTrades.filter((t) => t.pnl === 0).length, [todayTrades]);
-  const todayWinRate = todayTrades.length > 0 ? Math.round((todayWins / todayTrades.length) * 100) : 0;
+  // P7 (winrate-display-sweep): single win rate from @/lib/stats (break-even excluded).
+  const todayWinRate = todayTrades.length > 0 ? Math.round(statsWinRate(todayTrades)) : 0;
 
   const todayR = useMemo(() => {
     return todayTrades.reduce((sum, t) => {
@@ -168,7 +170,7 @@ export function TodaySessionCockpit({
               )
             }
             className="px-3 py-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
-            title="Discipline Shield & Zen Cool-Down"
+            title={t("shield_title")}
           >
             <ShieldAlert className="w-3.5 h-3.5 text-indigo-400" />
             <span>🛡️ SOS Zen</span>
@@ -215,7 +217,7 @@ export function TodaySessionCockpit({
               className="shrink-0 px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-200 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <ShieldAlert className="w-3.5 h-3.5" />
-              <span>Kích hoạt Khiên</span>
+              <span>{t("activate_shield")}</span>
             </button>
           </motion.div>
         ) : isHardStopWarning ? (
@@ -245,7 +247,7 @@ export function TodaySessionCockpit({
               className="shrink-0 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <ShieldAlert className="w-3.5 h-3.5" />
-              <span>Hạ nhiệt ngay</span>
+              <span>{t("cool_down_now")}</span>
             </button>
           </motion.div>
         ) : isConsecutiveLoss ? (
@@ -272,7 +274,7 @@ export function TodaySessionCockpit({
               className="shrink-0 px-3 py-1.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-200 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <Coffee className="w-3.5 h-3.5" />
-              <span>Bài tập thở 4-7-8</span>
+              <span>{t("breathing_478")}</span>
             </button>
           </motion.div>
         ) : isHighFrequency ? (
@@ -455,7 +457,7 @@ export function TodaySessionCockpit({
         <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col justify-between">
           <span className="text-xs font-semibold text-gray-400 flex items-center justify-between">
             <span>{t('discipline_streak')}</span>
-            <span className="text-[10px] text-gray-500 font-mono">Recent Streak</span>
+            <span className="text-[10px] text-gray-500 font-mono">{t("recent_streak")}</span>
           </span>
 
           <div className="my-2">

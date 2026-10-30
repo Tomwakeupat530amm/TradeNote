@@ -254,10 +254,12 @@ describe("allowed-columns-parity (E-16)", () => {
       ["notes", "setup", "confluences", "emotion", "mistake", "checklist_results", "screenshot_url", "screenshot_path", "risk_is_estimated"].sort(),
     );
   });
-  it("the lib allow-list maps onto exactly those columns", () => {
-    expect([...LOCKED_DAY_EDITABLE_COLUMNS].sort()).toEqual([...hardStopGolden.meta.allowedColumns].sort());
-    const mapped = new Set(LOCKED_DAY_EDITABLE_FIELDS.map((f) => hardStopGolden.meta.fieldToColumn[f]));
-    expect([...mapped].sort()).toEqual([...hardStopGolden.meta.allowedColumns].sort());
+  it("the lib allow-list maps onto exactly those columns minus screenshot_url", () => {
+    // P7 gỡ trường client `screenshotUrl`; cột còn trong trigger 052/golden là mục thừa vô hại; 090 drop cột.
+    const clientColumns = [...hardStopGolden.meta.allowedColumns].filter((c) => c !== "screenshot_url").sort();
+    expect([...LOCKED_DAY_EDITABLE_COLUMNS].sort()).toEqual(clientColumns);
+    const mapped = new Set(LOCKED_DAY_EDITABLE_FIELDS.map((f) => (hardStopGolden.meta.fieldToColumn as Record<string, string>)[f]));
+    expect([...mapped].sort()).toEqual(clientColumns);
   });
 });
 

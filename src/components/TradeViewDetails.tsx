@@ -9,7 +9,6 @@ import { useTranslations } from "next-intl";
 import { ShareTradeModal } from "./ShareTradeModal";
 import { VisualRRBox } from "./VisualRRBox";
 import { TradingViewMiniChart } from "./TradingViewMiniChart";
-import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
 import { useSignedUrl } from "@/hooks/useSignedUrl";
 import { EstimatedRiskBadge } from "./EstimatedRiskBadge";
 import { UNRATED } from "@/lib/psychology";
@@ -29,7 +28,7 @@ export function TradeViewDetails({ trade, onEdit, onDelete, deleteDisabledReason
   const tVisual = useTranslations("VisualRR");
   const tShot = useTranslations("Screenshots");
   const tRisk = useTranslations("Risk");
-  const screenshotPath = trade.screenshotPath ?? pathFromLegacyUrl(trade.screenshotUrl);
+  const screenshotPath = trade.screenshotPath ?? null;
   const signedShot = useSignedUrl(screenshotPath);
   const tTag = useTagTranslation();
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);

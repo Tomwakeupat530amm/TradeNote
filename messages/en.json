@@ -32,7 +32,9 @@
     "tooltip_guide": "Comprehensive user handbook & guide",
     "risk_status_safe": "All risk limits & discipline rules are safe",
     "risk_status_alert": "Active Risk Alert - Pay Attention",
-    "risk_status_title": "Discipline & Risk Guard"
+    "risk_status_title": "Discipline & Risk Guard",
+    "sound_mute": "Mute audio cues",
+    "sound_unmute": "Unmute audio cues"
   },
   "Sidebar": {
     "brand": "TradeNote",
@@ -946,7 +948,12 @@
     "status_cooldown": "Take a Break 🧘",
     "status_good": "Disciplined 👍",
     "recent_trades_today": "Trades filled today ({count})",
-    "view_in_journal": "View all in Journal"
+    "view_in_journal": "View all in Journal",
+    "shield_title": "Discipline Shield & Zen Cool-Down",
+    "activate_shield": "Activate Shield",
+    "cool_down_now": "Cool down now",
+    "breathing_478": "4-7-8 breathing exercise",
+    "recent_streak": "Recent Streak"
   },
   "CommandPalette": {
     "placeholder": "Search trades (MNQ, XAUUSD...), setups, pages or quick actions...",
@@ -1124,7 +1131,8 @@
     "drag_drop_hint": "Drop chart image here or press Ctrl + V",
     "drop_active": "Release to attach screenshot",
     "paste_badge": "Optimized WebP",
-    "processing_image": "Optimizing screenshot..."
+    "processing_image": "Optimizing screenshot...",
+    "screenshotAlt": "Trade screenshot"
   },
   "SlideOverDrawer": {
     "title_new": "Log Detailed Trade",
@@ -1165,7 +1173,12 @@
     "drop_active": "Release to attach screenshot",
     "paste_badge": "Optimized WebP",
     "has_image_badge": "Image attached",
-    "processing_image": "Optimizing screenshot..."
+    "processing_image": "Optimizing screenshot...",
+    "closeDrawer": "Close drawer",
+    "err_invalid_image": "Please upload a valid image file.",
+    "toast_screenshot_attached": "Screenshot attached!",
+    "err_no_account": "No active trading account selected.",
+    "err_lot_size_positive": "Lot size must be greater than 0."
   },
   "MobileNav": {
     "dashboard": "Dashboard",
@@ -1191,7 +1204,12 @@
     "share_trade": "Share",
     "no_screenshot": "No chart screenshot",
     "click_to_zoom": "Click to expand chart",
-    "setup_unspecified": "General Trade"
+    "setup_unspecified": "General Trade",
+    "confirmDelete": "Delete this trade?",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "expandedChartAlt": "Expanded trade chart",
+    "closeLightbox": "Close image preview"
   },
   "DisciplineShield": {
     "modal_title": "Discipline Shield & Zen Cool-Down",
@@ -1365,7 +1383,8 @@
     "shareDownloaded": "Share card PNG downloaded",
     "downloadPng": "Download PNG",
     "shareExportFailed": "Could not export the share card",
-    "shareImageSkipped": "Chart image unavailable - exported card without it"
+    "shareImageSkipped": "Chart image unavailable - exported card without it",
+    "chartAlt": "Trade chart"
   },
   "Auth": {
     "brand": "TradeNote",
@@ -1480,5 +1499,20 @@
     "source": "Source",
     "recordedOn": "Recorded {date}",
     "unverified": "Reference source - not verified"
+  },
+  "Draft": {
+    "quotaImageKept": "Browser storage is full: the screenshot is kept for this session only. Your text draft was saved.",
+    "saveFailed": "Could not save the draft in this browser.",
+    "quotaImageKeptTextFailed": "Browser storage is full: the screenshot is kept for this session only, but your text draft could NOT be saved."
+  },
+  "Cooldown": {
+    "activeTitle": "Discipline Shield active ({minutes} min left)",
+    "prompt": "You are in a psychological cool-down. Are you taking this trade because it follows your Playbook rules, or because you want to win back a loss?",
+    "dismiss": "I am calm - continue logging"
+  },
+  "Meta": {
+    "title": "TradeNote - Prop Firm Trading Journal",
+    "titleTemplate": "%s | TradeNote",
+    "description": "Prop firm trading journal with risk engine, Hard Stop and discipline analytics."
   }
 }

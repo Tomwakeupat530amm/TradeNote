@@ -5,7 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { AuthProvider } from "@/components/AuthProvider";
 import { Toaster } from 'sonner';
 import { NextIntlClientProvider } from 'next-intl';
-import { getMessages } from 'next-intl/server';
+import { getMessages, getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { routing } from '@/i18n/routing';
 import { ClientLocaleDetector } from "@/components/ClientLocaleDetector";
@@ -20,10 +20,20 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "TradeNote MVP",
-  description: "Prop Firm Trading Journal",
-};
+export async function generateMetadata({
+  params
+}: {
+  params: Promise<{locale: string}>;
+}): Promise<Metadata> {
+  const { locale: requested } = await params;
+  // generateMetadata runs before the layout body (which calls notFound()), so never pass an unknown locale on.
+  const locale = (routing.locales as readonly string[]).includes(requested) ? requested : routing.defaultLocale;
+  const t = await getTranslations({ locale, namespace: 'Meta' });
+  return {
+    title: { default: t('title'), template: t('titleTemplate') },
+    description: t('description'),
+  };
+}
 
 export default async function RootLayout({
   children,

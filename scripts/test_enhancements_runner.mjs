@@ -3417,14 +3417,18 @@ it("E21(i): useSignedUrl batches via createSignedUrls with in-memory cache only 
   assert.ok(code.includes('export function prefetchSignedUrls'), "must export prefetchSignedUrls");
 });
 
-it("E21(ii): stores no longer split '/trade-screenshots/' and GC by screenshotPath ?? pathFromLegacyUrl", () => {
+it("E21(ii): stores no longer split '/trade-screenshots/'; trade GC by screenshotPath only (P7 E1)", () => {
   const tradeStore = readSrc('src/store/useTradeStore.ts');
   const playbookStore = readSrc('src/store/usePlaybookStore.ts');
   for (const code of [tradeStore, playbookStore]) {
     assert.ok(!code.includes("split('/trade-screenshots/')"), "legacy URL split must be gone");
-    assert.ok(code.includes('pathFromLegacyUrl('), "must derive path via pathFromLegacyUrl");
   }
-  assert.ok(tradeStore.includes('screenshotPath ?? pathFromLegacyUrl('), "deleteTrade/updateTrade GC must prefer screenshotPath");
+  // P7 E1: playbook image_url still stores a public URL -> keeps the legacy mapper; trades never read screenshot_url.
+  assert.ok(playbookStore.includes('pathFromLegacyUrl('), "playbook store must derive path via pathFromLegacyUrl");
+  assert.ok(!tradeStore.includes('pathFromLegacyUrl('), "trade store must not map legacy screenshot_url anymore");
+  assert.ok(!/screenshot_url|screenshotUrl/.test(tradeStore), "trade store must not read/write screenshot_url");
+  assert.ok(tradeStore.includes('(tradeToDelete.screenshotPath ?? null)'), "deleteTrade GC must use screenshotPath only");
+  assert.ok(tradeStore.includes('(existingBefore.screenshotPath ?? null)'), "updateTrade GC must use screenshotPath only");
   assert.ok(tradeStore.includes('screenshot_path: finalScreenshotPath'), "addTrade must write screenshot_path");
   assert.ok(tradeStore.includes('payload.screenshot_path = null'), "removing an image must null screenshot_path");
   assert.ok(!/getPublicUrl/.test(tradeStore), "trade store must not build public URLs anymore");
@@ -3485,6 +3489,10 @@ it("E21(iv): ShareTradeModal exports PNG via plain Canvas 2D, no DOM-to-image de
   // P3 logged exception (A1b): exactly this one script line may be added (no regex/prefix widening).
   const E21_EXACT_ALLOWED_LINES = new Set([
     '"test:unit": "vitest run"',
+    // P7 logged exception (Step B1, registry Phase 7): the i18n hard-coded string scan script.
+    '"test:i18n": "node scripts/i18n_hardcoded_scan.mjs"',
+    // P7 logged exception (Step C5, registry Phase 7): the repo hygiene check script.
+    '"test:hygiene": "node scripts/repo_hygiene_check.mjs --self-test"',
   ]);
   const diffLines = diff.split(/\r?\n/).filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l));
   const norm = (l) => l.slice(1).trim().replace(/,$/, '');
@@ -4480,7 +4488,7 @@ it("40a: preset picker link has rel=\"noopener noreferrer\" + target=_blank and 
 
 it("40b: E21(ii) storage literals still present in the stores (P1/P6)", () => {
   const ts = s40Read('src/store/useTradeStore.ts');
-  for (const lit of ['screenshotPath ?? pathFromLegacyUrl(', 'screenshot_path: finalScreenshotPath', 'payload.screenshot_path = null']) assert.ok(ts.includes(lit), lit);
+  for (const lit of ['(tradeToDelete.screenshotPath ?? null)', 'screenshot_path: finalScreenshotPath', 'payload.screenshot_path = null']) assert.ok(ts.includes(lit), lit);
   assert.ok(!ts.includes('getPublicUrl'), 'no getPublicUrl in useTradeStore');
   assert.ok(s40Read('src/store/usePlaybookStore.ts').includes('getPublicUrl'), 'playbook store keeps getPublicUrl');
 });
@@ -4550,6 +4558,182 @@ it("40h: i18n EN = VI parity (100%) and every key used by the P6 components exis
   assert.deepStrictEqual(missing, []);
 });
 // ===== END Section 40 =====
+
+// ===== BEGIN Section 41 (P7 hardening: i18n hard-coded string scan, Cooldown/Meta, generateMetadata) =====
+console.log("\n--- Section 41: P7 i18n scan (AST), Cooldown/Meta parity, generateMetadata ---");
+const s41Scan = await import('./i18n_hardcoded_scan.mjs');
+const s41En = JSON.parse(s40Read('messages/en.json'));
+const s41Vi = JSON.parse(s40Read('messages/vi.json'));
+
+it("41a: i18n scan self-test (Vietnamese/English caught; //, U+00D7, comments ignored; reason required)", () => {
+  assert.deepStrictEqual(s41Scan.selfTest(), []);
+});
+
+it("41b: allow-list valid (every entry has a reason) and no finding outside it", () => {
+  const list = s41Scan.loadAllowlist();
+  assert.deepStrictEqual(s41Scan.validateAllowlist(list), []);
+  const left = s41Scan.applyAllowlist(s41Scan.scanProject(), list);
+  assert.deepStrictEqual(left.map((f) => `[${f.kind}] ${f.file}:${f.line} ${f.text}`), []);
+});
+
+it("41c: P7 screens carry no hard-coded Vietnamese (QuickLog, Drawer, Cockpit, CardsView, layout)", () => {
+  const files = ['src/components/QuickLogTradeModal.tsx', 'src/components/TradeSlideOverDrawer.tsx', 'src/components/TodaySessionCockpit.tsx', 'src/components/TradeCardsView.tsx', 'src/app/[locale]/layout.tsx'];
+  const vi = files.flatMap((f) => s41Scan.scanSource(f, s40Read(f)).filter((x) => x.kind === 'vi'));
+  assert.deepStrictEqual(vi, []);
+});
+
+it("41d: Cooldown, Meta, Draft namespaces: EN = VI keys, non-empty strings, used keys exist", () => {
+  for (const ns of ['Cooldown', 'Meta', 'Draft']) {
+    assert.ok(s41En[ns] && s41Vi[ns], `${ns} exists in en and vi`);
+    assert.deepStrictEqual(Object.keys(s41En[ns]).sort(), Object.keys(s41Vi[ns]).sort(), `${ns} parity`);
+    for (const m of [s41En, s41Vi]) for (const v of Object.values(m[ns])) assert.ok(typeof v === 'string' && v.trim(), `${ns} non-empty`);
+  }
+  for (const k of ['title', 'titleTemplate', 'description']) assert.ok(s41En.Meta[k] && s41Vi.Meta[k], `Meta.${k}`);
+  for (const f of ['src/components/QuickLogTradeModal.tsx', 'src/components/TradeSlideOverDrawer.tsx']) {
+    const src = s40Read(f);
+    assert.ok(src.includes('useTranslations("Cooldown")'), `${f} binds Cooldown`);
+    for (const k of s40Keys(src, 'tCooldown')) assert.ok(typeof s41En.Cooldown[k] === 'string' && typeof s41Vi.Cooldown[k] === 'string', `Cooldown.${k}`);
+    for (const k of s40Keys(src, 'tDraft')) assert.ok(typeof s41En.Draft[k] === 'string' && typeof s41Vi.Draft[k] === 'string', `Draft.${k}`);
+  }
+});
+
+it("41e: [locale]/layout.tsx uses generateMetadata with the Meta namespace, validates the locale, no static 'TradeNote MVP'", () => {
+  const src = s40Read('src/app/[locale]/layout.tsx');
+  assert.ok(/export async function generateMetadata\(/.test(src), 'generateMetadata exported');
+  assert.ok(!/export const metadata\b/.test(src) && !src.includes('TradeNote MVP'), 'static metadata removed');
+  assert.ok(/getTranslations\(\{\s*locale,\s*namespace:\s*'Meta'\s*\}\)/.test(src), 'getTranslations Meta');
+  assert.ok(/routing\.locales[\s\S]{0,80}includes\(requested\)/.test(src), 'locale validated before getTranslations');
+});
+// ===== END Section 41 =====
+
+// ===== BEGIN Section 42 (P7 E2: patch 090 DROP COLUMN trades.screenshot_url - static guards) =====
+console.log("\n--- Section 42: P7 E2 patch 090 (destructive guard, down, safety block, probe 90 read-only, p7_prod_apply) ---");
+const s42Strip = (sql) => sql.replace(/\/\*[\s\S]*?\*\//g, ' ').split('\n').map((l) => l.replace(/--.*$/, '')).join('\n');
+const s42Up = s40Read('supabase/patches/090_drop_trades_screenshot_url.sql');
+const s42UpCode = s42Strip(s42Up);
+const s42DownPath = 'supabase/patches/090_drop_trades_screenshot_url.down.sql';
+
+it("42a: 090 up - one DESTRUCTIVE-OK line, DROP COLUMN IF EXISTS, no BEGIN/COMMIT/ROLLBACK/CONCURRENTLY, schema_migrations '090' idempotent", () => {
+  assert.strictEqual((s42Up.match(/^\s*--\s*DESTRUCTIVE-OK:\s*\S+/gm) || []).length, 1, 'exactly one DESTRUCTIVE-OK line');
+  assert.ok(/ALTER TABLE public\.trades DROP COLUMN IF EXISTS screenshot_url;/.test(s42UpCode), 'DROP COLUMN IF EXISTS');
+  assert.ok(!/\b(BEGIN|COMMIT|ROLLBACK)\s*;/i.test(s42UpCode.replace(/\$p090\$[\s\S]*?\$p090\$/g, '')), 'no transaction control outside the DO block');
+  assert.ok(!/\bCOMMIT\b|\bROLLBACK\b|\bCONCURRENTLY\b/i.test(s42UpCode), 'no COMMIT/ROLLBACK/CONCURRENTLY');
+  assert.ok(/INSERT INTO public\.schema_migrations \(version, name\)\s*VALUES \('090', '[a-z_]+'\)\s*ON CONFLICT DO NOTHING;/.test(s42UpCode), 'schema_migrations 090 ON CONFLICT DO NOTHING');
+});
+
+it("42b: 090 down exists - re-adds a nullable empty text column, removes the 090 row, no transaction control", () => {
+  assert.ok(fs.existsSync(path.resolve(S40_ROOT, s42DownPath)), 'down file exists');
+  const raw = s40Read(s42DownPath);
+  const code = s42Strip(raw);
+  assert.ok(/ALTER TABLE public\.trades ADD COLUMN IF NOT EXISTS screenshot_url text;/.test(code), 'ADD COLUMN IF NOT EXISTS text');
+  assert.ok(!/NOT NULL|DEFAULT/i.test(code), 'nullable, no default (empty)');
+  assert.ok(/DELETE FROM public\.schema_migrations WHERE version = '090';/.test(code), 'removes 090');
+  assert.ok(!/\b(BEGIN|COMMIT|ROLLBACK)\b/i.test(code), 'no transaction control');
+  assert.ok(/backup/i.test(raw), 'documents that data comes back only from backup');
+});
+
+it("42c: 090 up - DO safety block checks the column exists and RAISEs on url-without-path BEFORE the DROP", () => {
+  const doIdx = s42UpCode.indexOf('DO $p090$');
+  const dropIdx = s42UpCode.indexOf('DROP COLUMN');
+  assert.ok(doIdx >= 0 && doIdx < dropIdx, 'DO block before DROP');
+  const block = s42UpCode.slice(doIdx, dropIdx);
+  assert.ok(/information_schema\.columns[\s\S]*column_name = 'screenshot_url'/.test(block), 'column existence check');
+  assert.ok(/screenshot_url IS NOT NULL[\s\S]*screenshot_path IS NULL/.test(block), 'url-without-path count');
+  assert.ok(/IF v_bad > 0 THEN\s*RAISE EXCEPTION/.test(block), 'RAISE EXCEPTION when > 0');
+});
+
+it("42d: probe 90 is read-only (no DML/DDL) and reports url_without_path, dependents, 050-053 as PASS/FAIL", () => {
+  const code = s42Strip(s40Read('supabase/probes/90_p7_pre_checks.sql'));
+  assert.ok(!/\b(INSERT|UPDATE|DELETE|ALTER|DROP|CREATE|TRUNCATE|GRANT|REVOKE|COPY)\b/i.test(code), 'no DML/DDL');
+  for (const k of ['url_without_path', 'dependent_views', 'dependent_objects', 'migrations_050_053', 'column_exists']) assert.ok(code.includes(`'${k}'`), k);
+  assert.ok(/'PASS' ELSE 'FAIL'/.test(code), 'PASS/FAIL status');
+});
+
+const { spawnSync: s42Spawn } = await import('node:child_process');
+it("42e: p7_prod_apply.mjs refuses without --confirm-prod before touching env, never names an env file, exits 2", () => {
+  const src = s40Read('scripts/p7_prod_apply.mjs');
+  const refuse = src.indexOf("if (!args.includes('--confirm-prod'))");
+  const firstEnv = src.indexOf('process.env');
+  assert.ok(refuse > 0 && firstEnv > refuse, '--confirm-prod check precedes any env access');
+  assert.ok(!/\.tradenote-prod|\.env\.local|\.env['"`]/.test(src), 'no env file name');
+  const r = s42Spawn(process.execPath, [path.resolve(S40_ROOT, 'scripts/p7_prod_apply.mjs'), '--stage', '0'], { encoding: 'utf8' });
+  assert.strictEqual(r.status, 2, `exit 2 without --confirm-prod (got ${r.status})`);
+});
+// ===== END Section 42 =====
+
+// ===== BEGIN Section 43 (P7 C4/C5: orphan EquityCurveChart removed + repo hygiene check) =====
+console.log("\n--- Section 43: P7 C4/C5 repo hygiene (orphan component removed, repo_hygiene_check self-test) ---");
+
+it("43a: C4 - EquityCurveChart.tsx removed and no longer referenced in src/ or the i18n allow-list", () => {
+  assert.ok(!fs.existsSync(path.resolve(S40_ROOT, 'src/components/EquityCurveChart.tsx')), 'orphan component deleted');
+  assert.ok(!s40Read('scripts/i18n_hardcoded_allowlist.json').includes('EquityCurveChart'), 'allow-list entry removed');
+});
+
+it("43b: C5 - repo_hygiene_check.mjs is dependency-free ESM exposing the pure checks, wired as npm test:hygiene", () => {
+  const src = s40Read('scripts/repo_hygiene_check.mjs');
+  const imports = [...src.matchAll(/^import .* from '([^']+)';$/gm)].map((m) => m[1]);
+  assert.ok(imports.length > 0 && imports.every((m) => m.startsWith('node:')), `only node: imports (got ${imports.join(', ')})`);
+  for (const fn of ['checkEnvTemplate', 'checkGitignore', 'checkGitattributes', 'findCrlf', 'runSelfTest', 'runRepoChecks']) {
+    assert.ok(new RegExp(`export function ${fn}\\(`).test(src), `exports ${fn}`);
+  }
+  const pkg = JSON.parse(s40Read('package.json'));
+  assert.strictEqual(pkg.scripts['test:hygiene'], 'node scripts/repo_hygiene_check.mjs --self-test');
+  for (const f of ['env-template-clean', 'env-template-secret', 'env-template-dburl', 'gitignore-clean', 'gitignore-no-negation', 'gitattributes-clean', 'lf-sample']) {
+    assert.ok(fs.existsSync(path.resolve(S40_ROOT, `scripts/fixtures/repo-hygiene/${f}.fixture`)), `fixture ${f}`);
+  }
+});
+
+const { spawnSync: s43Spawn } = await import('node:child_process');
+it("43c: C5 - repo_hygiene_check --self-test exits 0 (fixtures fail/pass as expected, app repo clean)", () => {
+  const r = s43Spawn(process.execPath, [path.resolve(S40_ROOT, 'scripts/repo_hygiene_check.mjs'), '--self-test'], { cwd: S40_ROOT, encoding: 'utf8' });
+  assert.strictEqual(r.status, 0, `exit 0 expected (got ${r.status}):\n${r.stdout}${r.stderr}`);
+  assert.ok(/OK: all hygiene checks passed/.test(r.stdout), 'OK line');
+  assert.ok(!/^\s*FAIL\b/m.test(r.stdout), 'no FAIL line');
+});
+
+it("43d: C5 - unknown argument is a usage error (exit 2)", () => {
+  const r = s43Spawn(process.execPath, [path.resolve(S40_ROOT, 'scripts/repo_hygiene_check.mjs'), '--bogus'], { cwd: S40_ROOT, encoding: 'utf8' });
+  assert.strictEqual(r.status, 2, `exit 2 expected (got ${r.status})`);
+});
+// ===== END Section 43 =====
+
+// ===== BEGIN Section 44 (P7 fix leg after review E17: 090 guidance + GD2 matrix precheck order) =====
+console.log("\n--- Section 44: P7 fix leg (090 url-without-path guidance, GD2 precheck inside the transaction) ---");
+
+it("44a: 090 HINT/guidance never says 'backfill path'; tells to null screenshot_url after checking the GD0 backup", () => {
+  const up = s40Read('supabase/patches/090_drop_trades_screenshot_url.sql');
+  const app = s40Read('scripts/p7_prod_apply.mjs');
+  assert.ok(!/backfill path/i.test(up), '090 has no "backfill path"');
+  assert.ok(up.includes("HINT = 'P7_090_URL_WITHOUT_PATH'"), 'machine HINT code unchanged');
+  assert.ok(/screenshot_url = NULL/.test(up) && /GD0/.test(up), '090 text points to nulling the URL after the GD0 backup check');
+  const g = app.slice(app.indexOf('export const URL_WITHOUT_PATH_GUIDANCE'), app.indexOf('// Ap 090; verify'));
+  assert.ok(g.length > 0 && /screenshot_url = NULL/.test(g) && !/backfill/i.test(g), 'apply-script guidance');
+  assert.ok(/includes\('url_without_path'\)\) log\(`HUONG DAN: \$\{URL_WITHOUT_PATH_GUIDANCE\}`\)/.test(app), 'guidance printed when probe 90 fails on url_without_path');
+});
+
+it("44b: GD2 - diffMatrix(before) runs inside the transaction BEFORE the 090 UP; mismatch -> ROLLBACK, no commit-then-down", () => {
+  const app = s40Read('scripts/p7_prod_apply.mjs');
+  const fn = app.slice(app.indexOf('export async function apply090('), app.indexOf('export async function rollback090('));
+  const iBegin = fn.indexOf("db.query('BEGIN')");
+  const iBefore = fn.indexOf('const before = await probe11Raw(db);');
+  const iPre = fn.indexOf('const pre = precheck(before);');
+  const iRb = fn.indexOf("await db.query('ROLLBACK');", iPre);
+  const iUp = fn.indexOf('await db.query(read(F.up));');
+  assert.ok(iBegin >= 0 && iBegin < iBefore && iBefore < iPre && iPre < iRb && iRb < iUp, 'BEGIN < probe11(before) < precheck < ROLLBACK < UP');
+  const cli = app.slice(app.indexOf("} else if (STAGE === '2') {"), app.indexOf("} else if (STAGE === '3') {"));
+  assert.ok(/apply090\(db, log, errText, diffMatrix\)/.test(cli), 'GD2 passes diffMatrix as precheck');
+  assert.ok(!/rollback090\(/.test(cli), 'GD2 never commits the DROP and then runs 090.down');
+});
+
+const { spawnSync: s44Spawn } = await import('node:child_process');
+it("44c: p7_prod_apply.mjs passes node --check and still refuses (exit 2) without flags", () => {
+  const file = path.resolve(S40_ROOT, 'scripts/p7_prod_apply.mjs');
+  const chk = s44Spawn(process.execPath, ['--check', file], { encoding: 'utf8' });
+  assert.strictEqual(chk.status, 0, `node --check: ${chk.stderr}`);
+  const r = s44Spawn(process.execPath, [file], { encoding: 'utf8' });
+  assert.strictEqual(r.status, 2, `exit 2 without flags (got ${r.status})`);
+});
+// ===== END Section 44 =====
 
 
 console.log("\n-------------------------------------------------------");

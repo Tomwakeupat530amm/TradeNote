@@ -17,6 +17,7 @@ import { useSignedUrl } from "@/hooks/useSignedUrl";
 import { isPlaybookRename, tradesForPlaybook } from "@/lib/playbookMatch";
 import { PlaybookRenameDialog } from "@/components/PlaybookRenameDialog";
 import { useHistoryReady } from "@/components/TradesLoadBanner";
+import { useFormOverlayRegistration } from "@/store/useFormOverlayStore";
 
 function playbookImagePath(playbook: Playbook): string | null {
   return playbook.imagePath ?? pathFromLegacyUrl(playbook.imageUrl);
@@ -85,6 +86,8 @@ export default function PlaybookPage() {
   const [viewingPlaybook, setViewingPlaybook] = useState<Playbook | null>(null);
   // P6 D2: rename affects new trades only; confirm with the old-trade count (lower bound, active account).
   const [renameConfirmOpen, setRenameConfirmOpen] = useState(false);
+  useFormOverlayRegistration("playbook-view", !!viewingPlaybook);
+  useFormOverlayRegistration("playbook-edit", isModalOpen);
   const historyReady = useHistoryReady();
 
   const openAddModal = () => {

@@ -1,0 +1,13 @@
+// Fixture (review E17 m1): English hidden in a conditional, a fallback, a JSX child expression
+// and a toast call must be caught (5 findings). The condition operand ("ready") is not display text.
+import { toast } from "sonner";
+export function D({ on, label }: { on: boolean; label?: string }) {
+  if (on === ("ready" as unknown as boolean)) toast.error("Could not save the trade");
+  return (
+    <div>
+      <button title={on ? "Mute audio cues" : "Enable audio cues"} />
+      <input placeholder={label || "Search your trades"} />
+      <span>{"Hard Stop Active"}</span>
+    </div>
+  );
+}

@@ -1,0 +1,276 @@
+{
+  "_note": "P7 i18n scan allow-list. Every entry needs a reason. kind: vi | en | all; optional contains narrows to findings whose text includes it. Baseline: process/general-plans/active/hardening-security-data-integrity_11-10-26/harness/p7/i18n-scan-baseline.txt",
+  "entries": [
+    {
+      "file": "src/app/[locale]/error.tsx",
+      "kind": "all",
+      "reason": "error boundary is intentionally bilingual (renders outside a working i18n tree)"
+    },
+    {
+      "file": "src/app/api/ai-coach/route.ts",
+      "kind": "vi",
+      "reason": "server AI prompt/fallback text; Vietnamese is the model instruction language, branch is by locale server-side"
+    },
+    {
+      "file": "src/components/AICoachModal.tsx",
+      "kind": "vi",
+      "reason": "AI Coach branches on locale for these strings"
+    },
+    {
+      "file": "src/components/DisciplineShieldModal.tsx",
+      "kind": "vi",
+      "reason": "quoteVi data: Vietnamese quote variants selected by locale"
+    },
+    {
+      "file": "src/components/UserGuideModal.tsx",
+      "kind": "all",
+      "reason": "user guide i18n deferred (D8), backlog userguide-modal-i18n_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/lib/analyticsMath.ts",
+      "kind": "vi",
+      "reason": "data comparison against a stored legacy emotion value, not display text",
+      "contains": "Bình tĩnh"
+    },
+    {
+      "file": "src/lib/positionCalculator.ts",
+      "kind": "vi",
+      "reason": "calculator recommendation text, legacy pure-math module covered by runner copy tests; out of P7 screens"
+    },
+    {
+      "file": "src/lib/riskEngine.ts",
+      "kind": "vi",
+      "reason": "risk engine recommendation text, legacy pure-math module; out of P7 screens"
+    },
+    {
+      "file": "src/components/QuickLogTradeModal.tsx",
+      "kind": "en",
+      "contains": "5s Fast-Log",
+      "reason": "brand label / ticker placeholder / trading term kept identical in EN and VI"
+    },
+    {
+      "file": "src/components/QuickLogTradeModal.tsx",
+      "kind": "en",
+      "contains": "MNQ, XAUUSD",
+      "reason": "brand label / ticker placeholder / trading term kept identical in EN and VI"
+    },
+    {
+      "file": "src/components/QuickLogTradeModal.tsx",
+      "kind": "en",
+      "contains": "Loss",
+      "reason": "brand label / ticker placeholder / trading term kept identical in EN and VI"
+    },
+    {
+      "file": "src/components/QuickLogTradeModal.tsx",
+      "kind": "en",
+      "contains": "1R Risk",
+      "reason": "brand label / ticker placeholder / trading term kept identical in EN and VI"
+    },
+    {
+      "file": "src/components/TodaySessionCockpit.tsx",
+      "kind": "en",
+      "contains": "SOS Zen",
+      "reason": "trading term / product label kept identical in EN and VI"
+    },
+    {
+      "file": "src/components/TodaySessionCockpit.tsx",
+      "kind": "en",
+      "contains": "Net PnL",
+      "reason": "trading term / product label kept identical in EN and VI"
+    },
+    {
+      "file": "src/components/TodaySessionCockpit.tsx",
+      "kind": "en",
+      "contains": "Winrate",
+      "reason": "trading term / product label kept identical in EN and VI"
+    },
+    {
+      "file": "src/components/TradeCardsView.tsx",
+      "kind": "en",
+      "contains": "conf",
+      "reason": "abbreviation \"conf\" (confluences) kept identical in EN and VI"
+    },
+    {
+      "file": "src/components/TradeSlideOverDrawer.tsx",
+      "kind": "en",
+      "contains": "BTCUSDT, EURUSD",
+      "reason": "ticker placeholder / trading term / technical label kept identical in EN and VI"
+    },
+    {
+      "file": "src/components/TradeSlideOverDrawer.tsx",
+      "kind": "en",
+      "contains": "1R Standard",
+      "reason": "ticker placeholder / trading term / technical label kept identical in EN and VI"
+    },
+    {
+      "file": "src/components/TradeSlideOverDrawer.tsx",
+      "kind": "en",
+      "contains": "R-Multiple (Live)",
+      "reason": "ticker placeholder / trading term / technical label kept identical in EN and VI"
+    },
+    {
+      "file": "src/components/TradeSlideOverDrawer.tsx",
+      "kind": "en",
+      "contains": "Auto",
+      "reason": "ticker placeholder / trading term / technical label kept identical in EN and VI"
+    },
+    {
+      "file": "src/components/TradeSlideOverDrawer.tsx",
+      "kind": "en",
+      "contains": "WebP",
+      "reason": "ticker placeholder / trading term / technical label kept identical in EN and VI"
+    },
+    {
+      "file": "src/app/[locale]/accounts/page.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/app/[locale]/analytics/page.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/app/[locale]/daily-review/page.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/app/[locale]/journal/page.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/app/[locale]/page.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/app/[locale]/playbook/page.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/app/[locale]/settings/page.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/app/[locale]/simulator/page.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/components/CommandPaletteModal.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/components/DailyExecutiveReportCard.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/components/DisciplineShieldModal.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/components/EconomicCalendarWidget.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/components/Header.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/components/MatrixCorrelationAnalytics.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/components/MobileBottomNav.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/components/PositionSizeCalculator.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/components/ShareTradeModal.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/components/Sidebar.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/components/TradeDetailsModal.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/components/TradeEditForm.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/components/TradeViewDetails.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/components/TradingViewMiniChart.tsx",
+      "kind": "en",
+      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+    },
+    {
+      "file": "src/components/QuickLogTradeModal.tsx",
+      "kind": "en",
+      "contains": "Delete",
+      "reason": "fallback literal after a t() call (t(...) || \"...\"); shown only if the key is missing, keys exist in EN+VI (review E17 m1 new finding)"
+    },
+    {
+      "file": "src/components/TradeSlideOverDrawer.tsx",
+      "kind": "en",
+      "contains": "Change",
+      "reason": "fallback literal after a t() call (t(...) || \"...\"); shown only if the key is missing, keys exist in EN+VI (review E17 m1 new finding)"
+    },
+    {
+      "file": "src/components/QuickLogTradeModal.tsx",
+      "kind": "en",
+      "contains": "Standard",
+      "reason": "fallback account name when the active account has no name (data placeholder); deferred K5 backlog i18n-english-residual_NOTE_29-10-26.md (review E17 m1 new finding)"
+    },
+    {
+      "file": "src/components/TodaySessionCockpit.tsx",
+      "kind": "en",
+      "contains": "Setup",
+      "reason": "fallback label when a trade has no setup (data placeholder); deferred K5 backlog i18n-english-residual_NOTE_29-10-26.md (review E17 m1 new finding)"
+    },
+    {
+      "file": "src/components/AICoachModal.tsx",
+      "kind": "en",
+      "contains": "Diagnostics cache reset",
+      "reason": "English arm of an explicit locale === \"vi\" ternary (already bilingual); move to keys later, K5 backlog (review E17 m1 new finding)"
+    },
+    {
+      "file": "src/components/AICoachModal.tsx",
+      "kind": "en",
+      "contains": "Reset cached result",
+      "reason": "English arm of an explicit locale === \"vi\" ternary (already bilingual); move to keys later, K5 backlog (review E17 m1 new finding)"
+    },
+    {
+      "file": "src/components/VisualRRBox.tsx",
+      "kind": "en",
+      "contains": "Break Even",
+      "reason": "hard-coded English outside the P7 screens; deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md (review E17 m1 new finding)"
+    }
+  ]
+}

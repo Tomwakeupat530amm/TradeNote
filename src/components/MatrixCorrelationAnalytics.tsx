@@ -22,6 +22,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import TradeDetailsModal from "./TradeDetailsModal";
+import { useFormOverlayRegistration } from "@/store/useFormOverlayStore";
 
 interface MatrixCorrelationAnalyticsProps {
   trades: Trade[];
@@ -35,6 +36,7 @@ export function MatrixCorrelationAnalytics({ trades }: MatrixCorrelationAnalytic
   const [metric, setMetric] = useState<MatrixMetricType>("winRate");
   const [selectedCell, setSelectedCell] = useState<{ title: string; cellData: MatrixCellData } | null>(null);
   const [inspectTrade, setInspectTrade] = useState<Trade | null>(null);
+  useFormOverlayRegistration("matrix-drilldown", !!selectedCell);
 
   // Compute matrices using pure domain engines
   const setupSessionData = useMemo(() => calculateSetupSessionMatrix(trades), [trades]);

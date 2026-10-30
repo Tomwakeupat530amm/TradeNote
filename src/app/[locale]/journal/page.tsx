@@ -26,7 +26,7 @@ import { toast } from "sonner";
 import clsx from "clsx";
 import { useTranslations } from "next-intl";
 import { useTagTranslation } from "@/hooks/useTagTranslation";
-import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
+import { winRate as statsWinRate } from "@/lib/stats";
 import { ESTIMATED_RISK_PARAM, isEstimatedRiskFilterOn, isEstimatedTrade } from "@/lib/estimatedRisk";
 import { EstimatedRiskBadge } from "@/components/EstimatedRiskBadge";
 import { TradesLoadBanner } from "@/components/TradesLoadBanner";
@@ -213,21 +213,7 @@ function JournalContent() {
     setIsAdding(true);
   }, []);
 
-  // Keyboard shortcut: Press 'N' to quickly open Add Trade drawer
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === "n" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        const target = e.target as HTMLElement | null;
-        if (target && (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable)) {
-          return;
-        }
-        e.preventDefault();
-        handleOpenAdd();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleOpenAdd]);
+  // P7 A: the global `N` hotkey lives only in Header.tsx (opens Quick Log once).
 
   // Handle URL query params (e.g. ?view=calendar, ?search=...)
   useEffect(() => {
@@ -532,9 +518,8 @@ function JournalContent() {
               <div className="flex items-center gap-3 font-mono">
                 {(() => {
                   const pnlSum = filteredTrades.reduce((acc, t) => acc + t.pnl, 0);
-                  const wins = filteredTrades.filter(t => t.result === "Win").length;
-                  const decisive = filteredTrades.filter(t => t.result === "Win" || t.result === "Loss").length;
-                  const winRate = decisive > 0 ? Math.round((wins / decisive) * 100) : 0;
+                  // P7 (winrate-display-sweep): single win rate from @/lib/stats (break-even excluded).
+                  const winRate = Math.round(statsWinRate(filteredTrades));
                   return (
                     <>
                       <span>{t('net_pnl_label')}: <strong className={pnlSum >= 0 ? "text-emerald-400" : "text-rose-400"}>{pnlSum >= 0 ? `+$${pnlSum.toLocaleString()}` : `-$${Math.abs(pnlSum).toLocaleString()}`}</strong></span>
@@ -646,7 +631,7 @@ function JournalContent() {
                                     ⭐ A+
                                   </span>
                                 )}
-                                {(trade.screenshotPath ?? pathFromLegacyUrl(trade.screenshotUrl)) && (
+                                {trade.screenshotPath && (
                                   <span title={t('has_screenshot')} className="inline-flex items-center gap-0.5 rounded-md bg-sky-500/15 border border-sky-500/30 px-1.5 py-0.5 text-[10px] font-medium text-sky-300">
                                     <ImageIcon className="w-3 h-3" />
                                   </span>

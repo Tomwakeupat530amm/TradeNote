@@ -221,7 +221,6 @@ export const LOCKED_DAY_FIELD_COLUMNS = {
   emotion: "emotion",
   mistake: "mistake",
   checklistResults: "checklist_results",
-  screenshotUrl: "screenshot_url",
   screenshotPath: "screenshot_path",
   screenshotFile: "screenshot_path",
   riskIsEstimated: "risk_is_estimated",

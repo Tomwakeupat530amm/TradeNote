@@ -1,0 +1,5 @@
+# fixture
+node_modules
+.env*
+!.env.test.example
+!.env.example

@@ -5,7 +5,7 @@ import { useAccountStore } from './useAccountStore';
 import { useNotificationStore } from './useNotificationStore';
 import { usePreferenceStore } from './usePreferenceStore';
 import { compressScreenshot } from '@/lib/imageCompressor';
-import { SCREENSHOT_BUCKET, buildScreenshotPath, pathFromLegacyUrl } from '@/lib/screenshotStorage';
+import { SCREENSHOT_BUCKET, buildScreenshotPath } from '@/lib/screenshotStorage';
 import { rMultiple as computeRMultiple } from '@/lib/risk';
 import { assertMutationAllowed, effectiveLimit, evaluateHardStop, HardStopError, type HardStopTrade } from '@/lib/hardStop';
 import { serverHardStopHint, toServerHardStopError } from '@/lib/hardStopServerError';
@@ -32,8 +32,6 @@ export interface Trade {
   emotion: EmotionTag;
   mistake: MistakeTag;
   notes: string;
-  /** Legacy column value (public URL). Never written with a signed URL. */
-  screenshotUrl?: string;
   /** Storage path `{userId}/...` in the private bucket; source of truth for display + GC. */
   screenshotPath?: string;
   date: string;
@@ -54,7 +52,7 @@ export type NewTradeInput = Omit<Trade, 'id' | 'date' | 'riskAmount' | 'rMultipl
   date?: string;
 };
 
-export type TradeUpdateInput = Partial<Omit<Trade, 'id' | 'screenshotUrl' | 'screenshotPath' | 'rMultiple'>> & {
+export type TradeUpdateInput = Partial<Omit<Trade, 'id' | 'screenshotPath' | 'rMultiple'>> & {
   screenshotFile?: File | Blob | string | null;
 };
 
@@ -249,8 +247,7 @@ function mapTradeRow(d: any): Trade {
     emotion: d.emotion,
     mistake: d.mistake,
     notes: d.notes,
-    screenshotUrl: d.screenshot_url,
-    screenshotPath: d.screenshot_path ?? pathFromLegacyUrl(d.screenshot_url) ?? undefined,
+    screenshotPath: d.screenshot_path ?? undefined,
     date: d.date,
     ...mapRiskFields(d),
     session: d.session || 'New York',
@@ -406,8 +403,6 @@ export const useTradeStore = create<TradeState>((set, get) => ({
       emotion: trade.emotion,
       mistake: trade.mistake,
       notes: trade.notes,
-      // screenshot_url kept null for new uploads (legacy column, removed in P7)
-      screenshot_url: null,
       screenshot_path: finalScreenshotPath
     };
 
@@ -451,8 +446,7 @@ export const useTradeStore = create<TradeState>((set, get) => ({
         emotion: data.emotion as EmotionTag,
         mistake: data.mistake as MistakeTag,
         notes: data.notes,
-        screenshotUrl: data.screenshot_url ?? undefined,
-        screenshotPath: data.screenshot_path ?? pathFromLegacyUrl(data.screenshot_url) ?? undefined,
+        screenshotPath: data.screenshot_path ?? undefined,
         date: data.date,
         ...mapRiskFields(data),
         session: trade.session || 'New York',
@@ -519,7 +513,7 @@ export const useTradeStore = create<TradeState>((set, get) => ({
     // --- Hard Stop guard (FIRST, before any upload/update) ---
     await guardHardStop('update', existingBefore?.accountId, existingBefore, updates as Record<string, unknown>);
     const previousPath = existingBefore
-      ? (existingBefore.screenshotPath ?? pathFromLegacyUrl(existingBefore.screenshotUrl))
+      ? (existingBefore.screenshotPath ?? null)
       : null;
     let newScreenshotPath: string | null = null;
 
@@ -588,10 +582,8 @@ export const useTradeStore = create<TradeState>((set, get) => ({
     
     const removingImage = updates.screenshotFile === null;
     if (removingImage) {
-      payload.screenshot_url = null;
       payload.screenshot_path = null;
     } else if (newScreenshotPath) {
-      payload.screenshot_url = null;
       payload.screenshot_path = newScreenshotPath;
     }
 
@@ -623,7 +615,6 @@ export const useTradeStore = create<TradeState>((set, get) => ({
               ...t,
               ...stateUpdates,
               ...stateRisk,
-              screenshotUrl: imageChanged ? undefined : t.screenshotUrl,
               screenshotPath: imageChanged ? (payload.screenshot_path ?? undefined) : t.screenshotPath
             }
           : t
@@ -661,7 +652,7 @@ export const useTradeStore = create<TradeState>((set, get) => ({
 
     // Storage GC: remove the screenshot now that the row is gone; failures are queued per user.
     const storagePath = tradeToDelete
-      ? (tradeToDelete.screenshotPath ?? pathFromLegacyUrl(tradeToDelete.screenshotUrl))
+      ? (tradeToDelete.screenshotPath ?? null)
       : null;
     if (storagePath) await removeScreenshotsOrQueue(useAuthStore.getState().user?.id, [storagePath]);
   }

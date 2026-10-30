@@ -62,7 +62,6 @@ const FIELD_TO_COLUMN = {
   riskIsEstimated: 'risk_is_estimated',
   session: 'session',
   checklistResults: 'checklist_results',
-  screenshotUrl: 'screenshot_url',
   screenshotPath: 'screenshot_path',
 };
 const OP = { add: 'INSERT', update: 'UPDATE', delete: 'DELETE' };

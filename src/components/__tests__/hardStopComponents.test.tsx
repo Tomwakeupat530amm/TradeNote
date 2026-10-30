@@ -251,10 +251,10 @@ describe("cooldown-dismiss", () => {
   it("cooldown banner is dismissable and the save button stays enabled when Hard Stop is not locked", async () => {
     localStorage.setItem("tradenote_cooldown_until", String(Date.now() + 10 * 60_000));
     await renderDrawer();
-    const dismiss = await screen.findByText("Tôi Đã Bình Tĩnh - Tiếp Tục Ghi Lệnh");
+    const dismiss = await screen.findByText("Cooldown.dismiss");
     expect(drawerSave()).not.toBeDisabled();
     fireEvent.click(dismiss);
-    expect(screen.queryByText("Tôi Đã Bình Tĩnh - Tiếp Tục Ghi Lệnh")).toBeNull();
+    expect(screen.queryByText("Cooldown.dismiss")).toBeNull();
     expect(drawerSave()).not.toBeDisabled();
   });
 
@@ -265,7 +265,7 @@ describe("cooldown-dismiss", () => {
     await renderDrawer();
     expect(screen.getByTestId("hard-stop-banner")).toBeInTheDocument();
     expect(drawerSave()).toBeDisabled();
-    fireEvent.click(await screen.findByText("Tôi Đã Bình Tĩnh - Tiếp Tục Ghi Lệnh"));
+    fireEvent.click(await screen.findByText("Cooldown.dismiss"));
     expect(screen.getByTestId("hard-stop-banner")).toBeInTheDocument();
     expect(screen.getByTestId("hard-stop-banner").querySelectorAll("button").length).toBe(0);
     expect(drawerSave()).toBeDisabled();

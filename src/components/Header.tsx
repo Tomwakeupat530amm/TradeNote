@@ -19,6 +19,9 @@ import { DisciplineShieldModal } from "./DisciplineShieldModal";
 import { UserGuideModal } from "./UserGuideModal";
 import { isSoundEnabled, toggleSound } from "@/lib/soundEngine";
 import { useHardStop } from "@/hooks/useHardStop";
+import { useGuideStore } from "@/store/useGuideStore";
+import { useFormOverlayStore, useFormOverlayRegistration } from "@/store/useFormOverlayStore";
+import { shouldOpenQuickLog } from "@/lib/hotkeys";
 
 export function Header() {
   const t = useTranslations('Header');
@@ -47,18 +50,23 @@ export function Header() {
         setIsCommandPaletteOpen(prev => !prev);
         return;
       }
-      if (e.key.toLowerCase() === "n" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        const target = e.target as HTMLElement | null;
-        if (target && (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable)) {
-          return;
-        }
+      // N opens Quick Log only when no form/modal is open. Read the overlay store
+      // at keydown time (deps [] => a closure value would be stale). Never toggles closed.
+      if (shouldOpenQuickLog(e, useFormOverlayStore.getState().isAnyOpen)) {
         e.preventDefault();
-        setIsQuickLogOpen(prev => !prev);
+        setIsQuickLogOpen(true);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  // Register Header-owned modals with the shared overlay store so N stays a no-op while they are open.
+  const isGuideOpen = useGuideStore((s) => s.isOpen);
+  useFormOverlayRegistration("calculator", isCalculatorOpen);
+  useFormOverlayRegistration("command-palette", isCommandPaletteOpen);
+  useFormOverlayRegistration("discipline-shield", isShieldOpen);
+  useFormOverlayRegistration("user-guide", isGuideOpen);
 
   useEffect(() => {
     fetchNotifications();
@@ -166,7 +174,7 @@ export function Header() {
               const next = toggleSound();
               setSoundOn(next);
             }}
-            title={soundOn ? "Mute audio cues" : "Unmute audio cues"}
+            title={soundOn ? t("sound_mute") : t("sound_unmute")}
             className={clsx(
               "relative p-2.5 rounded-xl transition-all border cursor-pointer",
               soundOn

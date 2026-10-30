@@ -11,7 +11,9 @@
     "test:api": "node scripts/test_api_coach.mjs",
     "test:rls": "node scripts/rls_two_user_harness.mjs",
     "lint:sql": "node scripts/sql_patch_lint.mjs",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "test:i18n": "node scripts/i18n_hardcoded_scan.mjs",
+    "test:hygiene": "node scripts/repo_hygiene_check.mjs --self-test"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",

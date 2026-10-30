@@ -15,12 +15,12 @@ import { Trade } from "@/store/useTradeStore";
 import { detectSession } from "@/lib/sessionUtils";
 import { useTagTranslation } from "@/hooks/useTagTranslation";
 import { getAssetBadgeStyle } from "@/lib/assetColors";
-import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
 import { prefetchSignedUrls, useSignedUrl } from "@/hooks/useSignedUrl";
 import { EstimatedRiskBadge } from "./EstimatedRiskBadge";
+import { useFormOverlayRegistration } from "@/store/useFormOverlayStore";
 
 function screenshotPathOf(trade: Trade): string | null {
-  return trade.screenshotPath ?? pathFromLegacyUrl(trade.screenshotUrl);
+  return trade.screenshotPath ?? null;
 }
 
 function CardScreenshotThumb({ path, zoomLabel, onZoom }: { path: string; zoomLabel: string; onZoom: (src: string) => void }) {
@@ -38,7 +38,7 @@ function CardScreenshotThumb({ path, zoomLabel, onZoom }: { path: string; zoomLa
         <>
           <img
             src={url}
-            alt="Trade Chart"
+            alt={tShot("chartAlt")}
             className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
             loading="lazy"
           />
@@ -101,6 +101,7 @@ export function TradeCardsView({
   const tTag = useTagTranslation();
 
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  useFormOverlayRegistration("cards-lightbox", !!lightboxSrc);
   const [tradeToDeleteId, setTradeToDeleteId] = useState<string | null>(null);
 
   // One batched createSignedUrls call for every visible card.
@@ -298,14 +299,14 @@ export function TradeCardsView({
                     onClick={(e) => e.stopPropagation()} 
                     className="absolute inset-x-3 bottom-3 p-3 bg-gray-950 border border-rose-500/40 rounded-xl shadow-2xl flex items-center justify-between gap-2 z-10 animate-in fade-in zoom-in-95 duration-150"
                   >
-                    <span className="text-xs text-rose-300 font-medium">Xác nhận xóa?</span>
+                    <span className="text-xs text-rose-300 font-medium">{t("confirmDelete")}</span>
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => setTradeToDeleteId(null)}
                         className="px-2.5 py-1 text-xs text-gray-400 hover:text-white bg-white/5 rounded-lg"
                       >
-                        Hủy
+                        {t("cancel")}
                       </button>
                       <button
                         type="button"
@@ -315,7 +316,7 @@ export function TradeCardsView({
                         }}
                         className="px-2.5 py-1 text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 rounded-lg"
                       >
-                        Xóa
+                        {t("delete")}
                       </button>
                     </div>
                   </div>
@@ -342,14 +343,14 @@ export function TradeCardsView({
             >
               <img
                 src={lightboxSrc}
-                alt="Expanded Chart"
+                alt={t("expandedChartAlt")}
                 className="w-full h-auto max-h-[85vh] object-contain rounded-2xl"
               />
               <button
                 type="button"
                 onClick={() => setLightboxSrc(null)}
                 className="absolute top-3 right-3 p-2 rounded-full bg-black/60 hover:bg-black/90 text-white transition-colors"
-                aria-label="Close Lightbox"
+                aria-label={t("closeLightbox")}
               >
                 <X className="w-5 h-5" />
               </button>

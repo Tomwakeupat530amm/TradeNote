@@ -22,6 +22,8 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/routing";
 import { processClipboardImage } from "@/lib/imageCompressor";
 import { getAssetBadgeStyle } from "@/lib/assetColors";
+import { sanitizeDraftScreenshot, writeDrawerDraft } from "@/lib/draftScreenshotHolder";
+import { useFormOverlayRegistration } from "@/store/useFormOverlayStore";
 
 interface QuickLogTradeModalProps {
   isOpen: boolean;
@@ -40,12 +42,16 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
   const tTrade = useTranslations("Trade");
   const tHardStop = useTranslations("HardStop");
   const tPsych = useTranslations("Psych");
+  const tDraft = useTranslations("Draft");
+  const tCooldown = useTranslations("Cooldown");
   const { accounts, activeAccountId } = useAccountStore();
   const { addTrade } = useTradeStore();
   const { playbooks, fetchPlaybooks } = usePlaybookStore();
 
   const activeAccount = accounts.find((a) => a.id === activeAccountId) || accounts[0];
   const hardStop = useHardStop(activeAccount?.id ?? null);
+  // Register as an open form so the global N hotkey stays a no-op while open.
+  useFormOverlayRegistration("quick-log", isOpen);
 
   // Dynamic setups from Playbook
   const dynamicSetups = useMemo(() => {
@@ -302,13 +308,22 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
         riskAmount: riskAmount.trim(),
         setup,
         notes: notes.trim(),
-        screenshot: screenshot || null,
+        // Only inline data: images are persisted (never signed/http/blob URLs).
+        screenshot: sanitizeDraftScreenshot(screenshot),
         timestamp: Date.now(),
       };
-      try {
-        localStorage.setItem(`tradenote_drawer_draft_${activeAccount.id}`, JSON.stringify(draftData));
-      } catch (e) {
-        console.error("Failed to save drawer draft from QuickLog:", e);
+      const status = writeDrawerDraft(activeAccount.id, draftData);
+      // Switch only when the text draft is safely stored; otherwise stay open (nothing is lost).
+      if (status === "quota-image-kept-text-failed") {
+        toast.error(tDraft("quotaImageKeptTextFailed"));
+        return;
+      }
+      if (status === "failed") {
+        toast.error(tDraft("saveFailed"));
+        return;
+      }
+      if (status === "quota-image-kept") {
+        toast.info(tDraft("quotaImageKept"));
       }
     }
     onClose();
@@ -399,17 +414,17 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
               <div className="mx-6 mt-4 p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs space-y-2.5 shadow-lg">
                 <div className="flex items-center gap-2 font-bold text-amber-300">
                   <span className="text-base">🛡️</span>
-                  <span>Khiên Kỷ Luật Đang Hoạt Động (còn {cooldownRemaining} phút)</span>
+                  <span>{tCooldown("activeTitle", { minutes: cooldownRemaining })}</span>
                 </div>
                 <p className="text-amber-200/80 leading-relaxed text-[11px]">
-                  Bạn đang trong thời gian hạ nhiệt tâm lý. Bạn vào lệnh này vì đúng quy tắc Playbook hay vì đang muốn gỡ lệnh trước?
+                  {tCooldown("prompt")}
                 </p>
                 <button
                   type="button"
                   onClick={() => setHasDismissedCooldown(true)}
                   className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-100 font-semibold cursor-pointer transition-all text-xs"
                 >
-                  Tôi Đã Bình Tĩnh - Tiếp Tục Ghi Lệnh
+                  {tCooldown("dismiss")}
                 </button>
               </div>
             )}
@@ -630,7 +645,7 @@ export function QuickLogTradeModal({ isOpen, onClose, onOpenDetailedDrawer }: Qu
                 <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-gray-950 p-2 group">
                   <img
                     src={screenshot}
-                    alt="Trade Screenshot"
+                    alt={t("screenshotAlt")}
                     className="max-h-40 w-full object-cover rounded-xl"
                   />
                   

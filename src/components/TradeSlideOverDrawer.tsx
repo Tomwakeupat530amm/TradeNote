@@ -24,8 +24,9 @@ import { detectSession, TradingSession, SESSIONS } from "@/lib/sessionUtils";
 import { useTagTranslation } from "@/hooks/useTagTranslation";
 import { playSuccessChime } from "@/lib/soundEngine";
 import { processClipboardImage } from "@/lib/imageCompressor";
-import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
 import { useSignedUrl } from "@/hooks/useSignedUrl";
+import { sanitizeDraftScreenshot, getHeldScreenshot, writeDrawerDraft, clearDrawerDraft, removeDraftScreenshot } from "@/lib/draftScreenshotHolder";
+import { useFormOverlayRegistration } from "@/store/useFormOverlayStore";
 
 interface TradeSlideOverDrawerProps {
   isOpen: boolean;
@@ -49,6 +50,8 @@ export function TradeSlideOverDrawer({
   initialData
 }: TradeSlideOverDrawerProps) {
   const t = useTranslations("SlideOverDrawer");
+  const tDraft = useTranslations("Draft");
+  const tCooldown = useTranslations("Cooldown");
   const c = useTranslations("Common");
   const tRisk = useTranslations("Risk");
   const tTrade = useTranslations("Trade");
@@ -102,6 +105,14 @@ export function TradeSlideOverDrawer({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draftKey = activeAccount ? `tradenote_drawer_draft_${activeAccount.id}` : null;
+  const draftAccountId = activeAccount?.id ?? null;
+  // X10: the draft screenshot is restored only once per closed->open transition,
+  // so effect re-runs (riskSuggestion/initialData) never resurrect a removed image.
+  const screenshotRestoredRef = useRef(false);
+  const quotaNoticeShownRef = useRef(false);
+
+  // Register as an open form so the global N hotkey stays a no-op while open.
+  useFormOverlayRegistration("trade-drawer", isOpen);
 
   // Dynamic setups from Playbook
   const dynamicSetups = useMemo(() => {
@@ -169,6 +180,8 @@ export function TradeSlideOverDrawer({
   // Reset or Populate form when drawer opens or tradeToEdit changes
   useEffect(() => {
     if (!isOpen) {
+      screenshotRestoredRef.current = false;
+      quotaNoticeShownRef.current = false;
       return;
     }
 
@@ -190,12 +203,13 @@ export function TradeSlideOverDrawer({
         setMistake(tradeToEdit.mistake || UNRATED);
         setNotes(tradeToEdit.notes || "");
         setScreenshot(null);
-        setExistingScreenshotPath(tradeToEdit.screenshotPath ?? pathFromLegacyUrl(tradeToEdit.screenshotUrl));
+        setExistingScreenshotPath(tradeToEdit.screenshotPath ?? null);
         setScreenshotRemoved(false);
         setActiveTab("execution");
       } else {
         // Create Mode: Check if draft exists
         let draftFound = false;
+        let draftShot: string | null = null;
         if (draftKey && typeof window !== "undefined") {
           try {
             const rawDraft = localStorage.getItem(draftKey);
@@ -211,11 +225,23 @@ export function TradeSlideOverDrawer({
               if (draft.mistake) setMistake(draft.mistake);
               if (draft.notes) setNotes(draft.notes);
               if (draft.confluences) setConfluences(draft.confluences);
+              // Only inline data: images are accepted (signed/http/blob URLs rejected).
+              draftShot = sanitizeDraftScreenshot(draft.screenshot);
               draftFound = true;
               setHasRestoredDraft(true);
             }
           } catch (e) {
             console.error("Failed to parse drawer draft:", e);
+          }
+        }
+
+        // Quota fallback: image kept in the session holder when the draft could not carry it.
+        if (!screenshotRestoredRef.current) {
+          screenshotRestoredRef.current = true;
+          const shot = draftShot ?? (draftAccountId ? getHeldScreenshot(draftAccountId) : null);
+          if (shot) {
+            setScreenshot(shot);
+            draftFound = true;
           }
         }
 
@@ -256,13 +282,14 @@ export function TradeSlideOverDrawer({
     }, 0);
 
     return () => clearTimeout(timer);
-  }, [isOpen, tradeToEdit, initialData, riskSuggestion, draftKey]);
+  }, [isOpen, tradeToEdit, initialData, riskSuggestion, draftKey, draftAccountId]);
 
   // Draft Autosave (debounced 400ms, only in Create Mode)
   useEffect(() => {
     if (!isOpen || tradeToEdit || !draftKey || typeof window === "undefined") return;
 
     const timer = setTimeout(() => {
+      if (!draftAccountId) return;
       const draftData = {
         asset,
         lotSize,
@@ -274,22 +301,26 @@ export function TradeSlideOverDrawer({
         mistake,
         notes,
         confluences,
+        // Only data: images are persisted; never signed/http/blob URLs (P1).
+        screenshot: sanitizeDraftScreenshot(screenshot),
       };
-      try {
-        localStorage.setItem(draftKey, JSON.stringify(draftData));
-      } catch {
-        // Ignore quota limits
+      const status = writeDrawerDraft(draftAccountId, draftData);
+      if ((status === "quota-image-kept" || status === "quota-image-kept-text-failed") && !quotaNoticeShownRef.current) {
+        quotaNoticeShownRef.current = true;
+        if (status === "quota-image-kept") toast.info(tDraft("quotaImageKept"));
+        else toast.error(tDraft("quotaImageKeptTextFailed"));
       }
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [isOpen, tradeToEdit, draftKey, asset, lotSize, pnl, pnlSign, riskAmount, setup, emotion, mistake, notes, confluences]);
+  }, [isOpen, tradeToEdit, draftKey, draftAccountId, asset, lotSize, pnl, pnlSign, riskAmount, setup, emotion, mistake, notes, confluences, screenshot, tDraft]);
 
   const handleDiscardDraft = useCallback(() => {
-    if (draftKey && typeof window !== "undefined") {
-      localStorage.removeItem(draftKey);
+    if (draftAccountId && typeof window !== "undefined") {
+      clearDrawerDraft(draftAccountId);
     }
     setHasRestoredDraft(false);
+    setScreenshot(null);
     setAsset("MNQ");
     setLotSize("1");
     setPnl("0");
@@ -301,7 +332,7 @@ export function TradeSlideOverDrawer({
     setEmotion(UNRATED);
     setMistake(UNRATED);
     toast.info(t("toast_draft_cleared"));
-  }, [draftKey, riskSuggestion, t]);
+  }, [draftAccountId, riskSuggestion, t]);
 
   // Date Change with auto-session detection
   const handleDateChange = (val: string) => {
@@ -333,7 +364,7 @@ export function TradeSlideOverDrawer({
   // Core image processor (Ultra-fast WebP compression)
   const processImageFile = useCallback(async (file: File | Blob) => {
     if (!file.type.startsWith("image/")) {
-      toast.error("Please upload a valid image file.");
+      toast.error(t("err_invalid_image"));
       return;
     }
     setIsProcessingImage(true);
@@ -345,14 +376,14 @@ export function TradeSlideOverDrawer({
       if (res.ratioPercent > 0) {
         toast.success(t("clipboard_pasted", { ratio: res.ratioPercent }));
       } else {
-        toast.success(tTag("screenshot_pasted") || "Screenshot attached!");
+        toast.success(tTag("screenshot_pasted") || t("toast_screenshot_attached"));
       }
     } catch {
       const reader = new FileReader();
       reader.onload = () => {
         setScreenshot(reader.result as string);
         setScreenshotRemoved(false);
-        toast.success("Screenshot attached!");
+        toast.success(t("toast_screenshot_attached"));
       };
       reader.readAsDataURL(file);
     } finally {
@@ -439,13 +470,13 @@ export function TradeSlideOverDrawer({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeAccount) {
-      toast.error("No active trading account selected.");
+      toast.error(t("err_no_account"));
       return;
     }
 
     const parsedLot = parseFloat(lotSize);
     if (isNaN(parsedLot) || parsedLot <= 0) {
-      toast.error("Lot size must be greater than 0.");
+      toast.error(t("err_lot_size_positive"));
       return;
     }
 
@@ -513,9 +544,9 @@ export function TradeSlideOverDrawer({
           screenshotFile: screenshot && screenshot.startsWith("data:") ? screenshot : undefined,
         });
 
-        // Clear local draft upon successful save
-        if (draftKey && typeof window !== "undefined") {
-          localStorage.removeItem(draftKey);
+        // Clear local draft + held image ONLY upon successful save
+        if (draftAccountId && typeof window !== "undefined") {
+          clearDrawerDraft(draftAccountId);
         }
         toast.success(t("toast_saved_success"));
       }
@@ -605,7 +636,7 @@ export function TradeSlideOverDrawer({
                 type="button"
                 onClick={handleClose}
                 className="p-2 text-gray-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
-                aria-label="Close drawer"
+                aria-label={t("closeDrawer")}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -641,17 +672,17 @@ export function TradeSlideOverDrawer({
               <div className="mx-6 mt-3 p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs space-y-2 shadow-lg">
                 <div className="flex items-center gap-2 font-bold text-amber-300">
                   <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>Khiên Kỷ Luật Đang Hoạt Động (còn {cooldownRemaining} phút)</span>
+                  <span>{tCooldown("activeTitle", { minutes: cooldownRemaining })}</span>
                 </div>
                 <p className="text-amber-200/80 leading-relaxed text-[11px]">
-                  Bạn đang trong thời gian hạ nhiệt tâm lý. Bạn vào lệnh này vì đúng quy tắc Playbook hay vì đang muốn gỡ lệnh trước?
+                  {tCooldown("prompt")}
                 </p>
                 <button
                   type="button"
                   onClick={() => setHasDismissedCooldown(true)}
                   className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-100 font-semibold cursor-pointer transition-all text-xs"
                 >
-                  Tôi Đã Bình Tĩnh - Tiếp Tục Ghi Lệnh
+                  {tCooldown("dismiss")}
                 </button>
               </div>
             )}
@@ -1024,7 +1055,7 @@ export function TradeSlideOverDrawer({
                         {previewSrc ? (
                           <img
                             src={previewSrc}
-                            alt="Trade chart"
+                            alt={tShot("chartAlt")}
                             className="w-full h-auto object-cover max-h-52"
                           />
                         ) : signedShot.error ? (
@@ -1063,6 +1094,9 @@ export function TradeSlideOverDrawer({
                             type="button"
                             onClick={() => {
                               setScreenshot(null);
+                              // Explicit removal: drop the held copy AND the stored draft image now
+                              // (closing within the 400ms autosave debounce must not resurrect it).
+                              if (draftAccountId && !tradeToEdit) removeDraftScreenshot(draftAccountId);
                               setExistingScreenshotPath(null);
                               setScreenshotRemoved(true);
                               setCompressionRatio(null);

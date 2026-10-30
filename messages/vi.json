@@ -32,7 +32,9 @@
     "tooltip_guide": "Sổ tay hướng dẫn sử dụng toàn diện",
     "risk_status_safe": "Tất cả giới hạn rủi ro & kỷ luật đang trong vùng an toàn",
     "risk_status_alert": "Cảnh báo rủi ro đang hoạt động - Chú ý",
-    "risk_status_title": "Kỷ Luật & Bảo Vệ Rủi Ro"
+    "risk_status_title": "Kỷ Luật & Bảo Vệ Rủi Ro",
+    "sound_mute": "Tắt âm báo",
+    "sound_unmute": "Bật âm báo"
   },
   "Sidebar": {
     "brand": "TradeNote",
@@ -946,7 +948,12 @@
     "status_cooldown": "Cần nghỉ ngơi 🧘",
     "status_good": "Kỷ luật chuẩn 👍",
     "recent_trades_today": "Các lệnh đã khớp hôm nay ({count})",
-    "view_in_journal": "Xem toàn bộ trong Journal"
+    "view_in_journal": "Xem toàn bộ trong Journal",
+    "shield_title": "Khiên Kỷ Luật & Hạ nhiệt Zen",
+    "activate_shield": "Kích hoạt Khiên",
+    "cool_down_now": "Hạ nhiệt ngay",
+    "breathing_478": "Bài tập thở 4-7-8",
+    "recent_streak": "Chuỗi gần đây"
   },
   "CommandPalette": {
     "placeholder": "Tìm lệnh (MNQ, XAUUSD...), setup, trang hoặc thao tác nhanh...",
@@ -1124,7 +1131,8 @@
     "drag_drop_hint": "Kéo thả ảnh chart vào đây hoặc bấm Ctrl + V",
     "drop_active": "Thả tay để tải ảnh lên",
     "paste_badge": "Đã tối ưu WebP",
-    "processing_image": "Đang nén tối ưu ảnh chart..."
+    "processing_image": "Đang nén tối ưu ảnh chart...",
+    "screenshotAlt": "Ảnh chụp giao dịch"
   },
   "SlideOverDrawer": {
     "title_new": "Ghi Lệnh Chi Tiết",
@@ -1165,7 +1173,12 @@
     "drop_active": "Thả tay để tải ảnh lên",
     "paste_badge": "Đã tối ưu WebP",
     "has_image_badge": "Đã có ảnh",
-    "processing_image": "Đang nén tối ưu ảnh chart..."
+    "processing_image": "Đang nén tối ưu ảnh chart...",
+    "closeDrawer": "Đóng ngăn kéo",
+    "err_invalid_image": "Vui lòng tải lên một tệp ảnh hợp lệ.",
+    "toast_screenshot_attached": "Đã đính kèm ảnh chụp!",
+    "err_no_account": "Chưa chọn tài khoản giao dịch nào.",
+    "err_lot_size_positive": "Khối lượng phải lớn hơn 0."
   },
   "MobileNav": {
     "dashboard": "Tổng quan",
@@ -1191,7 +1204,12 @@
     "share_trade": "Chia sẻ",
     "no_screenshot": "Chưa có ảnh chart",
     "click_to_zoom": "Bấm để phóng to chart",
-    "setup_unspecified": "Chung"
+    "setup_unspecified": "Chung",
+    "confirmDelete": "Xác nhận xóa?",
+    "cancel": "Hủy",
+    "delete": "Xóa",
+    "expandedChartAlt": "Biểu đồ giao dịch phóng to",
+    "closeLightbox": "Đóng xem ảnh"
   },
   "DisciplineShield": {
     "modal_title": "Khiên Kỷ Luật & Hạ Nhiệt Tâm Lý",
@@ -1365,7 +1383,8 @@
     "shareDownloaded": "Đã tải ảnh PNG thẻ chia sẻ",
     "downloadPng": "Tải PNG",
     "shareExportFailed": "Không xuất được thẻ chia sẻ",
-    "shareImageSkipped": "Không tải được ảnh chart - đã xuất thẻ không kèm ảnh"
+    "shareImageSkipped": "Không tải được ảnh chart - đã xuất thẻ không kèm ảnh",
+    "chartAlt": "Biểu đồ giao dịch"
   },
   "Auth": {
     "brand": "TradeNote",
@@ -1480,5 +1499,20 @@
     "source": "Nguồn",
     "recordedOn": "Ghi nhận {date}",
     "unverified": "Nguồn tham khảo - chưa kiểm tra"
+  },
+  "Draft": {
+    "quotaImageKept": "Bộ nhớ trình duyệt đã đầy: ảnh chỉ được giữ trong phiên này. Phần chữ của bản nháp đã được lưu.",
+    "saveFailed": "Không lưu được bản nháp trong trình duyệt này.",
+    "quotaImageKeptTextFailed": "Bộ nhớ trình duyệt đã đầy: ảnh chỉ được giữ trong phiên này, nhưng phần chữ của bản nháp KHÔNG lưu được."
+  },
+  "Cooldown": {
+    "activeTitle": "Khiên Kỷ Luật đang hoạt động (còn {minutes} phút)",
+    "prompt": "Bạn đang trong thời gian hạ nhiệt tâm lý. Bạn vào lệnh này vì đúng quy tắc Playbook hay vì đang muốn gỡ lệnh trước?",
+    "dismiss": "Tôi đã bình tĩnh - tiếp tục ghi lệnh"
+  },
+  "Meta": {
+    "title": "TradeNote - Nhật ký giao dịch Prop Firm",
+    "titleTemplate": "%s | TradeNote",
+    "description": "Nhật ký giao dịch cho prop firm với bộ máy rủi ro, Hard Stop và phân tích kỷ luật."
   }
 }

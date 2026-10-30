@@ -21,6 +21,7 @@ import {
   writeOrphanQueue,
   enqueueOrphanPaths,
   OrphanScanError,
+  isMissingLegacyColumn,
   type OrphanClient,
   type KeyValueStore,
 } from "@/lib/orphanScreenshots";
@@ -42,16 +43,20 @@ interface FakeOpts {
   fail?: "list" | "trades" | "count" | "playbooks";
   removeError?: boolean;
   maxRows?: number;
+  /** P7 E2: legacy column state - "present" (default), "dropped" (42703 like after patch 090), "error" (other failure). */
+  legacyColumn?: "present" | "dropped" | "error";
 }
 
 function fakeClient(o: FakeOpts = {}) {
   const log: string[] = [];
   const removed: string[][] = [];
+  const selects: string[] = [];
   const objects = (o.objects ?? []).map((x) => ({ id: "obj", created_at: OLD, ...x }));
   const client: OrphanClient = {
     from(table: string) {
       return {
-        select(_cols: string, opts?: { count?: "exact"; head?: boolean }) {
+        select(cols: string, opts?: { count?: "exact"; head?: boolean }) {
+          selects.push(`${table}:${cols}`);
           const eqs: [string, unknown][] = [];
           let orF: string | null = null;
           const rows = () =>
@@ -83,6 +88,12 @@ function fakeClient(o: FakeOpts = {}) {
             limit(n: number) {
               log.push("trades-page");
               if (o.fail === "trades") return Promise.resolve({ data: null, error: { message: "x" } });
+              if (table === "trades" && cols.includes("screenshot_url") && o.legacyColumn === "dropped") {
+                return Promise.resolve({ data: null, error: { code: "42703", message: "column trades.screenshot_url does not exist" } });
+              }
+              if (table === "trades" && cols.includes("screenshot_url") && o.legacyColumn === "error") {
+                return Promise.resolve({ data: null, error: { code: "57014", message: "canceling statement due to statement timeout" } });
+              }
               return Promise.resolve({ data: sortKeysetDesc(rows()).slice(0, Math.min(n, o.maxRows ?? Infinity)), error: null });
             },
             then<A, B>(ok?: ((v: ReturnType<typeof settle>) => A) | null, ko?: ((e: unknown) => B) | null) {
@@ -108,7 +119,7 @@ function fakeClient(o: FakeOpts = {}) {
       }),
     },
   };
-  return { client, log, removed };
+  return { client, log, removed, selects };
 }
 
 const trade = (id: string, extra: Row = {}): Row => ({ id, user_id: U, account_id: "acc-1", date: "2026-10-01T10:00:00.123456+00:00", ...extra });
@@ -126,9 +137,55 @@ describe("orphan-detection: allow-list", () => {
     }
   });
 
-  it("legacy screenshot_url maps to the same path as pathFromLegacyUrl (in-use set)", async () => {
+  it("P7 E2 defence: before 090 a legacy URL-without-path row keeps its file in use (not a candidate)", async () => {
+    // P1 invariant (patch 012) says url => path; this guards the unverifiable PROD case where it does not hold.
     const legacy = `https://x.supabase.co/storage/v1/object/public/trade-screenshots/${p(1)}?t=1`;
-    const { client } = fakeClient({ objects: [{ name: p(1).slice(U.length + 1) }], trades: [trade("t1", { screenshot_url: legacy })] });
+    const { client, selects } = fakeClient({
+      objects: [{ name: p(1).slice(U.length + 1) }, { name: p(2).slice(U.length + 1) }, { name: p(3).slice(U.length + 1) }],
+      trades: [trade("t1", { screenshot_url: legacy }), trade("t2", { screenshot_path: p(2) })],
+    });
+    expect((await scanOrphans(opts(client))).candidates).toEqual([p(3)]);
+    const pages = selects.filter((x) => x.startsWith("trades:id,"));
+    expect(pages.length).toBeGreaterThanOrEqual(2);
+    expect(pages.every((x) => x === "trades:id, date, screenshot_path, screenshot_url")).toBe(true);
+  });
+
+  it("P7 E2 defence: after 090 (42703 missing column) falls back to screenshot_path only and keeps scanning", async () => {
+    const { client, selects } = fakeClient({
+      legacyColumn: "dropped",
+      maxRows: 1,
+      objects: [{ name: p(1).slice(U.length + 1) }, { name: p(2).slice(U.length + 1) }],
+      trades: [trade("t1", { screenshot_path: p(1) }), trade("t2", { date: "2026-09-01T10:00:00.000000+00:00", screenshot_path: p(3) })],
+    });
+    expect((await scanOrphans(opts(client))).candidates).toEqual([p(2)]);
+    const tradePages = selects.filter((x) => x.startsWith("trades:id,"));
+    // first page: legacy try + fallback; later pages stay path-only (no repeated legacy attempts)
+    expect(tradePages[0]).toBe("trades:id, date, screenshot_path, screenshot_url");
+    expect(tradePages.slice(1).every((x) => x === "trades:id, date, screenshot_path")).toBe(true);
+    expect(tradePages.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("P7 E2 defence: any other trades query error still cancels the scan (no fallback)", async () => {
+    const { client, selects } = fakeClient({
+      legacyColumn: "error",
+      objects: [{ name: p(1).slice(U.length + 1) }],
+      trades: [trade("t1", { screenshot_path: p(2) })],
+    });
+    await expect(scanOrphans(opts(client))).rejects.toBeInstanceOf(OrphanScanError);
+    expect(selects.filter((x) => x.startsWith("trades:id,"))).toEqual(["trades:id, date, screenshot_path, screenshot_url"]);
+  });
+
+  it("P7 E2 defence: isMissingLegacyColumn recognises 42703 and the PostgREST message only", () => {
+    expect(isMissingLegacyColumn({ code: "42703", message: "x" })).toBe(true);
+    expect(isMissingLegacyColumn({ message: "column trades.screenshot_url does not exist" })).toBe(true);
+    expect(isMissingLegacyColumn({ message: "column trades.other does not exist" })).toBe(false);
+    expect(isMissingLegacyColumn({ code: "57014", message: "timeout" })).toBe(false);
+    expect(isMissingLegacyColumn(null)).toBe(false);
+  });
+
+  it("playbook image_url (public URL) still maps through the legacy mapper (in-use set)", async () => {
+    const legacy = `https://x.supabase.co/storage/v1/object/public/trade-screenshots/${p(1)}?t=1`;
+    const { client } = fakeClient({ objects: [{ name: p(1).slice(U.length + 1) }], playbooks: [{ id: "pb", user_id: U, image_url: legacy }] });
     expect((await scanOrphans(opts(client))).candidates).toEqual([]);
   });
 });
