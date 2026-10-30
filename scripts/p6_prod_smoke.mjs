@@ -22,6 +22,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
+import { seedCountVerdict } from './p6_seed_count.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.resolve(__dirname, '..');
@@ -251,22 +252,28 @@ async function keysetLoad(sb, accountId) {
 
 async function suiteSeed(db, sb, uid, accountId) {
   let total = 2500;
+  const countRows = async () =>
+    (await db.query('SELECT count(*)::int n FROM public.trades WHERE account_id = $1', [accountId])).rows[0].n;
+  let baseline = await countRows();
   await seedTrades(sb, uid, accountId, 0, total);
   const probe = await sb.from('trades').select('id').eq('account_id', accountId).limit(total);
   const returned = probe.data ? probe.data.length : -1;
   log(`max_rows probe: requested limit ${total}, REST returned ${returned} -> max_rows ${returned < total ? `= ${returned}` : `>= ${total}`}`);
   let load = await keysetLoad(sb, accountId);
-  let dbCount = (await db.query('SELECT count(*)::int n FROM public.trades WHERE account_id = $1', [accountId])).rows[0].n;
+  let dbCount = await countRows();
   log(`load ${total}: ${load.ms} ms Node-side, pages=${load.pages}, loaded=${load.count}, count(DB)=${dbCount}`);
-  record(load.count === dbCount && dbCount === total ? 'PASS' : 'FAIL', 'b6-seed-2500-count', `count(DB)=${dbCount} == loaded=${load.count}`);
+  let v = seedCountVerdict({ baseline, seeded: 2500, loaded: load.count, dbCount });
+  record(v.status, 'b6-seed-2500-count', v.detail);
   record(load.ms <= LOAD_BUDGET_MS ? 'PASS' : 'WARN', 'b6-seed-2500-time', `${load.ms} ms (budget ${LOAD_BUDGET_MS} ms, Node-side, excludes React render)`);
   if (load.ms <= LOAD_BUDGET_MS / 2) {
+    baseline = await countRows();
     await seedTrades(sb, uid, accountId, total, 2500);
     total = 5000;
     load = await keysetLoad(sb, accountId);
-    dbCount = (await db.query('SELECT count(*)::int n FROM public.trades WHERE account_id = $1', [accountId])).rows[0].n;
+    dbCount = await countRows();
     log(`load ${total}: ${load.ms} ms Node-side, pages=${load.pages}, loaded=${load.count}, count(DB)=${dbCount}`);
-    record(load.count === dbCount && dbCount === total ? 'PASS' : 'FAIL', 'b6-seed-5000-count', `count(DB)=${dbCount} == loaded=${load.count}`);
+    v = seedCountVerdict({ baseline, seeded: 2500, loaded: load.count, dbCount });
+    record(v.status, 'b6-seed-5000-count', v.detail);
     record(load.ms <= LOAD_BUDGET_MS ? 'PASS' : 'WARN', 'b6-seed-5000-time', `${load.ms} ms (Node-side)`);
   }
   return { maxRows: returned < 2500 ? returned : '>=2500', ms: load.ms, total };
