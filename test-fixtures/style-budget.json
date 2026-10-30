@@ -1,0 +1,111 @@
+{
+  "scope": "src/**/*.tsx excluding __tests__",
+  "measuredAt": "2026-10-30",
+  "zeroInNewFiles": [
+    "backdropBlur",
+    "gradient",
+    "glow",
+    "smallText",
+    "animate"
+  ],
+  "metrics": [
+    {
+      "id": "backdropBlur",
+      "pattern": "backdrop-blur",
+      "description": "backdrop-blur utilities in src/**/*.tsx. Measured 30-10-26 by styleBudget.test.ts regex after Guest G1-G3 files exist; ceiling may only go down.",
+      "ceiling": 81,
+      "baseline": 81,
+      "perFile": {}
+    },
+    {
+      "id": "gradient",
+      "pattern": "bg-(gradient-to|linear)-",
+      "description": "gradient backgrounds; narrow regex bg-(gradient-to|linear)- chosen because from-|via-|to- also matches to-r/to-t and other utilities (174+). Measured 30-10-26 by styleBudget.test.ts regex after Guest G1-G3 files exist; ceiling may only go down.",
+      "ceiling": 47,
+      "baseline": 47,
+      "perFile": {}
+    },
+    {
+      "id": "glow",
+      "pattern": "shadow-\\[0_0_",
+      "description": "glow shadows shadow-[0_0_.... Measured 30-10-26 by styleBudget.test.ts regex after Guest G1-G3 files exist; ceiling may only go down.",
+      "ceiling": 35,
+      "baseline": 35,
+      "perFile": {}
+    },
+    {
+      "id": "roundedXl",
+      "pattern": "\\brounded-xl\\b",
+      "description": "rounded-xl. Measured 30-10-26 by styleBudget.test.ts regex after Guest G1-G3 files exist; ceiling may only go down.",
+      "ceiling": 273,
+      "baseline": 273,
+      "perFile": {}
+    },
+    {
+      "id": "rounded2xl",
+      "pattern": "\\brounded-2xl\\b",
+      "description": "rounded-2xl. Measured 30-10-26 by styleBudget.test.ts regex after Guest G1-G3 files exist; ceiling may only go down.",
+      "ceiling": 105,
+      "baseline": 105,
+      "perFile": {}
+    },
+    {
+      "id": "rounded3xl",
+      "pattern": "\\brounded-3xl\\b",
+      "description": "rounded-3xl. Measured 30-10-26 by styleBudget.test.ts regex after Guest G1-G3 files exist; ceiling may only go down.",
+      "ceiling": 49,
+      "baseline": 49,
+      "perFile": {}
+    },
+    {
+      "id": "smallText",
+      "pattern": "text-\\[(10|11)px\\]",
+      "description": "text-[10px] / text-[11px]. Measured 30-10-26 by styleBudget.test.ts regex after Guest G1-G3 files exist; ceiling may only go down.",
+      "ceiling": 171,
+      "baseline": 171,
+      "perFile": {}
+    },
+    {
+      "id": "animate",
+      "pattern": "animate-(pulse|ping|bounce)",
+      "description": "animate-pulse/ping/bounce. Measured 30-10-26 by styleBudget.test.ts regex after Guest G1-G3 files exist; ceiling may only go down.",
+      "ceiling": 27,
+      "baseline": 27,
+      "perFile": {}
+    },
+    {
+      "id": "img",
+      "pattern": "<img\\b",
+      "description": "raw <img tags; EXCLUDES src/components/ui/** (SafeImage legitimately owns <img>). Measured 30-10-26 by styleBudget.test.ts regex after Guest G1-G3 files exist; ceiling may only go down.",
+      "ceiling": 10,
+      "baseline": 10,
+      "perFile": {},
+      "excludeUi": true
+    },
+    {
+      "id": "fixedInset0",
+      "pattern": "fixed inset-0",
+      "description": "fixed inset-0 overlays; EXCLUDES src/components/ui/** (Modal/Drawer legitimately own it). Measured 30-10-26 by styleBudget.test.ts regex after Guest G1-G3 files exist; ceiling may only go down.",
+      "ceiling": 25,
+      "baseline": 25,
+      "perFile": {},
+      "excludeUi": true
+    },
+    {
+      "id": "zArbitrary",
+      "pattern": "\\bz-\\[",
+      "description": "arbitrary z-[...] values. Measured 30-10-26 by styleBudget.test.ts regex after Guest G1-G3 files exist; ceiling may only go down.",
+      "ceiling": 3,
+      "baseline": 3,
+      "perFile": {}
+    },
+    {
+      "id": "zNumeric",
+      "pattern": "\\bz-(10|20|30|40|50)\\b",
+      "description": "raw numeric z-10..z-50 (use z-raised..z-toast). Measured 30-10-26 by styleBudget.test.ts regex after Guest G1-G3 files exist; ceiling may only go down.",
+      "ceiling": 50,
+      "baseline": 50,
+      "perFile": {}
+    }
+  ]
+}

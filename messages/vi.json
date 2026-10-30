@@ -1584,5 +1584,8 @@
     "image_disabled": "Tải ảnh bị tắt trong bản demo",
     "settings_account_locked": "Cài đặt tài khoản cần tài khoản thật",
     "delete_account_confirm": "Xóa tài khoản demo này?"
+  },
+  "Ui": {
+    "close": "Đóng"
   }
 }

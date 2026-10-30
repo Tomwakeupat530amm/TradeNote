@@ -576,6 +576,38 @@
       "find": "    safeRemove(storage, `tradenote_drawer_draft_${id}`);\n",
       "replace": "",
       "test": "src/lib/guest/__tests__/guestTransitions.test.ts"
+    },
+    {
+      "id": "U1-sign-after-symbol",
+      "description": "UI P1: formatMoney loses the leading minus (sign display broken, renders $220.00 / $-220 style)",
+      "file": "src/lib/format.ts",
+      "find": "  return sign === \"always\" ? \"exceptZero\" : \"negative\";\n",
+      "replace": "  return sign === \"always\" ? \"never\" : \"never\";\n",
+      "test": "src/lib/__tests__/format.test.ts"
+    },
+    {
+      "id": "U2-overlay-escape-ignored",
+      "description": "UI P1: overlayStack ignores Escape",
+      "file": "src/components/ui/overlayStack.ts",
+      "find": "  if (event.key === \"Escape\") {\n",
+      "replace": "  if (event.key === \"__never__\") {\n",
+      "test": "src/components/ui/__tests__/Modal.test.tsx"
+    },
+    {
+      "id": "U3-focus-trap-tab-off",
+      "description": "UI P1: useFocusTrap no longer wraps Tab",
+      "file": "src/components/ui/useFocusTrap.ts",
+      "find": "      if (event.key !== \"Tab\") return;\n",
+      "replace": "      return;\n",
+      "test": "src/components/ui/__tests__/Modal.test.tsx"
+    },
+    {
+      "id": "U4-scroll-lock-not-released",
+      "description": "UI P1: useScrollLock never restores body overflow",
+      "file": "src/components/ui/useScrollLock.ts",
+      "find": "        document.body.style.overflow = savedOverflow;\n",
+      "replace": "",
+      "test": "src/components/ui/__tests__/Modal.test.tsx"
     }
   ]
 }

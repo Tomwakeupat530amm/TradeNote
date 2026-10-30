@@ -4867,13 +4867,55 @@ it("46e: L4 - shouldSuggestTimezone + banner wiring (direct updatePreferences, p
   assert.ok(s40Read('src/app/[locale]/settings/page.tsx').includes('TimezoneSuggestionBanner'), 'banner mounted in settings');
 });
 
-it("46f: mutations.json - 72 mutants (60 + Guest GD-M1..M12), P8-M8..M10 (L4 x2, L3 x1) present", () => {
+it("46f: mutations.json - 76 mutants (60 + Guest GD-M1..M12 + UI U1..U4), P8-M8..M10 (L4 x2, L3 x1) present", () => {
   const d = JSON.parse(s40Read('test-fixtures/mutations.json'));
   const ids = d.mutants.map((m) => m.id);
-  assert.strictEqual(ids.length, 72, 'mutant total');
+  assert.strictEqual(ids.length, 76, 'mutant total');
   for (const i of [8, 9, 10]) assert.ok(ids.some((x) => x.startsWith(`P8-M${i}-`)), `P8-M${i} present`);
+  for (const i of [1, 2, 3, 4]) assert.ok(ids.some((x) => x.startsWith(`U${i}-`)), `U${i} present`);
 });
 // ===== END Section 46 =====
+
+// ===== Section 47: UI premium polish P1 foundation (static) =====
+console.log("\n--- Section 47: UI premium polish P1 foundation (tokens, formatter, shells) ---");
+const s47Css = s40Read('src/app/globals.css');
+const s47Theme = (() => {
+  const start = s47Css.indexOf('@theme static {');
+  if (start < 0) return '';
+  const end = s47Css.indexOf('\n}', start);
+  return end < 0 ? '' : s47Css.slice(start, end + 2);
+})();
+
+it("47a: globals.css @theme static has 16 colour tokens (Token Table), 3 radii, 6 z + 6 @utility z-*", () => {
+  assert.ok(s47Theme.length > 0, '@theme static block present');
+  const colours = [...s47Theme.matchAll(/--color-([\w-]+)\s*:/g)].map((m) => m[1]);
+  assert.strictEqual(new Set(colours).size, 16, 'colour token count derived from the Token Table');
+  for (const r of ['control', 'card', 'overlay']) assert.ok(s47Theme.includes(`--radius-${r}:`), `--radius-${r}`);
+  const z = ['raised', 'sticky', 'nav', 'drawer', 'modal', 'toast'];
+  for (const n of z) {
+    assert.ok(s47Theme.includes(`--z-${n}:`), `--z-${n}`);
+    assert.ok(s47Css.includes(`@utility z-${n} {`), `@utility z-${n}`);
+  }
+});
+
+it("47b: P1 files exist (format, useFormat, 8 shells, 2 hooks, cn.ts, overlayStack.ts, index.ts)", () => {
+  const files = ['src/lib/format.ts', 'src/lib/useFormat.ts',
+    ...['Card', 'Button', 'Stat', 'Badge', 'Field', 'Modal', 'Drawer', 'SafeImage'].map((c) => `src/components/ui/${c}.tsx`),
+    'src/components/ui/useFocusTrap.ts', 'src/components/ui/useScrollLock.ts',
+    'src/components/ui/cn.ts', 'src/components/ui/overlayStack.ts', 'src/components/ui/index.ts'];
+  for (const f of files) assert.ok(fs.existsSync(path.resolve(S40_ROOT, f)), `${f} exists`);
+});
+
+it("47c: ADD-ONLY invariant - nothing outside src/components/ui imports @/components/ui (retire in P2)", () => {
+  const walk = (rel) => fs.readdirSync(path.resolve(S40_ROOT, rel), { withFileTypes: true }).flatMap((e) => {
+    const r = `${rel}/${e.name}`;
+    if (e.isDirectory()) return r === 'src/components/ui' ? [] : walk(r);
+    return /\.(ts|tsx)$/.test(e.name) ? [r] : [];
+  });
+  const offenders = walk('src').filter((f) => /from\s+["']@\/components\/ui(\/[^"']*)?["']/.test(s40Read(f)));
+  assert.deepStrictEqual(offenders, [], 'no consumer of @/components/ui outside ui/**');
+});
+// ===== END Section 47 =====
 
 // ===== Section 53: Guest G1 static anti-leak =====
 console.log("\n--- Section 53: Guest G1 static anti-leak ---");

@@ -1584,5 +1584,8 @@
     "image_disabled": "Image upload is off in the demo",
     "settings_account_locked": "Account settings need a real account",
     "delete_account_confirm": "Delete this demo account?"
+  },
+  "Ui": {
+    "close": "Close"
   }
 }

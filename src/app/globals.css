@@ -51,3 +51,67 @@ body {
   }
 }
 
+
+/* UI premium polish P1 (track A): role-named design tokens (dark-only). Additive; existing blocks above unchanged. */
+@theme static {
+  --color-surface-0: #0A0D12;
+  --color-surface-1: #11151C;
+  --color-surface-2: #1A202A;
+  --color-line: #252C38;
+  --color-line-strong: #354052;
+  --color-ink: #E6EAF0;
+  --color-ink-muted: #9AA4B2;
+  --color-ink-faint: #7A8494;
+  --color-accent: #5B9DFF;
+  --color-accent-solid: #2F6FD6;
+  --color-profit: #2EBD85;
+  --color-profit-solid: #1A7F58;
+  --color-loss: #F6465D;
+  --color-loss-solid: #C8374A;
+  --color-warn: #F5A524;
+  --color-scrim: #000000;
+
+  --radius-control: 6px;
+  --radius-card: 10px;
+  --radius-overlay: 16px;
+
+  --shadow-raised: 0 1px 2px 0 rgb(0 0 0 / 0.45);
+  --shadow-overlay: 0 12px 32px -8px rgb(0 0 0 / 0.6);
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 280ms;
+
+  --text-data: 0.8125rem;
+  --text-data--line-height: 1.25rem;
+  --text-label: 0.75rem;
+  --text-label--line-height: 1rem;
+
+  --z-raised: 10;
+  --z-sticky: 20;
+  --z-nav: 40;
+  --z-drawer: 50;
+  --z-modal: 60;
+  --z-toast: 70;
+}
+
+@utility z-raised {
+  z-index: var(--z-raised);
+}
+@utility z-sticky {
+  z-index: var(--z-sticky);
+}
+@utility z-nav {
+  z-index: var(--z-nav);
+}
+@utility z-drawer {
+  z-index: var(--z-drawer);
+}
+@utility z-modal {
+  z-index: var(--z-modal);
+}
+@utility z-toast {
+  z-index: var(--z-toast);
+}
