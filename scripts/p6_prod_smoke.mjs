@@ -27,6 +27,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.resolve(__dirname, '..');
 const REPO_ROOT = path.resolve(APP_DIR, '..');
 const HARNESS_P6 = path.join(REPO_ROOT, 'process/general-plans/active/hardening-security-data-integrity_11-10-26/harness/p6');
+// RFC 2606 reserved, never deliverable: no mail can leave. GoTrue rejects it at signUp
+// (email_address_invalid, PROD 30-10-26) so the SQL-created confirmed user below is the
+// expected main path; do not switch to a deliverable domain (it would send real mail).
 const EMAIL_DOMAIN = 'example.invalid';
 const EMAIL_PREFIX = 'p6-probe-';
 const BUCKET = 'trade-screenshots';
@@ -105,13 +108,15 @@ async function suiteProbe(db) {
     const accId = acc ? acc.account_id : crypto.randomUUID();
     const plan1 = await db.query(
       `EXPLAIN SELECT * FROM public.trades WHERE account_id = $1 ORDER BY date DESC, id DESC LIMIT ${PAGE}`, [accId]);
+    // Real account id must not reach the evidence file (redact() only knows probe user ids).
+    const mask = (line) => String(line).split(String(accId)).join('[ACCOUNT_ID]');
     log('EXPLAIN keyset first page (largest account):');
-    for (const r of plan1.rows) log(`  ${r['QUERY PLAN']}`);
+    for (const r of plan1.rows) log(`  ${mask(r['QUERY PLAN'])}`);
     const plan2 = await db.query(
       `EXPLAIN SELECT * FROM public.trades WHERE account_id = $1 AND (date < now() OR (date = now() AND id < $2))
        ORDER BY date DESC, id DESC LIMIT ${PAGE}`, [accId, crypto.randomUUID()]);
     log('EXPLAIN keyset next page:');
-    for (const r of plan2.rows) log(`  ${r['QUERY PLAN']}`);
+    for (const r of plan2.rows) log(`  ${mask(r['QUERY PLAN'])}`);
     log(`largest account rows: ${acc ? acc.n : 0}`);
   } finally {
     await db.query('ROLLBACK');
@@ -133,13 +138,16 @@ async function createSqlUser(db, id, email, password) {
   const toks = await tokenColumns(db);
   const cols = ['id', 'instance_id', 'aud', 'role', 'email', 'encrypted_password', 'email_confirmed_at', 'created_at', 'updated_at',
     'raw_app_meta_data', 'raw_user_meta_data', ...toks];
-  const vals = ['$1', "'00000000-0000-0000-0000-000000000000'", "'authenticated'", "'authenticated'", '$2',
-    "extensions.crypt($3, extensions.gen_salt('bf'))", 'now()', 'now()', 'now()',
+  // Every parameter carries an explicit cast: node-pg sends untyped params, and a $n that Postgres must
+  // infer from two different contexts fails with "inconsistent types deduced for parameter $n" (B6 run
+  // 30-10-26). Keep $1::uuid / $2::text / $3::text explicit on every occurrence.
+  const vals = ['$1::uuid', "'00000000-0000-0000-0000-000000000000'", "'authenticated'", "'authenticated'", '$2::text',
+    "extensions.crypt($3::text, extensions.gen_salt('bf'))", 'now()', 'now()', 'now()',
     `'{"provider":"email","providers":["email"]}'::jsonb`, "'{}'::jsonb", ...toks.map(() => "''")];
   await db.query(`INSERT INTO auth.users (${cols.join(',')}) VALUES (${vals.join(',')})`, [id, email, password]);
   await db.query(
     `INSERT INTO auth.identities (id, user_id, provider_id, identity_data, provider, created_at, updated_at, last_sign_in_at)
-     VALUES (gen_random_uuid(), $1, $1::text, jsonb_build_object('sub', $1::text, 'email', $2::text, 'email_verified', true), 'email', now(), now(), now())`,
+     VALUES (gen_random_uuid(), $1::uuid, $1::text, jsonb_build_object('sub', $1::text, 'email', $2::text, 'email_verified', true), 'email', now(), now(), now())`,
     [id, email]);
 }
 
@@ -155,7 +163,7 @@ async function getUser(db) {
     userIds.push(uid);
     if (su.data.session) return { sb, uid, via };
     // signed up but unconfirmed: confirm by SQL then sign in
-    await db.query('UPDATE auth.users SET email_confirmed_at = now() WHERE id = $1 AND email LIKE $2', [uid, `${EMAIL_PREFIX}%@${EMAIL_DOMAIN}`]);
+    await db.query('UPDATE auth.users SET email_confirmed_at = now() WHERE id = $1::uuid AND email LIKE $2::text', [uid, `${EMAIL_PREFIX}%@${EMAIL_DOMAIN}`]);
     via = 'signUp+sql-confirm';
   } else {
     log(`signUp failed (${su.error?.code || su.error?.status || 'no user'}): ${errText(su.error)} -> SQL-created confirmed user`);
@@ -324,11 +332,11 @@ async function suiteDryrun(db) {
 // ---------------------------------------------------------------- residual + cleanup
 async function residual(db, uid) {
   const r = await db.query(
-    `SELECT (SELECT count(*) FROM auth.users WHERE id = $1 OR email LIKE $2)::int AS users,
-            (SELECT count(*) FROM public.accounts WHERE user_id = $1)::int AS accounts,
-            (SELECT count(*) FROM public.trades WHERE user_id = $1)::int AS trades,
-            (SELECT count(*) FROM public.user_preferences WHERE user_id = $1)::int AS prefs,
-            (SELECT count(*) FROM storage.objects WHERE bucket_id = $3 AND name LIKE $1::text || '/%')::int AS objects`,
+    `SELECT (SELECT count(*) FROM auth.users WHERE id = $1::uuid OR email LIKE $2::text)::int AS users,
+            (SELECT count(*) FROM public.accounts WHERE user_id = $1::uuid)::int AS accounts,
+            (SELECT count(*) FROM public.trades WHERE user_id = $1::uuid)::int AS trades,
+            (SELECT count(*) FROM public.user_preferences WHERE user_id = $1::uuid)::int AS prefs,
+            (SELECT count(*) FROM storage.objects WHERE bucket_id = $3::text AND name LIKE $1::uuid::text || '/%')::int AS objects`,
     [uid, `${EMAIL_PREFIX}%@${EMAIL_DOMAIN}`, BUCKET]);
   return r.rows[0];
 }
@@ -405,7 +413,7 @@ async function main() {
           }
           await sb.auth.signOut();
         }
-        const d = await db.query('DELETE FROM auth.users WHERE id = $1 AND email LIKE $2', [uid, `${EMAIL_PREFIX}%@${EMAIL_DOMAIN}`]);
+        const d = await db.query('DELETE FROM auth.users WHERE id = $1::uuid AND email LIKE $2::text', [uid, `${EMAIL_PREFIX}%@${EMAIL_DOMAIN}`]);
         log(`cleanup user: deleted ${d.rowCount}`);
       } catch (e) {
         log(`cleanup error: ${errText(e)}`);
