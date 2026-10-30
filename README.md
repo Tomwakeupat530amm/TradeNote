@@ -1,5 +1,7 @@
 # TradeNote
 
+**Demo trực tiếp / Live demo: [https://trade-note-zeta.vercel.app/](https://trade-note-zeta.vercel.app/)** (bấm "Try demo" ở trang đăng nhập / click "Try demo" on the login page)
+
 Tiếng Việt | [English](#english)
 
 ## Tiếng Việt
