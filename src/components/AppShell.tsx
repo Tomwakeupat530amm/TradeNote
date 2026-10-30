@@ -4,6 +4,7 @@ import React, { useEffect } from "react";
 import { useSidebarStore, initializeSidebarState } from "@/store/useSidebarStore";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
+import { GuestBanner } from "./GuestBanner";
 import { MobileBottomNav } from "./MobileBottomNav";
 import clsx from "clsx";
 import { usePathname } from "@/i18n/routing";
@@ -67,6 +68,7 @@ export function AppShell({ children }: AppShellProps) {
           isCollapsed ? "md:pl-20" : "md:pl-72"
         )}
       >
+        <GuestBanner />
         <Header />
         <main className="flex-1 overflow-y-auto bg-gray-950 p-4 sm:p-6 lg:p-8 pb-24 md:pb-8">
           {children}

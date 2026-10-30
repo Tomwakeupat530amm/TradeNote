@@ -27,6 +27,7 @@ import { processClipboardImage } from "@/lib/imageCompressor";
 import { useSignedUrl } from "@/hooks/useSignedUrl";
 import { sanitizeDraftScreenshot, getHeldScreenshot, writeDrawerDraft, clearDrawerDraft, removeDraftScreenshot } from "@/lib/draftScreenshotHolder";
 import { useFormOverlayRegistration } from "@/store/useFormOverlayStore";
+import { useGuestMode } from "@/lib/guest/useGuestMode";
 
 interface TradeSlideOverDrawerProps {
   isOpen: boolean;
@@ -52,6 +53,8 @@ export function TradeSlideOverDrawer({
   const t = useTranslations("SlideOverDrawer");
   const tDraft = useTranslations("Draft");
   const tCooldown = useTranslations("Cooldown");
+  const tGuest = useTranslations("Guest");
+  const isGuest = useGuestMode();
   const c = useTranslations("Common");
   const tRisk = useTranslations("Risk");
   const tTrade = useTranslations("Trade");
@@ -393,7 +396,7 @@ export function TradeSlideOverDrawer({
 
   // Global paste image support across all tabs
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || isGuest) return;
     const handlePaste = (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
       if (!items) return;
@@ -410,12 +413,13 @@ export function TradeSlideOverDrawer({
     };
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, [isOpen, processImageFile]);
+  }, [isOpen, isGuest, processImageFile]);
 
   // Drag & drop handlers
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isGuest) return;
     if (!isDragging) setIsDragging(true);
   };
 
@@ -430,6 +434,7 @@ export function TradeSlideOverDrawer({
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
+    if (isGuest) return;
     const files = e.dataTransfer?.files;
     if (files && files.length > 0) {
       processImageFile(files[0]);
@@ -714,7 +719,7 @@ export function TradeSlideOverDrawer({
               >
                 <Star className={clsx("w-3.5 h-3.5", isAplusSetup ? "text-amber-400 fill-amber-400" : "")} />
                 <span>{t("tab_psychology")}</span>
-                {hasImage && (
+                {hasImage && !isGuest && (
                   <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono border border-emerald-500/40 flex items-center gap-1">
                     📷 {t("has_image_badge")}
                   </span>
@@ -1040,12 +1045,18 @@ export function TradeSlideOverDrawer({
                       <label className="text-xs font-semibold uppercase tracking-wider text-gray-300">
                         {t("screenshot_label")}
                       </label>
-                      <span className="text-[10px] text-emerald-400/80 font-mono">
-                        {t("paste_hint")}
-                      </span>
+                      {!isGuest && (
+                        <span className="text-[10px] text-emerald-400/80 font-mono">
+                          {t("paste_hint")}
+                        </span>
+                      )}
                     </div>
 
-                    {isProcessingImage ? (
+                    {isGuest ? (
+                      <p data-testid="guest-image-disabled" className="text-xs text-gray-400">
+                        {tGuest("image_disabled")}
+                      </p>
+                    ) : isProcessingImage ? (
                       <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center gap-3 text-emerald-300 text-xs font-semibold animate-pulse">
                         <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
                         <span>{t("processing_image")}</span>
@@ -1122,13 +1133,15 @@ export function TradeSlideOverDrawer({
                         </div>
                       </div>
                     )}
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileChange}
-                      accept="image/*"
-                      className="hidden"
-                    />
+                    {!isGuest && (
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        accept="image/*"
+                        className="hidden"
+                      />
+                    )}
                   </div>
                 </div>
               )}

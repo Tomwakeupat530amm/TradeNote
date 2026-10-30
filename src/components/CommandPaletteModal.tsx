@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { useTradeStore } from "@/store/useTradeStore";
 import { useAccountStore } from "@/store/useAccountStore";
 import { useGuideStore } from "@/store/useGuideStore";
+import { useGuestMode } from "@/lib/guest/useGuestMode";
 import {
   Search,
   LayoutDashboard,
@@ -57,6 +58,7 @@ export function CommandPaletteModal({
 }: CommandPaletteModalProps) {
   const router = useRouter();
   const t = useTranslations("CommandPalette");
+  const isGuest = useGuestMode();
   const { trades } = useTradeStore();
   const { activeAccountId } = useAccountStore();
   const [query, setQuery] = useState("");
@@ -85,7 +87,7 @@ export function CommandPaletteModal({
 
   // Static Quick Actions
   const quickActions: PaletteItem[] = useMemo(() => {
-    return [
+    const items: PaletteItem[] = [
       {
         id: "action-new-trade",
         category: "action",
@@ -157,7 +159,9 @@ export function CommandPaletteModal({
         },
       },
     ];
-  }, [router, onClose, onOpenCalculator, t]);
+    // Guest demo: AI Coach is not available, so its action is omitted.
+    return isGuest ? items.filter((item) => item.id !== "action-ai-coach") : items;
+  }, [router, onClose, onOpenCalculator, t, isGuest]);
 
   // Static Navigation Items
   const navigationItems: PaletteItem[] = useMemo(() => {

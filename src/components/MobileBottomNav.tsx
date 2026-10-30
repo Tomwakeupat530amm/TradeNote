@@ -11,11 +11,15 @@ import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/routing";
 
 import { useAuthStore } from "@/store/useAuthStore";
+import { useGuestMode } from "@/lib/guest/useGuestMode";
+import { exitGuestMode } from "@/lib/guest/guestMode";
 import { QuickLogTradeModal } from "./QuickLogTradeModal";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 
 export function MobileBottomNav() {
   const t = useTranslations("MobileNav");
+  const tGuest = useTranslations("Guest");
+  const isGuest = useGuestMode();
   const pathname = usePathname();
   const { user, signOut } = useAuthStore();
 
@@ -258,12 +262,13 @@ export function MobileBottomNav() {
                   type="button"
                   onClick={() => {
                     setIsActionSheetOpen(false);
-                    signOut();
+                    if (isGuest) exitGuestMode();
+                    else signOut();
                   }}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold border border-rose-500/20 transition-colors"
                 >
                   <LogOut className="w-3.5 h-3.5" />
-                  <span>{t("sheet_logout")}</span>
+                  <span>{isGuest ? tGuest("exit_cta") : t("sheet_logout")}</span>
                 </button>
               </div>
             </motion.div>

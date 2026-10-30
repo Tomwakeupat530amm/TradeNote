@@ -13,6 +13,7 @@ import { Trash2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useGuestMode } from "@/lib/guest/useGuestMode";
 import { pathFromLegacyUrl } from "@/lib/screenshotStorage";
 import { defaultQueueStore, deleteOrphans, retryOrphanQueue, scanOrphans, type OrphanClient } from "@/lib/orphanScreenshots";
 
@@ -24,10 +25,11 @@ export default function OrphanCleanupCard() {
   const [busy, setBusy] = useState(false);
   const [candidates, setCandidates] = useState<string[] | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const isGuest = useGuestMode();
 
   // Retry the per-user queue once when the card opens (lib re-applies allow-list / prefix / in-use).
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || isGuest) return;
     let cancelled = false;
     retryOrphanQueue({ client: client(), store: defaultQueueStore(), userId, mapLegacyUrl: pathFromLegacyUrl })
       .then((res) => {
@@ -39,7 +41,7 @@ export default function OrphanCleanupCard() {
     return () => {
       cancelled = true;
     };
-  }, [userId, t]);
+  }, [userId, isGuest, t]);
 
   const handleScan = async () => {
     if (!userId) return;
@@ -72,6 +74,9 @@ export default function OrphanCleanupCard() {
       setBusy(false);
     }
   };
+
+  // Guest demo: no storage maintenance tool (after all hooks).
+  if (isGuest) return null;
 
   return (
     <section data-testid="orphan-cleanup-card" className="bg-gray-900 rounded-2xl border border-gray-800 p-6 sm:p-8 space-y-4 mt-6">

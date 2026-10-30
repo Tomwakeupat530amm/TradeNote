@@ -10,6 +10,7 @@ import { DEFAULT_DRAWDOWN_MODE, type DrawdownMode } from "@/lib/propRisk";
 import { isValidTimeZone } from "@/lib/tradingDay";
 import { Link } from "@/i18n/routing";
 import { useEstimatedRiskCounts } from "@/hooks/useEstimatedRiskCounts";
+import { useGuestMode } from "@/lib/guest/useGuestMode";
 import { toast } from "sonner";
 import { HardStopError } from "@/lib/hardStop";
 import clsx from "clsx";
@@ -28,6 +29,8 @@ export default function AccountsPage() {
   const tRisk = useTranslations("Risk");
   const tHardStop = useTranslations("HardStop");
   const tPresets = useTranslations("Presets");
+  const tGuest = useTranslations("Guest");
+  const isGuest = useGuestMode();
   const estimatedCounts = useEstimatedRiskCounts(accounts.map((a) => a.id));
   const totalEstimated = Object.values(estimatedCounts).reduce((sum, n) => sum + n, 0);
 
@@ -669,7 +672,11 @@ export default function AccountsPage() {
                 {t('edit')}
               </button>
               <button 
-                onClick={() => deleteAccount(account.id)}
+                onClick={() => {
+                  // Guest demo: confirm that only sample data is removed (D4).
+                  if (isGuest && !window.confirm(tGuest("delete_account_confirm"))) return;
+                  deleteAccount(account.id);
+                }}
                 className="rounded-md bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-400 hover:bg-red-500/20"
               >
                 {c('delete')}

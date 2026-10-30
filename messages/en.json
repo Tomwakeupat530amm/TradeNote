@@ -1574,5 +1574,15 @@
     "keep_utc": "Keep UTC",
     "applied": "Timezone set to {zone}.",
     "apply_failed": "Could not update the timezone. Please try again."
+  },
+  "Guest": {
+    "banner_text": "Sample data - stored only in this browser",
+    "reset_cta": "Reset demo data",
+    "exit_cta": "Exit demo / Sign up",
+    "enter_cta": "Try demo",
+    "ai_locked": "AI Coach needs an account",
+    "image_disabled": "Image upload is off in the demo",
+    "settings_account_locked": "Account settings need a real account",
+    "delete_account_confirm": "Delete this demo account?"
   }
 }

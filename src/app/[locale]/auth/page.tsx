@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "@/i18n/routing";
+import { enterGuestMode } from "@/lib/guest/guestMode";
 import { Activity, MailCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -38,6 +39,7 @@ const inputClass =
 
 export default function AuthPage() {
   const t = useTranslations("Auth");
+  const tGuest = useTranslations("Guest");
   const locale = useLocale();
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -246,6 +248,14 @@ export default function AuthPage() {
                   </motion.button>
                 </div>
               </form>
+
+              <button
+                type="button"
+                onClick={() => enterGuestMode()}
+                className="mt-4 flex w-full justify-center rounded-md border border-slate-700 px-3 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-800 transition-colors"
+              >
+                {tGuest("enter_cta")}
+              </button>
 
               <p className="mt-8 text-center text-sm text-gray-400">
                 {isLogin ? t("notMember") : t("haveAccount")}{" "}

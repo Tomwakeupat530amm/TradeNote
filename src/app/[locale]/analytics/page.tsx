@@ -32,6 +32,7 @@ import {
 import { Link } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
 import { AICoachModal } from "@/components/AICoachModal";
+import { useGuestMode } from "@/lib/guest/useGuestMode";
 import { 
   calculateExtendedStats, 
   filterTradesByTimeframe, 
@@ -65,6 +66,8 @@ export default function AnalyticsPage() {
   const { accounts, activeAccountId } = useAccountStore();
   const activeAccount = accounts.find((a) => a.id === activeAccountId);
   const t = useTranslations("Analytics");
+  const tGuest = useTranslations("Guest");
+  const isGuest = useGuestMode();
   const tStats = useTranslations("Stats");
   const [isAICoachOpen, setIsAICoachOpen] = useState(false);
   const [timeframe, setTimeframe] = useState<TimeframeFilter>("all");
@@ -333,7 +336,9 @@ export default function AnalyticsPage() {
           <button
             type="button"
             onClick={() => setIsAICoachOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 hover:opacity-95 transition-all w-fit cursor-pointer"
+            disabled={isGuest}
+            title={isGuest ? tGuest("ai_locked") : undefined}
+            className="disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 hover:opacity-95 transition-all w-fit cursor-pointer"
           >
             <Sparkles className="h-4 w-4" />
             {t('btn_ai_coach')}
@@ -367,7 +372,9 @@ export default function AnalyticsPage() {
           <button
             type="button"
             onClick={() => setIsAICoachOpen(true)}
-            className="text-xs font-semibold text-indigo-300 hover:text-indigo-200 underline whitespace-nowrap cursor-pointer shrink-0 hidden sm:block"
+            disabled={isGuest}
+            title={isGuest ? tGuest("ai_locked") : undefined}
+            className="disabled:opacity-50 disabled:cursor-not-allowed text-xs font-semibold text-indigo-300 hover:text-indigo-200 underline whitespace-nowrap cursor-pointer shrink-0 hidden sm:block"
           >
             {t('view_deep_analytics')}
           </button>

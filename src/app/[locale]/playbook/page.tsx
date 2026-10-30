@@ -18,6 +18,7 @@ import { isPlaybookRename, tradesForPlaybook } from "@/lib/playbookMatch";
 import { PlaybookRenameDialog } from "@/components/PlaybookRenameDialog";
 import { useHistoryReady } from "@/components/TradesLoadBanner";
 import { useFormOverlayRegistration } from "@/store/useFormOverlayStore";
+import { useGuestMode } from "@/lib/guest/useGuestMode";
 
 function playbookImagePath(playbook: Playbook): string | null {
   return playbook.imagePath ?? pathFromLegacyUrl(playbook.imageUrl);
@@ -49,6 +50,8 @@ function PlaybookImage({ source, alt, className }: { source: string; alt: string
 
 export default function PlaybookPage() {
   const t = useTranslations("Playbook");
+  const tGuest = useTranslations("Guest");
+  const isGuest = useGuestMode();
   const { playbooks, addPlaybook, updatePlaybook, deletePlaybook } = usePlaybookStore();
   const { trades } = useTradeStore();
   const { activeAccountId } = useAccountStore();
@@ -134,6 +137,7 @@ export default function PlaybookPage() {
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
+    if (isGuest) return;
     const items = e.clipboardData.items;
     for (const item of items) {
       if (item.type.indexOf("image") !== -1) {
@@ -563,6 +567,10 @@ export default function PlaybookPage() {
                           </button>
                         </div>
                       </div>
+                    ) : isGuest ? (
+                      <p data-testid="guest-image-disabled" className="text-xs text-gray-400">
+                        {tGuest("image_disabled")}
+                      </p>
                     ) : (
                       <div className="w-full h-40 border-2 border-dashed border-white/20 rounded-xl flex flex-col items-center justify-center text-gray-500 bg-gray-950/50">
                         <Upload className="w-8 h-8 mb-2 opacity-50" />

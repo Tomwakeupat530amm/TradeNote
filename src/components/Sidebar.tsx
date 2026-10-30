@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useGuestMode } from "@/lib/guest/useGuestMode";
+import { exitGuestMode } from "@/lib/guest/guestMode";
 import { useSidebarStore } from "@/store/useSidebarStore";
 import { useGuideStore } from "@/store/useGuideStore";
 import { motion } from "framer-motion";
@@ -42,6 +44,9 @@ export function Sidebar() {
   const [activeQuoteIndex, setActiveQuoteIndex] = useState(0);
   const t = useTranslations("Navigation");
   const tSidebar = useTranslations("Sidebar");
+  const tGuest = useTranslations("Guest");
+  const isGuest = useGuestMode();
+  const signOutLabel = isGuest ? tGuest("exit_cta") : tSidebar("sign_out");
 
   useEffect(() => {
     if (!user) {
@@ -214,19 +219,19 @@ export function Sidebar() {
               <div className="relative group">
                 <button
                   type="button"
-                  onClick={() => signOut()}
+                  onClick={() => (isGuest ? exitGuestMode() : signOut())}
                   className={clsx(
                     "w-full flex items-center rounded-xl p-2.5 text-sm font-semibold text-gray-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all border border-transparent hover:border-rose-500/20",
                     isCollapsed ? "justify-center" : "gap-x-3 -mx-1"
                   )}
                 >
                   <LogOut className="h-5 w-5 shrink-0 text-gray-400 group-hover:text-rose-400 transition-colors" aria-hidden="true" />
-                  {!isCollapsed && <span className="truncate">{tSidebar("sign_out")}</span>}
+                  {!isCollapsed && <span className="truncate">{signOutLabel}</span>}
                 </button>
                 {/* Floating Tooltip */}
                 {isCollapsed && (
                   <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-gray-900 border border-rose-500/30 text-xs font-semibold text-rose-300 shadow-2xl pointer-events-none opacity-0 group-hover:opacity-100 group-hover:scale-100 scale-95 transition-all z-50 whitespace-nowrap">
-                    {tSidebar("sign_out")}
+                    {signOutLabel}
                   </div>
                 )}
               </div>

@@ -15,6 +15,7 @@ import { twMerge } from "tailwind-merge";
 import { useTranslations } from "next-intl";
 import OrphanCleanupCard from "@/components/OrphanCleanupCard";
 import TimezoneSuggestionBanner from "@/components/TimezoneSuggestionBanner";
+import { useGuestMode } from "@/lib/guest/useGuestMode";
 
 const CURRENCY_OPTIONS = ["USD", "EUR", "GBP", "AUD", "CAD", "JPY"] as const;
 const TIMEZONE_OPTIONS = [
@@ -38,6 +39,8 @@ export default function SettingsPage() {
   const t = useTranslations("Settings");
   const tHardStop = useTranslations("HardStop");
   const tPsych = useTranslations("Psych");
+  const tGuest = useTranslations("Guest");
+  const isGuest = useGuestMode();
   const { user } = useAuthStore();
   const { accounts, activeAccountId, updateAccount } = useAccountStore();
   const { preferences, fetchPreferences, updatePreferences, isLoading: prefsLoading } = usePreferenceStore();
@@ -352,6 +355,7 @@ export default function SettingsPage() {
                     <p className="text-sm text-gray-400 mt-1">{t("profile_desc")}</p>
                   </div>
                   {/* Avatar Upload */}
+                  {!isGuest && (
                   <div className="flex items-center gap-4">
                     <div className="h-16 w-16 rounded-full bg-gray-800 overflow-hidden border border-gray-700">
                       {preferences?.avatarUrl ? (
@@ -374,6 +378,7 @@ export default function SettingsPage() {
                       </button>
                     </div>
                   </div>
+                  )}
                 </div>
 
                 <form onSubmit={handleSaveProfile} className="space-y-6">
@@ -431,6 +436,11 @@ export default function SettingsPage() {
               </div>
 
               {/* Security */}
+              {isGuest ? (
+                <p data-testid="guest-settings-account-locked" className="rounded-md border border-gray-800 bg-gray-900 p-4 text-sm text-gray-400">
+                  {tGuest("settings_account_locked")}
+                </p>
+              ) : (
               <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 sm:p-8">
                 <div className="mb-6">
                   <h3 className="text-lg font-semibold text-white">{t("security")}</h3>
@@ -491,6 +501,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+              )}
             </div>
           )}
 
@@ -730,7 +741,7 @@ export default function SettingsPage() {
           )}
 
           {/* P6: orphan screenshot cleanup (dry-run scan; delete only after an irreversible-action confirm) */}
-          <OrphanCleanupCard />
+          {!isGuest && <OrphanCleanupCard />}
 
         </div>
       </div>

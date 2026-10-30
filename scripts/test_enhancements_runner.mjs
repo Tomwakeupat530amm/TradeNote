@@ -4867,13 +4867,154 @@ it("46e: L4 - shouldSuggestTimezone + banner wiring (direct updatePreferences, p
   assert.ok(s40Read('src/app/[locale]/settings/page.tsx').includes('TimezoneSuggestionBanner'), 'banner mounted in settings');
 });
 
-it("46f: mutations.json - 60 mutants, P8-M8..M10 (L4 x2, L3 x1) present", () => {
+it("46f: mutations.json - 72 mutants (60 + Guest GD-M1..M12), P8-M8..M10 (L4 x2, L3 x1) present", () => {
   const d = JSON.parse(s40Read('test-fixtures/mutations.json'));
   const ids = d.mutants.map((m) => m.id);
-  assert.strictEqual(ids.length, 60, 'mutant total');
+  assert.strictEqual(ids.length, 72, 'mutant total');
   for (const i of [8, 9, 10]) assert.ok(ids.some((x) => x.startsWith(`P8-M${i}-`)), `P8-M${i} present`);
 });
 // ===== END Section 46 =====
+
+// ===== Section 53: Guest G1 static anti-leak =====
+console.log("\n--- Section 53: Guest G1 static anti-leak ---");
+const s53Walk = (rel) => {
+  const out = [];
+  for (const e of fs.readdirSync(path.resolve(S40_ROOT, rel), { withFileTypes: true })) {
+    const r = `${rel}/${e.name}`;
+    if (e.isDirectory()) out.push(...s53Walk(r));
+    else if (/\.(ts|tsx)$/.test(e.name)) out.push(r);
+  }
+  return out;
+};
+const s53Src = s53Walk('src').filter((f) => !f.includes('/__tests__/') && !/\.test\.tsx?$/.test(f));
+const s53Guest = s53Src.filter((f) => f.startsWith('src/lib/guest/'));
+
+it("53a: supabase-js is imported only at the allowed sites", () => {
+  const allowed = ['src/lib/supabase.ts', 'src/app/api/ai-coach/route.ts', 'src/store/useAuthStore.ts'];
+  const hits = s53Src.filter((f) => /from\s+['"]@supabase\/supabase-js['"]/.test(s40Read(f)));
+  for (const f of hits) assert.ok(allowed.includes(f), `unexpected supabase-js import in ${f}`);
+  const auth = s40Read('src/store/useAuthStore.ts').match(/import\s*\{([^}]*)\}\s*from\s*['"]@supabase\/supabase-js['"]/);
+  assert.ok(auth && auth[1].trim() === 'User', 'useAuthStore imports only User');
+});
+
+it("53b: createClient( only in supabase.ts and the AI route", () => {
+  const hits = s53Src.filter((f) => s40Read(f).includes('createClient('));
+  assert.deepStrictEqual(hits.sort(), ['src/app/api/ai-coach/route.ts', 'src/lib/supabase.ts']);
+});
+
+it("53c: src/lib/guest (non-test) has no supabase-js import, fetch, XMLHttpRequest or NEXT_PUBLIC_SUPABASE", () => {
+  assert.ok(s53Guest.length >= 8, 'guest files found');
+  for (const f of s53Guest) {
+    const s = s40Read(f);
+    assert.ok(!/from\s+['"]@supabase\/supabase-js['"]/.test(s), `${f} imports supabase-js`);
+    for (const bad of ['fetch(', 'XMLHttpRequest', 'NEXT_PUBLIC_SUPABASE']) assert.ok(!s.includes(bad), `${f} contains ${bad}`);
+  }
+});
+
+it("53d: files importing supabase from @/lib/supabase define no other `supabase` identifier", () => {
+  const allow = ['src/lib/orphanScreenshots.ts', 'src/app/api/ai-coach/route.ts'];
+  const users = s53Src.filter((f) => /import\s*\{[^}]*\bsupabase\b[^}]*\}\s*from\s*['"]@\/lib\/supabase['"]/.test(s40Read(f)));
+  assert.ok(users.length > 0, 'importers found');
+  for (const f of users) {
+    if (allow.includes(f)) continue;
+    assert.ok(!/\b(const|let|var|function|class)\s+supabase\b/.test(s40Read(f)), `${f} redefines supabase`);
+  }
+});
+
+it("53e: supabase.ts imports ./guest/guestFlag behind typeof window; guestFlag.ts holds tradenote_guest_v1", () => {
+  const s = s40Read('src/lib/supabase.ts');
+  assert.ok(/from\s+['"]\.\/guest\/guestFlag['"]/.test(s), 'imports ./guest/guestFlag');
+  assert.ok(s.includes('typeof window'), 'typeof window branch');
+  assert.ok(s40Read('src/lib/guest/guestFlag.ts').includes('tradenote_guest_v1'), 'flag key literal');
+});
+
+it("53f: every fixed key / prefix in guestMode.ts exists by exact name in app source", () => {
+  const keys = ['tradeNoteActiveAccount', 'tradenote_cooldown_until', 'tradenote_session_closed_', 'tradenote_drawer_draft_', 'ai_coach_', 'tradenote_custom_routine_items_', 'tradenote_show_routine_widget_', 'tradenote_premarket_', 'orphan_screenshots_v1:', 'tz_suggestion_dismissed_v1:'];
+  const gm = s40Read('src/lib/guest/guestMode.ts');
+  const app = s53Src.filter((f) => !f.startsWith('src/lib/guest/')).map((f) => s40Read(f));
+  for (const k of keys) {
+    assert.ok(gm.includes(k), `guestMode.ts lacks ${k}`);
+    assert.ok(app.some((s) => s.includes(k)), `app source lacks ${k}`);
+  }
+});
+
+it("53g: src/lib/guest (non-test) has no Vietnamese letters; GD-M1..GD-M5 mutants present", () => {
+  const vi = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
+  for (const f of s53Guest) assert.ok(!vi.test(s40Read(f)), `${f} has Vietnamese letters`);
+  const ids = JSON.parse(s40Read('test-fixtures/mutations.json')).mutants.map((m) => m.id);
+  for (const i of [1, 2, 3, 4, 5]) assert.ok(ids.some((x) => x.startsWith(`GD-M${i}-`)), `GD-M${i} present`);
+});
+// ===== END Section 53 =====
+
+// ===== Section 54: Guest UI + closure guards (G2+G3) =====
+console.log("\n--- Section 54: Guest UI + closure guards ---");
+it("54a: exactly one <GuestBanner in AppShell", () => {
+  assert.strictEqual(s40Read('src/components/AppShell.tsx').split('<GuestBanner').length - 1, 1);
+});
+it("54b: auth page offers Guest entry (enterGuestMode or useGuestMode) + Guest enter_cta", () => {
+  const s = s40Read('src/app/[locale]/auth/page.tsx');
+  assert.ok(/enterGuestMode|useGuestMode/.test(s), 'entry helper');
+  assert.ok(s.includes('enter_cta'), 'enter_cta');
+});
+it("54c: Sidebar and MobileBottomNav use useGuestMode + exitGuestMode", () => {
+  for (const f of ['src/components/Sidebar.tsx', 'src/components/MobileBottomNav.tsx']) {
+    const s = s40Read(f);
+    assert.ok(s.includes('useGuestMode') && s.includes('exitGuestMode'), f);
+  }
+});
+it("54d: AICoachModal checks isGuest before getSession and the AI fetch; that fetch only there", () => {
+  const s = s40Read('src/components/AICoachModal.tsx');
+  const g = s.indexOf('if (isGuest)');
+  assert.ok(g > 0 && g < s.indexOf('getSession') && g < s.indexOf('fetch("/api/ai-coach"'), 'guard order');
+  const hits = s53Src.filter((f) => s40Read(f).includes('fetch("/api/ai-coach"'));
+  assert.deepStrictEqual(hits, ['src/components/AICoachModal.tsx']);
+});
+it("54e: settings page and OrphanCleanupCard branch on isGuest", () => {
+  assert.ok(s40Read('src/app/[locale]/settings/page.tsx').includes('isGuest'));
+  assert.ok(/if \(isGuest\) return null;/.test(s40Read('src/components/OrphanCleanupCard.tsx')));
+});
+it("54f: accounts page confirms Guest delete with Guest.delete_account_confirm", () => {
+  assert.ok(s40Read('src/app/[locale]/accounts/page.tsx').includes('delete_account_confirm'));
+});
+it("54g: flag literal tradenote_guest_v1 appears only in guestFlag.ts / types.ts", () => {
+  const hits = s53Src.filter((f) => /tradenote_guest_v1(?!_)/.test(s40Read(f)));
+  for (const f of hits) assert.ok(['src/lib/guest/guestFlag.ts', 'src/lib/guest/types.ts', 'src/lib/guest/guestMode.ts', 'src/lib/supabase.ts'].includes(f), `flag literal in ${f}`);
+});
+it("54h: Guest namespace has the 8 fixed keys with EN = VI key sets", () => {
+  const en = JSON.parse(s40Read('messages/en.json')).Guest || {};
+  const vi = JSON.parse(s40Read('messages/vi.json')).Guest || {};
+  const want = ['ai_locked', 'banner_text', 'delete_account_confirm', 'enter_cta', 'exit_cta', 'image_disabled', 'reset_cta', 'settings_account_locked'];
+  assert.deepStrictEqual(Object.keys(en).sort(), want);
+  assert.deepStrictEqual(Object.keys(vi).sort(), want);
+  for (const k of want) assert.ok(en[k] && vi[k] && !/'\{/.test(en[k] + vi[k]), k);
+});
+it("54i: B1-B5 pins and guest-image-disabled hints present", () => {
+  const pins = {
+    'src/components/QuickLogTradeModal.tsx': ['pnlInputRef', 'setPnlSign', 'active:scale-[0.96]', 'guest-image-disabled'],
+    'src/components/TradeSlideOverDrawer.tsx': ['useTranslations("Cooldown")', 'tCooldown(', 'tDraft(', 'TradeSlideOverDrawer', 'HardStopError', 'guest-image-disabled'],
+    'src/components/TradeEditForm.tsx': ['guest-image-disabled'],
+    'src/app/[locale]/settings/page.tsx': ['handleSaveRisk', 'handleSaveProfile', '<OrphanCleanupCard', 'TimezoneSuggestionBanner'],
+    'src/components/OrphanCleanupCard.tsx': ['role="alertdialog"'],
+    'src/components/TimezoneSuggestionBanner.tsx': ['toast.error(t("apply_failed"));'],
+    'src/app/[locale]/accounts/page.tsx': ['Personal', 'await updateAccount(', 'tPresets('],
+    'src/app/[locale]/playbook/page.tsx': ['playbookMatch', 'guest-image-disabled'],
+  };
+  for (const [f, list] of Object.entries(pins)) { const s = s40Read(f); for (const p of list) assert.ok(s.includes(p), `${f} lacks ${p}`); }
+});
+it("54j: the G2/G3 Guest test files exist and are non-empty", () => {
+  for (const f of ['src/lib/guest/__tests__/guestTransitions.test.ts', 'src/components/__tests__/guestLoginAfterGuest.test.tsx', 'src/lib/guest/__tests__/guestNoNetwork.test.ts', 'src/lib/guest/__tests__/guestStaticAudit.test.ts', 'src/components/__tests__/guestBanner.test.tsx', 'src/components/__tests__/guestAiLock.test.tsx', 'src/components/__tests__/guestFeatureLocks.test.tsx', 'src/components/__tests__/guestSettingsLocks.test.tsx']) {
+    assert.ok(fs.existsSync(path.resolve(S40_ROOT, f)) && s40Read(f).trim().length > 100, f);
+  }
+});
+it("54k: guestMode UNSCOPED_REAL_KEYS + SESSION_CLOSED_PREFIX = sticky entries in guestStaticAudit", () => {
+  const gm = s40Read('src/lib/guest/guestMode.ts');
+  const keys = JSON.parse(gm.match(/UNSCOPED_REAL_KEYS = (\[[^\]]*\])/)[1]);
+  keys.push(gm.match(/SESSION_CLOSED_PREFIX = "([^"]+)"/)[1]);
+  const audit = s40Read('src/lib/guest/__tests__/guestStaticAudit.test.ts');
+  const sticky = [...audit.matchAll(/^\s*"?([\w:]+)"?: "sticky"/gm)].map((m) => m[1]);
+  assert.deepStrictEqual(sticky.sort(), keys.sort());
+});
+// ===== END Section 54 =====
 
 
 console.log("\n-------------------------------------------------------");

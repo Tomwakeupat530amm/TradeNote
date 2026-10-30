@@ -13,6 +13,7 @@ import { useTagTranslation } from "@/hooks/useTagTranslation";
 import { useTranslations } from "next-intl";
 import { processClipboardImage } from "@/lib/imageCompressor";
 import { useSignedUrl } from "@/hooks/useSignedUrl";
+import { useGuestMode } from "@/lib/guest/useGuestMode";
 
 const RESULTS: TradeResult[] = ["Win", "Loss", "Break Even"];
 const SETUPS = ["Breakout", "Pullback", "Reversal", "Continuation", "Other"];
@@ -36,6 +37,8 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
   const tRisk = useTranslations("Risk");
   const tTrade = useTranslations("Trade");
   const tHardStop = useTranslations("HardStop");
+  const tGuest = useTranslations("Guest");
+  const isGuest = useGuestMode();
   const hardStop = useHardStop(trade.accountId);
   // Locked trading day: only notes/tags/screenshot stay editable (PnL/risk/time/result disabled).
   const locked = hardStop.isLockedDay(trade.date);
@@ -104,7 +107,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
   // Paste image handler for edit mode
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
-      if (!isOpen) return;
+      if (!isOpen || isGuest) return;
       const items = e.clipboardData?.items;
       if (!items) return;
 
@@ -122,7 +125,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
 
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, [isOpen, processImageFile]);
+  }, [isOpen, isGuest, processImageFile]);
 
   // Drag & drop handlers
   const handleDragOver = (e: React.DragEvent) => {
@@ -425,7 +428,11 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
         <div className="space-y-1">
           <label className="block text-sm font-medium text-gray-300">{t("screenshot")}</label>
           
-          {isProcessingImage ? (
+          {isGuest ? (
+            <p data-testid="guest-image-disabled" className="text-xs text-gray-400">
+              {tGuest("image_disabled")}
+            </p>
+          ) : isProcessingImage ? (
             <div className="flex flex-col items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 h-[120px] p-3 text-center text-emerald-300 animate-pulse">
               <Loader2 className="w-5 h-5 animate-spin text-emerald-400 mb-1" />
               <span className="text-xs font-semibold">{t("optimizing_screenshot")}</span>

@@ -480,6 +480,102 @@
       "find": "    \"aria_quick_log\": \"Ghi lệnh nhanh\"",
       "replace": "    \"aria_quick_log_removed\": \"Ghi lệnh nhanh\"",
       "test": "src/lib/__tests__/messagesIcu.test.ts"
+    },
+    {
+      "id": "GD-M1-isGuestMode-always-false",
+      "description": "G1: isGuestMode ignores the flag and always returns false",
+      "file": "src/lib/guest/guestMode.ts",
+      "find": "  return readGuestFlag();\n",
+      "replace": "  return false;\n",
+      "test": "src/lib/guest/__tests__/guestMode.test.ts"
+    },
+    {
+      "id": "GD-M2-supabase-always-real",
+      "description": "G1: supabase.ts always picks the real client even with the Guest flag",
+      "file": "src/lib/supabase.ts",
+      "find": "  typeof window !== 'undefined' && readGuestFlag()\n",
+      "replace": "  typeof window !== 'undefined' && false && readGuestFlag()\n",
+      "test": "src/lib/guest/__tests__/supabaseSelect.test.ts"
+    },
+    {
+      "id": "GD-M3-exit-keeps-cooldown",
+      "description": "G1: exitGuestMode no longer removes tradenote_cooldown_until, so a Guest cooldown leaks into the real session",
+      "file": "src/lib/guest/guestMode.ts",
+      "find": "    removeUnscopedKeys(storage);\n    safeRemove(storage, GUEST_DB_KEY);\n    safeRemove(storage, FLAG_KEY);\n",
+      "replace": "    for (const key of UNSCOPED_REAL_KEYS) if (key !== \"tradenote_cooldown_until\") safeRemove(storage, key);\n    for (const key of allKeys(storage)) if (key.startsWith(SESSION_CLOSED_PREFIX)) safeRemove(storage, key);\n    safeRemove(storage, GUEST_DB_KEY);\n    safeRemove(storage, FLAG_KEY);\n",
+      "test": "src/lib/guest/__tests__/guestMode.test.ts"
+    },
+    {
+      "id": "GD-M4-enter-keeps-active-account",
+      "description": "G1: enterGuestMode no longer removes tradeNoteActiveAccount, so the real account id leaks into Guest",
+      "file": "src/lib/guest/guestMode.ts",
+      "find": "    removeUnscopedKeys(storage);\n    safeSet(storage, FLAG_KEY, \"1\");\n",
+      "replace": "    for (const key of UNSCOPED_REAL_KEYS) if (key !== \"tradeNoteActiveAccount\") safeRemove(storage, key);\n    for (const key of allKeys(storage)) if (key.startsWith(SESSION_CLOSED_PREFIX)) safeRemove(storage, key);\n    safeSet(storage, FLAG_KEY, \"1\");\n",
+      "test": "src/lib/guest/__tests__/guestMode.test.ts"
+    },
+    {
+      "id": "GD-M5-fake-lt-becomes-gt",
+      "description": "G1: fakeCore lt comparison flipped to gt, breaking the (date desc, id desc) keyset or() pagination",
+      "file": "src/lib/guest/fakeCore.ts",
+      "find": "      return left < right;\n",
+      "replace": "      return left > right;\n",
+      "test": "src/lib/guest/__tests__/fakeFilters.test.ts"
+    },
+    {
+      "id": "GD-M6-ai-guard-removed",
+      "description": "G2: AICoachModal Guest guard removed, Guest reaches getSession/fetch",
+      "file": "src/components/AICoachModal.tsx",
+      "find": "    if (isGuest) {\n      toast.error(tGuest(\"ai_locked\"));\n      return;\n    }\n",
+      "replace": "",
+      "test": "src/components/__tests__/guestAiLock.test.tsx"
+    },
+    {
+      "id": "GD-M7-sidebar-guest-signout",
+      "description": "G2: Sidebar exit calls signOut in Guest",
+      "file": "src/components/Sidebar.tsx",
+      "find": "onClick={() => (isGuest ? exitGuestMode() : signOut())}",
+      "replace": "onClick={() => signOut()}",
+      "test": "src/components/__tests__/guestAuthEntry.test.tsx"
+    },
+    {
+      "id": "GD-M8-orphan-card-guest-null-removed",
+      "description": "G2: OrphanCleanupCard renders in Guest",
+      "file": "src/components/OrphanCleanupCard.tsx",
+      "find": "  if (isGuest) return null;\n",
+      "replace": "",
+      "test": "src/components/__tests__/guestSettingsLocks.test.tsx"
+    },
+    {
+      "id": "GD-M9-appshell-banner-removed",
+      "description": "G2: AppShell no longer mounts GuestBanner",
+      "file": "src/components/AppShell.tsx",
+      "find": "        <GuestBanner />\n",
+      "replace": "",
+      "test": "src/components/__tests__/guestBanner.test.tsx"
+    },
+    {
+      "id": "GD-M10-exit-keeps-guest-db",
+      "description": "G3: exitGuestMode keeps the Guest DB",
+      "file": "src/lib/guest/guestMode.ts",
+      "find": "    safeRemove(storage, GUEST_DB_KEY);\n    safeRemove(storage, FLAG_KEY);\n",
+      "replace": "    safeRemove(storage, FLAG_KEY);\n",
+      "test": "src/lib/guest/__tests__/guestTransitions.test.ts"
+    },
+    {
+      "id": "GD-M11-reset-clears-flag",
+      "description": "G3: resetGuestData also clears the Guest flag",
+      "file": "src/lib/guest/guestMode.ts",
+      "find": "    safeRemove(storage, GUEST_DB_KEY);\n  }\n  (opts.reload ?? defaultReload)();\n",
+      "replace": "    safeRemove(storage, GUEST_DB_KEY);\n    safeRemove(storage, FLAG_KEY);\n  }\n  (opts.reload ?? defaultReload)();\n",
+      "test": "src/lib/guest/__tests__/guestTransitions.test.ts"
+    },
+    {
+      "id": "GD-M12-drawer-draft-kept",
+      "description": "G3: Guest drawer draft not removed on exit/reset",
+      "file": "src/lib/guest/guestMode.ts",
+      "find": "    safeRemove(storage, `tradenote_drawer_draft_${id}`);\n",
+      "replace": "",
+      "test": "src/lib/guest/__tests__/guestTransitions.test.ts"
     }
   ]
 }

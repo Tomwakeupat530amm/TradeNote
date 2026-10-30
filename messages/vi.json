@@ -1574,5 +1574,15 @@
     "keep_utc": "Giữ UTC",
     "applied": "Đã đặt múi giờ thành {zone}.",
     "apply_failed": "Không cập nhật được múi giờ. Vui lòng thử lại."
+  },
+  "Guest": {
+    "banner_text": "Dữ liệu mẫu - chỉ lưu trên trình duyệt này",
+    "reset_cta": "Đặt lại dữ liệu mẫu",
+    "exit_cta": "Thoát demo / Đăng ký",
+    "enter_cta": "Dùng thử demo",
+    "ai_locked": "AI Coach cần có tài khoản",
+    "image_disabled": "Tải ảnh bị tắt trong bản demo",
+    "settings_account_locked": "Cài đặt tài khoản cần tài khoản thật",
+    "delete_account_confirm": "Xóa tài khoản demo này?"
   }
 }

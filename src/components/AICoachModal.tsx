@@ -13,6 +13,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { aggregateTradingHabits } from "@/lib/aiCoachAggregator";
 import type { AiCoachPayload } from "@/lib/aiCoachSchema";
 import { supabase } from "@/lib/supabase";
+import { useGuestMode } from "@/lib/guest/useGuestMode";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { useFormOverlayRegistration } from "@/store/useFormOverlayStore";
@@ -63,6 +64,8 @@ export function toAiCoachErrorCode(value: unknown): AiCoachErrorCode {
 export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
   useFormOverlayRegistration("ai-coach", isOpen);
   const t = useTranslations("AICoach");
+  const tGuest = useTranslations("Guest");
+  const isGuest = useGuestMode();
   const locale = useLocale();
   const { trades } = useTradeStore();
   // P6 B4: AI Coach analyses the full history only (isFullyLoaded for the active account).
@@ -113,6 +116,11 @@ export function AICoachModal({ isOpen, onClose }: AICoachModalProps) {
   }, [activeAccountId]);
 
   const handleRunAnalysis = async () => {
+    // Guest demo: never call the session or the AI endpoint.
+    if (isGuest) {
+      toast.error(tGuest("ai_locked"));
+      return;
+    }
     if (accountTrades.length === 0) {
       toast.error(t("toast_no_trades"));
       return;
