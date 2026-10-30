@@ -48,6 +48,7 @@ Tất cả ảnh chụp ở chế độ Guest demo (dữ liệu mẫu).
 Bấm **Try demo** ở trang đăng nhập để vào ngay với dữ liệu mẫu, không cần tài khoản hay Supabase thật.
 
 - Dữ liệu mẫu chỉ lưu trong trình duyệt của bạn (cờ `tradenote_guest_v1` trong `localStorage`).
+- Vào demo thì giao diện mặc định là tiếng Anh; bạn đổi sang tiếng Việt thì được giữ nguyên.
 - Bạn vẫn có thể thêm lệnh và xem mọi trang phân tích.
 - AI Coach, tải ảnh chụp màn hình và cài đặt tài khoản bị tắt trong demo.
 - Nút **Reset demo data** trên thanh trên cùng đưa dữ liệu về trạng thái ban đầu; **Exit demo / Sign up** để thoát.
@@ -94,8 +95,6 @@ Các lệnh khác: `npm run build`, `npm run start`, `npm run lint`.
 | `npm run test:rls` | Kiểm tra RLS hai người dùng (bỏ qua nếu không có project TEST) |
 | `npm run test:api` | Hợp đồng route AI Coach (ca live cần dev server) |
 
-Số liệu đo được cập nhật trong `../process/context/tests/all-tests.md`.
-
 ### Cấu trúc thư mục
 
 - `src/app/[locale]/`: các trang (Dashboard, Journal, Analytics, Playbook, Daily Review, Calendar, Economic Calendar, Simulator, Accounts, Settings, Auth)
@@ -122,17 +121,25 @@ Số liệu đo được cập nhật trong `../process/context/tests/all-tests.
 
 ### Screenshots
 
-All screenshots were taken in Guest demo mode (sample data). See the images above.
+All screenshots were taken in Guest demo mode (sample data).
 
-| Screen | Image |
-|---|---|
-| Login with "Try demo" | `docs/images/auth-demo.jpg` |
-| Dashboard | `docs/images/dashboard-en.jpg` |
-| Journal | `docs/images/journal-en.jpg` |
-| Analytics | `docs/images/analytics-en.jpg` |
-| Accounts | `docs/images/accounts-en.jpg` |
-| Vietnamese UI | `docs/images/dashboard-vi.jpg` |
-| Mobile | `docs/images/dashboard-mobile.jpg` |
+![Login page with the Try demo button](docs/images/auth-demo.jpg)
+*Login page with a "Try demo" button: no account needed.*
+
+![Dashboard](docs/images/dashboard-en.jpg)
+*Dashboard: balance, win rate, profit-target progress, Hard Stop distance and remaining bullets.*
+
+![Journal](docs/images/journal-en.jpg)
+*Journal: detailed trade table with filters, session, R-multiple, emotion and discipline tags.*
+
+![Analytics](docs/images/analytics-en.jpg)
+*Analytics: net PnL, profit factor, expectancy, equity curve and mistake-leakage alerts.*
+
+![Accounts](docs/images/accounts-en.jpg)
+*Prop-firm accounts: drawdown, consistency rule, 1R baseline, bullets and Hard Stop.*
+
+![Mobile dashboard](docs/images/dashboard-mobile.jpg)
+*Mobile layout (390x844).*
 
 ### Features
 
@@ -151,6 +158,7 @@ All screenshots were taken in Guest demo mode (sample data). See the images abov
 Click **Try demo** on the login page to enter with sample data, with no account and no real Supabase project needed.
 
 - Sample data lives only in your browser (the `tradenote_guest_v1` flag in `localStorage`).
+- The demo opens in English by default; if you switch to Vietnamese, that choice is kept.
 - You can still add trades and browse every analytics page.
 - AI Coach, screenshot upload, and account settings are disabled in the demo.
 - **Reset demo data** in the top bar restores the sample data; **Exit demo / Sign up** leaves demo mode.
@@ -186,8 +194,6 @@ Other commands: `npm run build`, `npm run start`, `npm run lint`.
 - `npm run lint:sql`: SQL patch lint
 - `npm run test:rls`: two-user RLS harness (skipped without a TEST project)
 - `npm run test:api`: AI Coach route contract (live cases need a dev server)
-
-Measured totals are tracked in `../process/context/tests/all-tests.md`.
 
 ### Project structure
 
