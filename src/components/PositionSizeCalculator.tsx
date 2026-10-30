@@ -217,7 +217,7 @@ export function PositionSizeCalculator({ isOpen, onClose }: PositionSizeCalculat
                       {t("tag_multi_asset")}
                     </span>
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                      1R: ${account1R.riskDollar} ({account1R.bullets} Bullets)
+                      {t("account_1r_badge", { risk: account1R.riskDollar, bullets: account1R.bullets })}
                     </span>
                   </h2>
                   <p className="text-xs text-gray-400">{t("subtitle")}</p>

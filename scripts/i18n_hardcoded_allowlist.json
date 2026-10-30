@@ -131,11 +131,6 @@
       "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
     },
     {
-      "file": "src/app/[locale]/daily-review/page.tsx",
-      "kind": "en",
-      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
-    },
-    {
       "file": "src/app/[locale]/journal/page.tsx",
       "kind": "en",
       "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
@@ -151,22 +146,7 @@
       "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
     },
     {
-      "file": "src/app/[locale]/settings/page.tsx",
-      "kind": "en",
-      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
-    },
-    {
       "file": "src/app/[locale]/simulator/page.tsx",
-      "kind": "en",
-      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
-    },
-    {
-      "file": "src/components/CommandPaletteModal.tsx",
-      "kind": "en",
-      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
-    },
-    {
-      "file": "src/components/DailyExecutiveReportCard.tsx",
       "kind": "en",
       "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
     },
@@ -176,27 +156,13 @@
       "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
     },
     {
-      "file": "src/components/EconomicCalendarWidget.tsx",
-      "kind": "en",
-      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
-    },
-    {
       "file": "src/components/Header.tsx",
       "kind": "en",
-      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
+      "contains": "Zen Shield",
+      "reason": "product label \"Zen Shield\" kept identical in EN and VI; runner section 'Header preserves Zen Shield' asserts the literal (L3 G2: other Header strings moved to keys)"
     },
     {
       "file": "src/components/MatrixCorrelationAnalytics.tsx",
-      "kind": "en",
-      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
-    },
-    {
-      "file": "src/components/MobileBottomNav.tsx",
-      "kind": "en",
-      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
-    },
-    {
-      "file": "src/components/PositionSizeCalculator.tsx",
       "kind": "en",
       "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
     },
@@ -207,26 +173,6 @@
     },
     {
       "file": "src/components/Sidebar.tsx",
-      "kind": "en",
-      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
-    },
-    {
-      "file": "src/components/TradeDetailsModal.tsx",
-      "kind": "en",
-      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
-    },
-    {
-      "file": "src/components/TradeEditForm.tsx",
-      "kind": "en",
-      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
-    },
-    {
-      "file": "src/components/TradeViewDetails.tsx",
-      "kind": "en",
-      "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
-    },
-    {
-      "file": "src/components/TradingViewMiniChart.tsx",
       "kind": "en",
       "reason": "hard-coded English outside the P7 screens (QuickLog, Drawer, Cockpit, CardsView, layout metadata); deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md"
     },
@@ -265,12 +211,6 @@
       "kind": "en",
       "contains": "Reset cached result",
       "reason": "English arm of an explicit locale === \"vi\" ternary (already bilingual); move to keys later, K5 backlog (review E17 m1 new finding)"
-    },
-    {
-      "file": "src/components/VisualRRBox.tsx",
-      "kind": "en",
-      "contains": "Break Even",
-      "reason": "hard-coded English outside the P7 screens; deferred, K5 backlog i18n-english-residual_NOTE_29-10-26.md (review E17 m1 new finding)"
     }
   ]
 }

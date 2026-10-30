@@ -206,7 +206,7 @@ export function DailyExecutiveReportCard({
           </div>
 
           <div className="text-xs text-gray-400 font-mono">
-            {report.totalTrades} Trades · Net: {report.netPnl >= 0 ? "+" : ""}${report.netPnl.toLocaleString()} ({report.totalR >= 0 ? "+" : ""}{report.totalR}R)
+            {t("summary_line", { trades: report.totalTrades, net: `${report.netPnl >= 0 ? "+" : ""}$${report.netPnl.toLocaleString()}`, r: `${report.totalR >= 0 ? "+" : ""}${report.totalR}` })}
           </div>
           {report.unratedCount > 0 && (
             <p className="text-[11px] text-gray-400 italic" data-testid="report-unrated-count">
@@ -328,7 +328,7 @@ export function DailyExecutiveReportCard({
                     <span className="text-xs font-normal text-emerald-300/80">({report.mvpTrade.lotSize}L)</span>
                   </div>
                   <div className="text-[11px] text-gray-400 font-mono">
-                    Setup: {report.mvpTrade.setup || "Discretionary"}
+                    {t("setup_label", { setup: report.mvpTrade.setup || t("setup_discretionary") })}
                   </div>
                 </div>
                 <div className="text-right">
@@ -347,7 +347,7 @@ export function DailyExecutiveReportCard({
             </div>
           ) : (
             <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center justify-center text-center text-xs text-gray-500 italic">
-              No standout winning trade recorded today.
+              {t("no_mvp_trade")}
             </div>
           )}
 
@@ -371,7 +371,7 @@ export function DailyExecutiveReportCard({
                     <span className="text-xs font-normal text-rose-300/80">({report.costliestLeakTrade.lotSize}L)</span>
                   </div>
                   <div className="text-[11px] text-gray-400 font-mono">
-                    Setup: {report.costliestLeakTrade.setup || "No Setup"}
+                    {t("setup_label", { setup: report.costliestLeakTrade.setup || t("setup_none") })}
                   </div>
                 </div>
                 <div className="text-right">
@@ -388,7 +388,7 @@ export function DailyExecutiveReportCard({
             </div>
           ) : (
             <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center justify-center text-center text-xs text-emerald-400/80">
-              Zero rule leakages detected today! Execution clean.
+              {t("no_leakage")}
             </div>
           )}
         </div>

@@ -39,7 +39,7 @@ export function MobileBottomNav() {
       {/* Fixed Bottom Navigation Bar (Mobile Only) */}
       <nav 
         className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-gray-950/90 backdrop-blur-xl border-t border-white/10 shadow-[0_-8px_20px_rgba(0,0,0,0.6)] px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
-        aria-label="Mobile Navigation"
+        aria-label={t("aria_nav")}
       >
         <div className="flex items-center justify-around h-14 max-w-md mx-auto">
           {/* 1. Dashboard */}
@@ -72,7 +72,7 @@ export function MobileBottomNav() {
               type="button"
               onClick={() => setIsQuickLogOpen(true)}
               className="relative -top-3 w-12 h-12 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 text-gray-950 flex items-center justify-center shadow-lg shadow-emerald-500/40 active:scale-95 transition-transform"
-              aria-label="Quick Log Trade"
+              aria-label={t("aria_quick_log")}
             >
               <Plus className="w-6 h-6 stroke-[2.5]" />
             </button>

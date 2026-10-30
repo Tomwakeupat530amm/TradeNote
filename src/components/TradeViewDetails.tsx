@@ -119,7 +119,7 @@ export function TradeViewDetails({ trade, onEdit, onDelete, deleteDisabledReason
               </span>
               {trade.checklistResults && Object.keys(trade.checklistResults).length > 0 && Object.values(trade.checklistResults).every(Boolean) && (
                 <span className="inline-flex items-center rounded-md bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-xs font-bold text-emerald-300">
-                  ⭐ A+ Setup
+                  {t("a_plus_setup")}
                 </span>
               )}
               {trade.confluences?.map(c => (
@@ -140,7 +140,7 @@ export function TradeViewDetails({ trade, onEdit, onDelete, deleteDisabledReason
             {/* Playbook Checklist Result if present */}
             {trade.checklistResults && Object.keys(trade.checklistResults).length > 0 && (
               <div className="border-t border-gray-800/80 pt-3 space-y-1.5">
-                <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">Playbook Rules:</div>
+                <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">{t("playbook_rules")}</div>
                 <div className="space-y-1">
                   {Object.entries(trade.checklistResults).map(([rule, passed]) => (
                     <div key={rule} className="flex items-center gap-2 text-xs">
@@ -213,7 +213,7 @@ export function TradeViewDetails({ trade, onEdit, onDelete, deleteDisabledReason
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={signedShot.url}
-                  alt="Trade setup"
+                  alt={t("screenshot_alt")}
                   className="w-full h-full object-contain cursor-zoom-in"
                   onClick={() => setZoomImageSrc(signedShot.url)}
                 />

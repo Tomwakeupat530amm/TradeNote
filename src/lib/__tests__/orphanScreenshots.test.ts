@@ -1,6 +1,6 @@
 /**
  * P6 Step A (A4): orphan-detection.
- * Safety properties of the irreversible cleanup tool: allow-list (avatar / playbook_* / legacy kept),
+ * Safety properties of the irreversible cleanup tool: allow-list (avatar / playbook_* kept; strict legacy names L2b),
  * age >= 24h, list-before-used, multi-account used-set, count mismatch or query error cancels,
  * poisoned queue entries never removed, lib loadable by plain Node (E15).
  */
@@ -21,7 +21,6 @@ import {
   writeOrphanQueue,
   enqueueOrphanPaths,
   OrphanScanError,
-  isMissingLegacyColumn,
   type OrphanClient,
   type KeyValueStore,
 } from "@/lib/orphanScreenshots";
@@ -43,8 +42,6 @@ interface FakeOpts {
   fail?: "list" | "trades" | "count" | "playbooks";
   removeError?: boolean;
   maxRows?: number;
-  /** P7 E2: legacy column state - "present" (default), "dropped" (42703 like after patch 090), "error" (other failure). */
-  legacyColumn?: "present" | "dropped" | "error";
 }
 
 function fakeClient(o: FakeOpts = {}) {
@@ -88,12 +85,6 @@ function fakeClient(o: FakeOpts = {}) {
             limit(n: number) {
               log.push("trades-page");
               if (o.fail === "trades") return Promise.resolve({ data: null, error: { message: "x" } });
-              if (table === "trades" && cols.includes("screenshot_url") && o.legacyColumn === "dropped") {
-                return Promise.resolve({ data: null, error: { code: "42703", message: "column trades.screenshot_url does not exist" } });
-              }
-              if (table === "trades" && cols.includes("screenshot_url") && o.legacyColumn === "error") {
-                return Promise.resolve({ data: null, error: { code: "57014", message: "canceling statement due to statement timeout" } });
-              }
               return Promise.resolve({ data: sortKeysetDesc(rows()).slice(0, Math.min(n, o.maxRows ?? Infinity)), error: null });
             },
             then<A, B>(ok?: ((v: ReturnType<typeof settle>) => A) | null, ko?: ((e: unknown) => B) | null) {
@@ -131,61 +122,73 @@ describe("orphan-detection: allow-list", () => {
     expect(isTradeScreenshotPath(buildScreenshotPath(U, "png"), U)).toBe(true);
   });
 
-  it("avatar, playbook_*, legacy names, other users and traversal are never candidates", () => {
+  it("avatar, playbook_*, non-allow-listed names, other users and traversal are never candidates", () => {
     for (const bad of [`${U}/avatar.png`, `${U}/playbook_1700000000000.webp`, `${U}/old.png`, `user-B/1700000000000-aabbccdd.webp`, `${U}/../user-B/1700000000000-aabbccdd.webp`, `${U}/x/1700000000000-aabbccdd.webp`, "", null]) {
       expect(isTradeScreenshotPath(bad, U)).toBe(false);
     }
   });
 
-  it("P7 E2 defence: before 090 a legacy URL-without-path row keeps its file in use (not a candidate)", async () => {
-    // P1 invariant (patch 012) says url => path; this guards the unverifiable PROD case where it does not hold.
-    const legacy = `https://x.supabase.co/storage/v1/object/public/trade-screenshots/${p(1)}?t=1`;
+  it("L1: the used set selects only id, date, screenshot_path (no legacy column, no retry) on every page", async () => {
     const { client, selects } = fakeClient({
-      objects: [{ name: p(1).slice(U.length + 1) }, { name: p(2).slice(U.length + 1) }, { name: p(3).slice(U.length + 1) }],
-      trades: [trade("t1", { screenshot_url: legacy }), trade("t2", { screenshot_path: p(2) })],
-    });
-    expect((await scanOrphans(opts(client))).candidates).toEqual([p(3)]);
-    const pages = selects.filter((x) => x.startsWith("trades:id,"));
-    expect(pages.length).toBeGreaterThanOrEqual(2);
-    expect(pages.every((x) => x === "trades:id, date, screenshot_path, screenshot_url")).toBe(true);
-  });
-
-  it("P7 E2 defence: after 090 (42703 missing column) falls back to screenshot_path only and keeps scanning", async () => {
-    const { client, selects } = fakeClient({
-      legacyColumn: "dropped",
       maxRows: 1,
       objects: [{ name: p(1).slice(U.length + 1) }, { name: p(2).slice(U.length + 1) }],
       trades: [trade("t1", { screenshot_path: p(1) }), trade("t2", { date: "2026-09-01T10:00:00.000000+00:00", screenshot_path: p(3) })],
     });
     expect((await scanOrphans(opts(client))).candidates).toEqual([p(2)]);
-    const tradePages = selects.filter((x) => x.startsWith("trades:id,"));
-    // first page: legacy try + fallback; later pages stay path-only (no repeated legacy attempts)
-    expect(tradePages[0]).toBe("trades:id, date, screenshot_path, screenshot_url");
-    expect(tradePages.slice(1).every((x) => x === "trades:id, date, screenshot_path")).toBe(true);
-    expect(tradePages.length).toBeGreaterThanOrEqual(3);
-  });
-
-  it("P7 E2 defence: any other trades query error still cancels the scan (no fallback)", async () => {
-    const { client, selects } = fakeClient({
-      legacyColumn: "error",
-      objects: [{ name: p(1).slice(U.length + 1) }],
-      trades: [trade("t1", { screenshot_path: p(2) })],
-    });
-    await expect(scanOrphans(opts(client))).rejects.toBeInstanceOf(OrphanScanError);
-    expect(selects.filter((x) => x.startsWith("trades:id,"))).toEqual(["trades:id, date, screenshot_path, screenshot_url"]);
-  });
-
-  it("P7 E2 defence: isMissingLegacyColumn recognises 42703 and the PostgREST message only", () => {
-    expect(isMissingLegacyColumn({ code: "42703", message: "x" })).toBe(true);
-    expect(isMissingLegacyColumn({ message: "column trades.screenshot_url does not exist" })).toBe(true);
-    expect(isMissingLegacyColumn({ message: "column trades.other does not exist" })).toBe(false);
-    expect(isMissingLegacyColumn({ code: "57014", message: "timeout" })).toBe(false);
-    expect(isMissingLegacyColumn(null)).toBe(false);
+    const pages = selects.filter((x) => x.startsWith("trades:id,"));
+    expect(pages.length).toBeGreaterThanOrEqual(3);
+    expect(pages.every((x) => x === "trades:id, date, screenshot_path")).toBe(true);
   });
 
   it("playbook image_url (public URL) still maps through the legacy mapper (in-use set)", async () => {
     const legacy = `https://x.supabase.co/storage/v1/object/public/trade-screenshots/${p(1)}?t=1`;
     const { client } = fakeClient({ objects: [{ name: p(1).slice(U.length + 1) }], playbooks: [{ id: "pb", user_id: U, image_url: legacy }] });
+    expect((await scanOrphans(opts(client))).candidates).toEqual([]);
+  });
+});
+
+describe("orphan-detection: legacy names (L2b)", () => {
+  // mirrors PROD owner1/owner2 legacy upload names: `{userId}/{13 digits}.png`
+  const L = (n: string) => `${U}/${n}`;
+  const LEGACY = L("1782538922182.png");
+
+  it("strict legacy shape: 10-14 digits + png/jpg/jpeg/webp, anchored", () => {
+    for (const ok of [LEGACY, L("1782538922.jpg"), L("17825389221823.jpeg"), L("1782538922182.webp")]) expect(isTradeScreenshotPath(ok, U)).toBe(true);
+    for (const bad of [L("178253892.png"), L("178253892218234.png"), L("1782538922182.gif"), L("1782538922182.png.bak"), L("avatar.png"), L("playbook_1782538922182.png"), L("x/1782538922182.png"), `user-B/1782538922182.png`, `${U}/../user-B/1782538922182.png`]) {
+      expect(isTradeScreenshotPath(bad, U)).toBe(false);
+    }
+  });
+
+  it("an old unused legacy file is a candidate; a fresh one (< 24h) is not", async () => {
+    const { client } = fakeClient({ objects: [{ name: "1782538922182.png" }, { name: "1782538922183.png", created_at: FRESH }] });
+    expect((await scanOrphans(opts(client))).candidates).toEqual([LEGACY]);
+  });
+
+  it("rejected legacy-like names are never candidates even when old and unused", async () => {
+    const names = ["178253892.png", "178253892218234.png", "1782538922182.gif", "1782538922182.png.bak", "avatar.png", "playbook_1782538922182.png"];
+    const { client } = fakeClient({ objects: names.map((name) => ({ name })) });
+    expect((await scanOrphans(opts(client))).candidates).toEqual([]);
+    expect(findOrphans(names.map((n) => ({ path: L(n), createdAt: OLD })), new Set(), U, NOW)).toEqual([]);
+  });
+
+  it("PROD owner1 case: a legacy file referenced by screenshot_path is never a candidate (scan + findOrphans)", async () => {
+    const { client } = fakeClient({ objects: [{ name: "1782538922182.png" }, { name: "1782538922184.png" }], trades: [trade("t1", { screenshot_path: LEGACY })] });
+    expect((await scanOrphans(opts(client))).candidates).toEqual([L("1782538922184.png")]);
+    expect(findOrphans([{ path: LEGACY, createdAt: OLD }], new Set([LEGACY]), U, NOW)).toEqual([]);
+  });
+
+  it("PROD owner1 case: an in-use legacy file in the queue is dropped by retryOrphanQueue, never removed", async () => {
+    const store = memoryStorage() as KeyValueStore;
+    writeOrphanQueue(store, U, [LEGACY, L("1782538922184.png")]);
+    const { client, removed } = fakeClient({ trades: [trade("t1", { screenshot_path: LEGACY })] });
+    const res = await retryOrphanQueue({ client, store, userId: U, mapLegacyUrl: pathFromLegacyUrl });
+    expect(removed.flat()).toEqual([L("1782538922184.png")]);
+    expect(res.dropped).toEqual([LEGACY]);
+  });
+
+  it("a legacy file used only by a playbook (public URL) is never a candidate", async () => {
+    const url = `https://x.supabase.co/storage/v1/object/public/trade-screenshots/${LEGACY}?t=1`;
+    const { client } = fakeClient({ objects: [{ name: "1782538922182.png" }], playbooks: [{ id: "pb", user_id: U, image_url: url }] });
     expect((await scanOrphans(opts(client))).candidates).toEqual([]);
   });
 });

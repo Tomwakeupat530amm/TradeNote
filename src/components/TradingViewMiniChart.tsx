@@ -99,7 +99,7 @@ export function TradingViewMiniChart({ asset }: TradingViewMiniChartProps) {
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs text-emerald-400 hover:underline pt-1"
           >
-            <span>TradingView: {symbol}</span>
+            <span>{t("tradingview_link", { symbol })}</span>
             <ExternalLink className="w-3 h-3" />
           </a>
         </div>

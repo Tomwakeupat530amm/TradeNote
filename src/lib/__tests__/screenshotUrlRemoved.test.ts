@@ -6,10 +6,8 @@
  *  - test files (`__tests__/`, `*.test.ts(x)`): negative assertions / legacy fixtures on purpose;
  *  - SQL patches, probes, golden JSON and schema snapshot live outside src/ (trigger 052 `c_allowed`
  *    keeps 'screenshot_url' as a harmless extra entry; 050-053 are not edited).
- *  - src/lib/orphanScreenshots.ts (P7 E2, deliberate safety exception): the orphan scan reads the
- *    legacy column defensively while it still exists, so a row with a URL but no path keeps its file
- *    out of the deletion candidates; after patch 090 it falls back on 42703. The literal must appear
- *    exactly once, as the `LEGACY_URL_COLUMN` constant (nothing else in that file may use it).
+ * L1 (closeout 30-10-26): patch 090 is applied on PROD, so the orphan-scan defence (LEGACY_URL_COLUMN,
+ * 42703 fallback) is gone too: NO production file under src/ may mention the column any more.
  * Playbook `image_url` keeps the legacy public-URL mapper (`pathFromLegacyUrl`) and is not affected.
  */
 import { describe, it, expect } from "vitest";
@@ -33,19 +31,13 @@ function walk(dir: string, out: string[]): string[] {
 }
 
 describe("P7 E1: client no longer references trades.screenshot_url", () => {
-  it("no production file under src/ mentions screenshot_url / screenshotUrl (except the orphan-scan defence)", () => {
+  it("no production file under src/ mentions screenshot_url / screenshotUrl (no exception left)", () => {
     const files = walk(path.join(APP, "src"), []);
     expect(files.length).toBeGreaterThan(50);
     const hits = files
       .filter((f) => PATTERN.test(fs.readFileSync(f, "utf8")))
       .map((f) => path.relative(APP, f).replace(/\\/g, "/"));
-    expect(hits).toEqual(["src/lib/orphanScreenshots.ts"]);
-  });
-
-  it("orphanScreenshots.ts: the only reference is the LEGACY_URL_COLUMN constant (P7 E2 exception)", () => {
-    const code = fs.readFileSync(path.join(APP, "src/lib/orphanScreenshots.ts"), "utf8");
-    expect(code.match(/screenshot_url|screenshotUrl/g)).toEqual(["screenshot_url"]);
-    expect(code).toContain("const LEGACY_URL_COLUMN = 'screenshot_url';");
+    expect(hits).toEqual([]);
   });
 
   it("scripts/p6_prod_smoke.mjs no longer reads the column (raw SQL)", () => {

@@ -4,6 +4,37 @@ import { useAuthStore } from './useAuthStore';
 import { usePreferenceStore } from './usePreferenceStore';
 import { evaluateAccountConfigChange, HardStopError, isAccountConfigChangeRelevant } from '@/lib/hardStop';
 import { toServerConfigLockedError } from '@/lib/hardStopServerError';
+import { defaultQueueStore, enqueueOrphanPaths, removeOrQueueStorageObjects } from '@/lib/orphanScreenshots';
+import { SCREENSHOT_BUCKET } from '@/lib/screenshotStorage';
+
+/** L2a: keyset page size for collecting an account's screenshot paths (PROD max_rows = 1000). */
+const ACCOUNT_PATH_PAGE = 500;
+const ACCOUNT_PATH_MAX_PAGES = 10_000;
+
+/**
+ * L2a: every screenshot_path of the account's trades, keyset paged by date desc, id desc until an
+ * EMPTY page (a short page is not the end when the server caps rows). Any query error or a stalled
+ * cursor throws, so deleteAccount stops before deleting anything.
+ */
+async function collectAccountScreenshotPaths(accountId: string): Promise<string[]> {
+  const paths: string[] = [];
+  let cursor: { date: string; id: string } | null = null;
+  for (let page = 0; page < ACCOUNT_PATH_MAX_PAGES; page++) {
+    let q = supabase.from('trades').select('id, date, screenshot_path').eq('account_id', accountId);
+    if (cursor) q = q.or(`date.lt."${cursor.date}",and(date.eq."${cursor.date}",id.lt.${cursor.id})`);
+    const { data, error } = await q.order('date', { ascending: false }).order('id', { ascending: false }).limit(ACCOUNT_PATH_PAGE);
+    if (error || !data) throw new Error(`Could not collect account screenshots: ${error?.message ?? 'no data'}`);
+    if (data.length === 0) return paths;
+    for (const r of data as { id: unknown; date: unknown; screenshot_path: unknown }[]) {
+      if (typeof r.screenshot_path === 'string' && r.screenshot_path) paths.push(r.screenshot_path);
+    }
+    const last = data[data.length - 1] as { id: unknown; date: unknown };
+    const next = { date: String(last.date), id: String(last.id) };
+    if (cursor && cursor.date === next.date && cursor.id === next.id) throw new Error('Could not collect account screenshots: cursor stalled');
+    cursor = next;
+  }
+  throw new Error('Could not collect account screenshots: paging did not terminate');
+}
 
 export interface AccountRules {
   maxPositions?: number;
@@ -175,15 +206,26 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   },
   
   deleteAccount: async (id) => {
-    const { error } = await supabase
-      .from('accounts')
-      .delete()
-      .eq('id', id);
+    // L2a: collect the account's screenshot paths FIRST; a failure throws before anything is deleted.
+    const paths = await collectAccountScreenshotPaths(id);
+    const userId = useAuthStore.getState().user?.id;
+    const owned = userId ? paths.filter((p) => p.startsWith(`${userId}/`)) : []; // L2a: only {user.id}/ paths
+
+    const { error } = await supabase.from('accounts').delete().eq('id', id); // L2a: DB delete first
 
     if (error) {
       console.error('Error deleting account:', error);
+      // A coded error is a definitive rejection: storage is never touched. A code-less error
+      // (network/timeout) is ambiguous - the delete may have committed - so the paths are queued;
+      // retryOrphanQueue re-checks "not referenced" before removing anything.
+      const coded = typeof error.code === 'string' && error.code.trim() !== '';
+      if (!coded && userId) enqueueOrphanPaths(defaultQueueStore(), userId, owned); // L2a: code-less error is queued, never removed
       throw error;
     }
+
+    // DB delete succeeded: remove the images now; failures are queued, never thrown.
+    const { failedPaths } = await removeOrQueueStorageObjects(supabase.storage.from(SCREENSHOT_BUCKET), defaultQueueStore(), userId, owned);
+    if (failedPaths.length > 0) console.warn('Could not remove account screenshot(s) from storage; queued for cleanup:', failedPaths.length);
 
     const currentAccounts = get().accounts;
     const newAccounts = currentAccounts.filter(a => a.id !== id);

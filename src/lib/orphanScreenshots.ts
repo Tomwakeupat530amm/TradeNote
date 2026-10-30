@@ -8,8 +8,12 @@
  *   "not referenced by any trade/playbook" check BEFORE any `remove`.
  * - Orphan scan: list storage FIRST, then compute the in-use set (all trades of the user across all
  *   accounts, keyset paged, cross-checked against the DB count; mismatch or any query error cancels).
- *   Only names produced by `buildScreenshotPath` (`{userId}/{ms}-{8 hex}.{ext}`) are candidates,
- *   so avatars, `playbook_*` and legacy names are never deleted. Age >= 24h (`now` injected).
+ *   Only two strict name shapes under `{userId}/` are candidates: names produced by
+ *   `buildScreenshotPath` (`{ms}-{8 hex}.{ext}`) and the legacy upload names
+ *   (`{10-14 digits}.{png|jpg|jpeg|webp}`); avatars, `playbook_*` and anything else are never
+ *   deleted. Age >= 24h (`now` injected). The in-use set = trades.screenshot_path + playbook image_url
+ *   (legacy public URLs mapped to paths), so an in-use legacy file is never a candidate.
+ * - `removeOrQueueStorageObjects`: shared remove-then-queue-failures helper (trade + account stores).
  *
  * E15: ZERO runtime imports (plain Node type stripping can load this file, like screenshotStorage.ts).
  * The Supabase client and the legacy-URL mapper are injected by the caller.
@@ -31,7 +35,7 @@ export interface KeyValueStore {
 
 export interface StorageError {
   message?: string;
-  /** PostgREST / Postgres error code when present (e.g. '42703' undefined_column). */
+  /** PostgREST / Postgres error code when present. */
   code?: string;
 }
 
@@ -78,13 +82,16 @@ export class OrphanScanError extends Error {
 
 const USER_ID_RE = /^[0-9A-Za-z-]+$/;
 const TRADE_FILE_RE = /^\d{10,}-[0-9a-f]{8}\.[0-9a-z]+$/;
+/** L2b: legacy upload names (`{Date.now()}.{ext}`, before buildScreenshotPath). Strict: 10-14 digits, 4 image extensions, anchored. */
+const LEGACY_TRADE_FILE_RE = /^\d{10,14}\.(png|jpg|jpeg|webp)$/;
 
-/** True only for a trade screenshot name created by buildScreenshotPath under `{userId}/`. */
+/** True only for a trade screenshot name under `{userId}/`: buildScreenshotPath output or a strict legacy name. */
 export function isTradeScreenshotPath(path: unknown, userId: string): boolean {
   if (typeof path !== 'string' || !USER_ID_RE.test(userId)) return false;
   const prefix = `${userId}/`;
   if (!path.startsWith(prefix)) return false;
-  return TRADE_FILE_RE.test(path.slice(prefix.length));
+  const name = path.slice(prefix.length);
+  return TRADE_FILE_RE.test(name) || LEGACY_TRADE_FILE_RE.test(name);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -104,6 +111,22 @@ export async function removeStorageObjects(bucket: OrphanBucket, paths: readonly
       failedPaths.push(...batch);
     }
   }
+  return { failedPaths };
+}
+
+/**
+ * L2a: remove paths, queue the failed ones for `userId` (when given). Never throws; returns the
+ * failed paths so the caller can log. Shared by the trade and account stores (no store import cycle).
+ */
+export async function removeOrQueueStorageObjects(
+  bucket: OrphanBucket,
+  store: KeyValueStore | null,
+  userId: string | undefined,
+  paths: readonly string[],
+): Promise<{ failedPaths: string[] }> {
+  if (paths.length === 0) return { failedPaths: [] };
+  const { failedPaths } = await removeStorageObjects(bucket, paths);
+  if (failedPaths.length > 0 && userId) enqueueOrphanPaths(store, userId, failedPaths);
   return { failedPaths };
 }
 
@@ -198,17 +221,6 @@ export async function listUserObjects(client: OrphanClient, userId: string): Pro
   throw new OrphanScanError('storage list did not terminate');
 }
 
-/** Legacy column dropped by patch 090 (P7b). Read ONLY here, defensively, until the column is gone. */
-const LEGACY_URL_COLUMN = 'screenshot_url';
-
-/** True when the error says the legacy column does not exist (Postgres 42703 / PostgREST message). */
-export function isMissingLegacyColumn(error: StorageError | null | undefined): boolean {
-  if (!error) return false;
-  if (error.code === '42703') return true;
-  const msg = String(error.message ?? '');
-  return msg.includes(LEGACY_URL_COLUMN) && /does not exist/i.test(msg);
-}
-
 function addPath(set: Set<string>, value: unknown, mapLegacyUrl: LegacyUrlMapper): void {
   if (typeof value !== 'string' || !value) return;
   set.add(value);
@@ -225,32 +237,18 @@ export async function loadUsedPaths(client: OrphanClient, userId: string, mapLeg
   let seen = 0;
   let cursor: { date: string; id: string } | null = null;
   let finished = false;
-  // P7 E2 defence: while the legacy column still exists (patch 090 not applied), a row that has a
-  // legacy URL but no path keeps its file protected (mapped path joins the in-use set). After 090
-  // drops the column the select fails with 42703 -> fall back to path-only (the post-drop state).
-  // Any other error still cancels the scan.
-  let withLegacy = true;
+  // Patch 090 dropped the legacy URL column on PROD: the used set comes from screenshot_path only
+  // (plus playbook image_url below). Any query error cancels the scan.
   for (let page = 0; page < MAX_PAGES; page++) {
-    const pageQuery = (columns: string) => {
-      let q = client.from('trades').select(columns).eq('user_id', userId);
-      if (cursor) q = q.or(`date.lt."${cursor.date}",and(date.eq."${cursor.date}",id.lt.${cursor.id})`);
-      return q.order('date', { ascending: false }).order('id', { ascending: false }).limit(USED_PAGE_SIZE);
-    };
-    let res = await pageQuery(withLegacy ? `id, date, screenshot_path, ${LEGACY_URL_COLUMN}` : 'id, date, screenshot_path');
-    if (withLegacy && res.error && isMissingLegacyColumn(res.error)) {
-      withLegacy = false;
-      res = await pageQuery('id, date, screenshot_path');
-    }
-    const { data, error } = res;
+    let q = client.from('trades').select('id, date, screenshot_path').eq('user_id', userId);
+    if (cursor) q = q.or(`date.lt."${cursor.date}",and(date.eq."${cursor.date}",id.lt.${cursor.id})`);
+    const { data, error } = await q.order('date', { ascending: false }).order('id', { ascending: false }).limit(USED_PAGE_SIZE);
     if (error || !data) throw new OrphanScanError('trades query failed');
     if (data.length === 0) {
       finished = true;
       break;
     }
-    for (const r of data) {
-      addPath(used, r.screenshot_path, mapLegacyUrl);
-      if (withLegacy) addPath(used, r[LEGACY_URL_COLUMN], mapLegacyUrl);
-    }
+    for (const r of data) addPath(used, r.screenshot_path, mapLegacyUrl);
     seen += data.length;
     const last = data[data.length - 1];
     const next = { date: String(last.date), id: String(last.id) };

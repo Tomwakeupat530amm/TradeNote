@@ -34,7 +34,14 @@
     "risk_status_alert": "Cảnh báo rủi ro đang hoạt động - Chú ý",
     "risk_status_title": "Kỷ Luật & Bảo Vệ Rủi Ro",
     "sound_mute": "Tắt âm báo",
-    "sound_unmute": "Bật âm báo"
+    "sound_unmute": "Bật âm báo",
+    "aria_open_sidebar": "Mở thanh bên",
+    "kbd_ctrl": "Ctrl",
+    "aria_toggle_sound": "Bật/tắt âm thanh",
+    "tooltip_zen_shield": "Lá chắn kỷ luật & Hạ nhiệt Zen",
+    "aria_view_notifications": "Xem thông báo",
+    "avatar_alt": "Ảnh đại diện",
+    "aria_close_sidebar": "Đóng thanh bên"
   },
   "Sidebar": {
     "brand": "TradeNote",
@@ -108,7 +115,27 @@
     "avatar_failed": "Tải ảnh đại diện thất bại",
     "tag_added": "Đã thêm thẻ!",
     "privacy_enabled": "Đã bật chế độ riêng tư",
-    "privacy_disabled": "Đã tắt chế độ riêng tư"
+    "privacy_disabled": "Đã tắt chế độ riêng tư",
+    "avatar_alt": "Ảnh đại diện",
+    "display_name_placeholder": "vd: Nguyễn Văn A",
+    "currency_usd": "Đô la Mỹ",
+    "currency_eur": "Euro",
+    "currency_gbp": "Bảng Anh",
+    "currency_aud": "Đô la Úc",
+    "currency_cad": "Đô la Canada",
+    "currency_jpy": "Yên Nhật",
+    "tz_utc": "UTC (Giờ phối hợp quốc tế)",
+    "tz_new_york": "EST/EDT (New York)",
+    "tz_chicago": "CST/CDT (Chicago)",
+    "tz_denver": "MST/MDT (Denver)",
+    "tz_los_angeles": "PST/PDT (Los Angeles)",
+    "tz_london": "GMT/BST (London)",
+    "tz_berlin": "CET/CEST (Berlin)",
+    "tz_tokyo": "JST (Tokyo)",
+    "tz_ho_chi_minh": "ICT (TP. Hồ Chí Minh / Hà Nội)",
+    "tz_sydney": "AEST/AEDT (Sydney)",
+    "no_active_account": "Chưa chọn",
+    "session_missing": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
   },
   "Dashboard": {
     "welcome": "Chào mừng trở lại",
@@ -328,7 +355,8 @@
     "periodic_emotional_placeholder": "Trạng thái cảm xúc của bạn {type} này thế nào?",
     "what_went_well": "Điều gì đã làm tốt?",
     "improvement_placeholder": "Bạn mắc sai lầm ở đâu? Cần sửa gì cho lần sau?",
-    "save_periodic_review": "Lưu Đánh giá {type}"
+    "save_periodic_review": "Lưu Đánh giá {type}",
+    "loading_reviews": "Đang tải nhật ký đánh giá..."
   },
   "Accounts": {
     "title": "Tài khoản Giao dịch",
@@ -458,7 +486,7 @@
     "badge_loss_streak": "Cảnh Báo Chuỗi Lỗ",
     "text_loss_streak": "Đang có chuỗi -{count} lệnh thua. Hãy dừng lại 1-2 giờ, kích hoạt Hard Stop và rà soát checklist trước khi mở lệnh tiếp theo.",
     "badge_leak_warning": "Rò Rỉ Vốn Cần Vá",
-    "text_leak_warning": "Lỗi '{mistake}' đã làm thất thoát -${amount} ({count} lệnh thua). Khắc phục lỗi này sẽ bảo vệ một lượng vốn đáng kể!",
+    "text_leak_warning": "Lỗi ''{mistake}'' đã làm thất thoát -${amount} ({count} lệnh thua). Khắc phục lỗi này sẽ bảo vệ một lượng vốn đáng kể!",
     "badge_good_discipline": "Kỷ Luật Tốt",
     "text_good_discipline": "Tỷ lệ thắng {winRate}% với Profit Factor {profitFactor}. Kế hoạch giao dịch đang phát huy hiệu quả rất tốt!",
     "filter_all": "Tất cả",
@@ -589,7 +617,8 @@
   "EconomicCalendar": {
     "title": "Lịch Kinh tế Trực tiếp",
     "subtitle": "Theo dõi các sự kiện vĩ mô có tác động cao và chuẩn bị cho biến động.",
-    "showing_impact_events": "Hiển thị các sự kiện có tác động Trung bình (Cam) và Cao (Đỏ). Thời gian được tự động điều chỉnh theo múi giờ địa phương của bạn."
+    "showing_impact_events": "Hiển thị các sự kiện có tác động Trung bình (Cam) và Cao (Đỏ). Thời gian được tự động điều chỉnh theo múi giờ địa phương của bạn.",
+    "iframe_title": "Lịch kinh tế"
   },
   "TradeDetailsModal": {
     "edit_trade_log": "Chỉnh sửa Giao dịch",
@@ -623,7 +652,18 @@
     "clipboard_pasted": "Đã dán & nén ảnh chụp màn hình (tiết kiệm {ratio}%)!",
     "drag_drop_hint": "Kéo thả ảnh vào đây hoặc bấm Ctrl + V",
     "drop_active": "Thả tay để tải ảnh lên",
-    "paste_badge": "Đã tối ưu WebP"
+    "paste_badge": "Đã tối ưu WebP",
+    "zoomed_image_alt": "Ảnh setup giao dịch phóng to",
+    "a_plus_setup": "⭐ Setup A+",
+    "playbook_rules": "Quy tắc Playbook:",
+    "screenshot_alt": "Ảnh setup giao dịch",
+    "invalid_image": "Vui lòng tải lên một tệp ảnh hợp lệ.",
+    "screenshot_attached": "Đã đính kèm ảnh chụp!",
+    "screenshot_pasted": "Đã dán ảnh chụp thành công!",
+    "trade_updated": "Đã cập nhật lệnh thành công!",
+    "trade_update_failed": "Cập nhật lệnh thất bại.",
+    "pnl_risk_label": "PnL / Rủi ro",
+    "optimizing_screenshot": "Đang tối ưu ảnh chụp..."
   },
   "Common": {
     "success": "Thành công",
@@ -997,7 +1037,8 @@
     "search_hint_suffix": "hoặc tên trang...",
     "kbd_navigate": "Điều hướng",
     "kbd_select": "Chọn",
-    "kbd_close": "Đóng"
+    "kbd_close": "Đóng",
+    "spotlight_hub": "Trung tâm lệnh nhanh"
   },
   "Calculator": {
     "title": "Position Size Calculator",
@@ -1036,7 +1077,8 @@
     "asset_forex_point": "Pips (100k units)",
     "pt_val_futures": "1 pt = ${val}.00 / HĐ",
     "pt_val_gold": "$1.00 move = $100 / standard lot",
-    "pt_val_forex": "1 pip = $10 / standard lot"
+    "pt_val_forex": "1 pip = $10 / standard lot",
+    "account_1r_badge": "1R: ${risk} ({bullets} viên đạn)"
   },
   "PreMarket": {
     "widget_title": "Nghi Thức Kỷ Luật Trước Phiên",
@@ -1193,7 +1235,9 @@
     "sheet_review": "Sổ Đúc Kết & Tâm Lý",
     "sheet_economic": "Lịch Kinh Tế",
     "sheet_settings": "Cài Đặt Hệ Thống",
-    "sheet_logout": "Đăng Xuất"
+    "sheet_logout": "Đăng Xuất",
+    "aria_nav": "Điều hướng di động",
+    "aria_quick_log": "Ghi lệnh nhanh"
   },
   "JournalCards": {
     "view_table": "Bảng Chi Tiết",
@@ -1254,7 +1298,9 @@
     "quality_loss": "Rủi Ro Kiểm Soát (-1.0R)",
     "tab_metrics": "Thông Số Thực Thi",
     "tab_market_chart": "Biểu Đồ Thị Trường (TradingView)",
-    "chart_unavailable": "Biểu đồ trực tiếp không khả dụng ngoại tuyến."
+    "chart_unavailable": "Biểu đồ trực tiếp không khả dụng ngoại tuyến.",
+    "tradingview_link": "TradingView: {symbol}",
+    "quality_break_even": "Hòa vốn (0.00R)"
   },
   "MatrixAnalytics": {
     "section_title": "Ma Trận Tương Quan Đa Chiều",
@@ -1295,7 +1341,13 @@
     "leak_title": "Lỗ Hổng Cần Khắc Phục Nhất",
     "directive_title": "Chỉ Thị AI Coach Cho Phiên Kế Tiếp",
     "close_session_btn": "Đóng Sổ Phiên Giao Dịch",
-    "session_closed_toast": "Đã khóa và đóng sổ phiên giao dịch thành công trong danh dự!"
+    "session_closed_toast": "Đã khóa và đóng sổ phiên giao dịch thành công trong danh dự!",
+    "summary_line": "{trades} lệnh · Ròng: {net} ({r}R)",
+    "setup_label": "Setup: {setup}",
+    "setup_discretionary": "Tùy biến",
+    "setup_none": "Không có setup",
+    "no_mvp_trade": "Hôm nay chưa có lệnh thắng nổi bật.",
+    "no_leakage": "Không phát hiện vi phạm quy tắc nào hôm nay! Thực thi sạch."
   },
   "UserGuide": {
     "modal_title": "Sổ Tay Hướng Dẫn Sử Dụng TradeNote Pro",
@@ -1514,5 +1566,13 @@
     "title": "TradeNote - Nhật ký giao dịch Prop Firm",
     "titleTemplate": "%s | TradeNote",
     "description": "Nhật ký giao dịch cho prop firm với bộ máy rủi ro, Hard Stop và phân tích kỷ luật."
+  },
+  "TimezoneSuggestion": {
+    "title": "Múi giờ của bạn vẫn là UTC. Trình duyệt báo múi giờ {zone}.",
+    "warning": "Đổi múi giờ sẽ dời ranh giới \"ngày giao dịch\" dùng cho drawdown cuối ngày và Hard Stop. Các ngày đã tính trước đó không được tính lại. Không có gì thay đổi cho tới khi bạn áp dụng.",
+    "apply": "Dùng {zone}",
+    "keep_utc": "Giữ UTC",
+    "applied": "Đã đặt múi giờ thành {zone}.",
+    "apply_failed": "Không cập nhật được múi giờ. Vui lòng thử lại."
   }
 }

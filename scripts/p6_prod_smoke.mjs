@@ -300,10 +300,10 @@ async function suiteDryrun(db) {
          UNION SELECT regexp_replace(image_url, '^.*/${BUCKET}/', '') FROM public.playbooks WHERE image_url IS NOT NULL
        )
        SELECT o.name, o.created_at, o.owner_dir,
-              (o.name ~ '^[0-9A-Za-z-]+/[0-9]{10,}-[0-9a-f]{8}\\.[0-9a-z]+$') AS allow_listed,
+              (o.name ~ '^[0-9A-Za-z-]+/([0-9]{10,}-[0-9a-f]{8}\\.[0-9a-z]+|[0-9]{10,14}\\.(png|jpg|jpeg|webp))$') AS allow_listed,
               EXISTS (SELECT 1 FROM used u WHERE u.p = o.name) AS in_use,
               (o.created_at < now() - interval '24 hours') AS old_enough,
-              ((o.name ~ '^[0-9A-Za-z-]+/[0-9]{10,}-[0-9a-f]{8}\\.[0-9a-z]+$')
+              ((o.name ~ '^[0-9A-Za-z-]+/([0-9]{10,}-[0-9a-f]{8}\\.[0-9a-z]+|[0-9]{10,14}\\.(png|jpg|jpeg|webp))$')
                 AND NOT EXISTS (SELECT 1 FROM used u WHERE u.p = o.name)
                 AND o.created_at < now() - interval '24 hours') AS candidate
        FROM objs o
@@ -324,7 +324,7 @@ async function suiteDryrun(db) {
       if (row.p) usedSet.add(String(row.p));
       if (row.u) { const i = String(row.u).indexOf(marker); usedSet.add(i >= 0 ? String(row.u).slice(i + marker.length) : String(row.u)); }
     }
-    const allowRe = /^[0-9A-Za-z-]+\/[0-9]{10,}-[0-9a-f]{8}\.[0-9a-z]+$/;
+    const allowRe = /^[0-9A-Za-z-]+\/([0-9]{10,}-[0-9a-f]{8}\.[0-9a-z]+|[0-9]{10,14}\.(png|jpg|jpeg|webp))$/;
     let candidates = 0;
     let badCandidates = 0;
     log(`dry-run: ${r.rows.length} object(s) in bucket (real users, read-only); independent used set=${usedSet.size}`);

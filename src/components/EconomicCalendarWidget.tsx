@@ -1,6 +1,6 @@
 "use client";
 
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 interface EconomicCalendarWidgetProps {
   height?: number | string;
@@ -9,6 +9,7 @@ interface EconomicCalendarWidgetProps {
 
 export function EconomicCalendarWidget({ height = 500, importanceFilter = "0,1" }: EconomicCalendarWidgetProps) {
   const locale = useLocale();
+  const t = useTranslations("EconomicCalendar");
 
   // Use srcDoc iframe to completely isolate the TradingView widget from React's lifecycle.
   // This prevents the "contentWindow is not available" error caused by the component unmounting
@@ -46,7 +47,7 @@ export function EconomicCalendarWidget({ height = 500, importanceFilter = "0,1" 
       <iframe
         srcDoc={srcDoc}
         style={{ width: "100%", height: "100%", border: "none" }}
-        title="Economic Calendar"
+        title={t("iframe_title")}
       />
     </div>
   );

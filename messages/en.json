@@ -34,7 +34,14 @@
     "risk_status_alert": "Active Risk Alert - Pay Attention",
     "risk_status_title": "Discipline & Risk Guard",
     "sound_mute": "Mute audio cues",
-    "sound_unmute": "Unmute audio cues"
+    "sound_unmute": "Unmute audio cues",
+    "aria_open_sidebar": "Open sidebar",
+    "kbd_ctrl": "Ctrl",
+    "aria_toggle_sound": "Toggle sound",
+    "tooltip_zen_shield": "Discipline Shield & Zen Cool-Down",
+    "aria_view_notifications": "View notifications",
+    "avatar_alt": "Avatar",
+    "aria_close_sidebar": "Close sidebar"
   },
   "Sidebar": {
     "brand": "TradeNote",
@@ -108,7 +115,27 @@
     "avatar_failed": "Failed to upload avatar",
     "tag_added": "Tag added!",
     "privacy_enabled": "Privacy mode enabled",
-    "privacy_disabled": "Privacy mode disabled"
+    "privacy_disabled": "Privacy mode disabled",
+    "avatar_alt": "Avatar",
+    "display_name_placeholder": "e.g. John Doe",
+    "currency_usd": "US Dollar",
+    "currency_eur": "Euro",
+    "currency_gbp": "British Pound",
+    "currency_aud": "Australian Dollar",
+    "currency_cad": "Canadian Dollar",
+    "currency_jpy": "Japanese Yen",
+    "tz_utc": "UTC (Coordinated Universal Time)",
+    "tz_new_york": "EST/EDT (New York)",
+    "tz_chicago": "CST/CDT (Chicago)",
+    "tz_denver": "MST/MDT (Denver)",
+    "tz_los_angeles": "PST/PDT (Los Angeles)",
+    "tz_london": "GMT/BST (London)",
+    "tz_berlin": "CET/CEST (Berlin)",
+    "tz_tokyo": "JST (Tokyo)",
+    "tz_ho_chi_minh": "ICT (Ho Chi Minh / Hanoi)",
+    "tz_sydney": "AEST/AEDT (Sydney)",
+    "no_active_account": "None",
+    "session_missing": "Your session has expired. Please log in again."
   },
   "Dashboard": {
     "welcome": "Welcome back",
@@ -328,7 +355,8 @@
     "periodic_emotional_placeholder": "How was your emotional state this {type}?",
     "what_went_well": "What went well?",
     "improvement_placeholder": "Where did you slip up? What to fix next time?",
-    "save_periodic_review": "Save {type} Review"
+    "save_periodic_review": "Save {type} Review",
+    "loading_reviews": "Loading reviews..."
   },
   "Accounts": {
     "title": "Trading Accounts",
@@ -458,7 +486,7 @@
     "badge_loss_streak": "Loss Streak Alert",
     "text_loss_streak": "Currently in a streak of -{count} losses. Take a 1-2 hour break, activate your Hard Stop, and review checklists before entering again.",
     "badge_leak_warning": "Capital Leak Detected",
-    "text_leak_warning": "Mistake '{mistake}' cost you -${amount} across {count} losing trades. Eliminating this leak will protect significant capital!",
+    "text_leak_warning": "Mistake ''{mistake}'' cost you -${amount} across {count} losing trades. Eliminating this leak will protect significant capital!",
     "badge_good_discipline": "Solid Discipline",
     "text_good_discipline": "Win rate {winRate}% with Profit Factor {profitFactor}. Your execution plan is working effectively!",
     "filter_all": "All Time",
@@ -589,7 +617,8 @@
   "EconomicCalendar": {
     "title": "Live Economic Calendar",
     "subtitle": "Track high-impact macroeconomic events and prepare for market volatility.",
-    "showing_impact_events": "Showing Medium (Orange) and High (Red) impact events. Times are automatically adjusted to your local timezone."
+    "showing_impact_events": "Showing Medium (Orange) and High (Red) impact events. Times are automatically adjusted to your local timezone.",
+    "iframe_title": "Economic Calendar"
   },
   "TradeDetailsModal": {
     "edit_trade_log": "Edit Trade Log",
@@ -623,7 +652,18 @@
     "clipboard_pasted": "Screenshot pasted & compressed ({ratio}% saved)!",
     "drag_drop_hint": "Drop image here or press Ctrl + V",
     "drop_active": "Release to attach screenshot",
-    "paste_badge": "Optimized WebP"
+    "paste_badge": "Optimized WebP",
+    "zoomed_image_alt": "Zoomed trade setup",
+    "a_plus_setup": "⭐ A+ Setup",
+    "playbook_rules": "Playbook Rules:",
+    "screenshot_alt": "Trade setup",
+    "invalid_image": "Please upload a valid image file.",
+    "screenshot_attached": "Screenshot attached!",
+    "screenshot_pasted": "Screenshot pasted successfully!",
+    "trade_updated": "Trade updated successfully!",
+    "trade_update_failed": "Failed to update trade.",
+    "pnl_risk_label": "PnL / Risk",
+    "optimizing_screenshot": "Optimizing screenshot..."
   },
   "Common": {
     "success": "Success",
@@ -997,7 +1037,8 @@
     "search_hint_suffix": "or page names...",
     "kbd_navigate": "Navigate",
     "kbd_select": "Select",
-    "kbd_close": "Close"
+    "kbd_close": "Close",
+    "spotlight_hub": "Spotlight Command Hub"
   },
   "Calculator": {
     "title": "Position Size Calculator",
@@ -1036,7 +1077,8 @@
     "asset_forex_point": "Pips (100k units)",
     "pt_val_futures": "1 pt = ${val}.00 / contract",
     "pt_val_gold": "$1.00 move = $100 / standard lot",
-    "pt_val_forex": "1 pip = $10 / standard lot"
+    "pt_val_forex": "1 pip = $10 / standard lot",
+    "account_1r_badge": "1R: ${risk} ({bullets} Bullets)"
   },
   "PreMarket": {
     "widget_title": "Pre-Market Discipline Routine",
@@ -1193,7 +1235,9 @@
     "sheet_review": "Daily Review & Mindset",
     "sheet_economic": "Economic Calendar",
     "sheet_settings": "App Settings",
-    "sheet_logout": "Sign Out"
+    "sheet_logout": "Sign Out",
+    "aria_nav": "Mobile navigation",
+    "aria_quick_log": "Quick log trade"
   },
   "JournalCards": {
     "view_table": "Detailed Table",
@@ -1254,7 +1298,9 @@
     "quality_loss": "Risk Contained (-1.0R)",
     "tab_metrics": "Execution Metrics",
     "tab_market_chart": "Market Chart (TradingView)",
-    "chart_unavailable": "Interactive chart unavailable offline."
+    "chart_unavailable": "Interactive chart unavailable offline.",
+    "tradingview_link": "TradingView: {symbol}",
+    "quality_break_even": "Break Even (0.00R)"
   },
   "MatrixAnalytics": {
     "section_title": "Deep Correlation Matrix",
@@ -1295,7 +1341,13 @@
     "leak_title": "Top Leak of the Day",
     "directive_title": "AI Coach Directive for Tomorrow",
     "close_session_btn": "Close Trading Day",
-    "session_closed_toast": "Trading session locked and completed with honor!"
+    "session_closed_toast": "Trading session locked and completed with honor!",
+    "summary_line": "{trades} Trades · Net: {net} ({r}R)",
+    "setup_label": "Setup: {setup}",
+    "setup_discretionary": "Discretionary",
+    "setup_none": "No Setup",
+    "no_mvp_trade": "No standout winning trade recorded today.",
+    "no_leakage": "Zero rule leakages detected today! Execution clean."
   },
   "UserGuide": {
     "modal_title": "TradeNote Pro User Handbook & Guide",
@@ -1514,5 +1566,13 @@
     "title": "TradeNote - Prop Firm Trading Journal",
     "titleTemplate": "%s | TradeNote",
     "description": "Prop firm trading journal with risk engine, Hard Stop and discipline analytics."
+  },
+  "TimezoneSuggestion": {
+    "title": "Your timezone is still UTC. Your browser reports {zone}.",
+    "warning": "Changing the timezone moves the trading-day boundary used by end-of-day drawdown and the Hard Stop. Days already calculated are not recomputed. Nothing changes until you apply.",
+    "apply": "Use {zone}",
+    "keep_utc": "Keep UTC",
+    "applied": "Timezone set to {zone}.",
+    "apply_failed": "Could not update the timezone. Please try again."
   }
 }

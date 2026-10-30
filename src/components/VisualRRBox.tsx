@@ -67,7 +67,7 @@ export function VisualRRBox({ rMultiple, pnl, riskAmount, result }: VisualRRBoxP
           {calculatedR >= 1.5 && calculatedR < 2.0 && t("quality_good")}
           {isWin && calculatedR < 1.5 && t("quality_suboptimal")}
           {isLoss && t("quality_loss")}
-          {isBE && "Break Even (0.00R)"}
+          {isBE && t("quality_break_even")}
         </span>
       </div>
 

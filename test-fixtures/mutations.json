@@ -370,11 +370,11 @@
       "test": "src/lib/__tests__/i18nScan.test.ts"
     },
     {
-      "id": "P7-M5-legacy-url-not-protected",
-      "description": "P7 (E2 defence): before patch 090 the legacy screenshot URL of a row without a path is no longer added to the in-use set, so its file becomes an orphan candidate",
+      "id": "P8-M1-used-set-drops-screenshot-path",
+      "description": "L1 (replaces P7-M5): the used set no longer includes trades.screenshot_path, so in-use trade files become orphan candidates",
       "file": "src/lib/orphanScreenshots.ts",
-      "find": "      if (withLegacy) addPath(used, r[LEGACY_URL_COLUMN], mapLegacyUrl);\n",
-      "replace": "",
+      "find": "    for (const r of data) addPath(used, r.screenshot_path, mapLegacyUrl);\n",
+      "replace": "    for (const r of data) void r;\n",
       "test": "src/lib/__tests__/orphanScreenshots.test.ts"
     },
     {
@@ -408,6 +408,78 @@
       "find": "    if (precheck) {\n",
       "replace": "    if (false && precheck) {\n",
       "test": "src/lib/__tests__/p7ProdApplyPrecheck.test.ts"
+    },
+    {
+      "id": "P8-M2-legacy-regex-widened",
+      "description": "L2b: the legacy name bound is widened (10-14 digits -> any digits), so 9/15-digit names become candidates",
+      "file": "src/lib/orphanScreenshots.ts",
+      "find": "const LEGACY_TRADE_FILE_RE = /^\\d{10,14}\\.(png|jpg|jpeg|webp)$/;",
+      "replace": "const LEGACY_TRADE_FILE_RE = /^\\d{1,}\\.(png|jpg|jpeg|webp)$/;",
+      "test": "src/lib/__tests__/orphanScreenshots.test.ts"
+    },
+    {
+      "id": "P8-M3-legacy-regex-no-end-anchor",
+      "description": "L2b: the legacy regex loses its `$` anchor, so `{ms}.png.bak` becomes a candidate",
+      "file": "src/lib/orphanScreenshots.ts",
+      "find": "const LEGACY_TRADE_FILE_RE = /^\\d{10,14}\\.(png|jpg|jpeg|webp)$/;",
+      "replace": "const LEGACY_TRADE_FILE_RE = /^\\d{10,14}\\.(png|jpg|jpeg|webp)/;",
+      "test": "src/lib/__tests__/orphanScreenshots.test.ts"
+    },
+    {
+      "id": "P8-M4-legacy-bypasses-used-set",
+      "description": "L2b: a legacy-named file skips the in-use check, so an in-use legacy file (PROD owner1) becomes a candidate",
+      "file": "src/lib/orphanScreenshots.ts",
+      "find": "    if (usedPaths.has(obj.path)) continue;\n",
+      "replace": "    if (usedPaths.has(obj.path) && !LEGACY_TRADE_FILE_RE.test(obj.path.slice(userId.length + 1))) continue;\n",
+      "test": "src/lib/__tests__/orphanScreenshots.test.ts"
+    },
+    {
+      "id": "P8-M5-account-storage-before-db",
+      "description": "L2a: deleteAccount removes the images BEFORE the DB delete, so a failed delete leaves trades with missing images",
+      "file": "src/store/useAccountStore.ts",
+      "find": "    const { error } = await supabase.from('accounts').delete().eq('id', id); // L2a: DB delete first\n",
+      "replace": "    await removeOrQueueStorageObjects(supabase.storage.from(SCREENSHOT_BUCKET), defaultQueueStore(), userId, owned);\n    const { error } = await supabase.from('accounts').delete().eq('id', id);\n",
+      "test": "src/store/__tests__/accountDeleteStorage.test.ts"
+    },
+    {
+      "id": "P8-M6-account-prefix-filter-dropped",
+      "description": "L2a: deleteAccount no longer keeps only `{user.id}/` paths, so foreign or non-user paths are sent to storage remove",
+      "file": "src/store/useAccountStore.ts",
+      "find": "    const owned = userId ? paths.filter((p) => p.startsWith(`${userId}/`)) : []; // L2a: only {user.id}/ paths\n",
+      "replace": "    const owned = paths;\n",
+      "test": "src/store/__tests__/accountDeleteStorage.test.ts"
+    },
+    {
+      "id": "P8-M7-account-codeless-error-removes",
+      "description": "L2a: a code-less (network) DB error removes the images directly instead of queueing them, although the delete may not have committed",
+      "file": "src/store/useAccountStore.ts",
+      "find": "      if (!coded && userId) enqueueOrphanPaths(defaultQueueStore(), userId, owned); // L2a: code-less error is queued, never removed\n",
+      "replace": "      if (!coded && userId) await removeOrQueueStorageObjects(supabase.storage.from(SCREENSHOT_BUCKET), defaultQueueStore(), userId, owned);\n",
+      "test": "src/store/__tests__/accountDeleteStorage.test.ts"
+    },
+    {
+      "id": "P8-M8-tz-suggest-any-saved-zone",
+      "description": "L4: shouldSuggestTimezone drops the saved === \"UTC\" condition, so users with a chosen zone are nagged",
+      "file": "src/lib/timezoneSuggestion.ts",
+      "find": "  if (saved !== \"UTC\") return false;\n",
+      "replace": "  if (saved === \"__never__\") return false;\n",
+      "test": "src/lib/__tests__/timezoneSuggestion.test.ts"
+    },
+    {
+      "id": "P8-M9-tz-banner-dismiss-on-error",
+      "description": "L4: a failed Apply marks the suggestion as dismissed, so the user never sees it again although nothing was saved",
+      "file": "src/components/TimezoneSuggestionBanner.tsx",
+      "find": "        toast.error(t(\"apply_failed\"));\n",
+      "replace": "        toast.error(t(\"apply_failed\"));\n        writeDismissed(userId, browser);\n",
+      "test": "src/components/__tests__/timezoneSuggestionBanner.test.tsx"
+    },
+    {
+      "id": "P8-M10-i18n-new-key-missing-vi",
+      "description": "L3: a key extracted by the closeout (MobileNav.aria_quick_log) disappears from vi, so the raw key path is shown",
+      "file": "messages/vi.json",
+      "find": "    \"aria_quick_log\": \"Ghi lệnh nhanh\"",
+      "replace": "    \"aria_quick_log_removed\": \"Ghi lệnh nhanh\"",
+      "test": "src/lib/__tests__/messagesIcu.test.ts"
     }
   ]
 }

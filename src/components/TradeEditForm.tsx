@@ -74,7 +74,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
   // Core image processor (Ultra-fast WebP compression)
   const processImageFile = useCallback(async (file: File | Blob) => {
     if (!file.type.startsWith("image/")) {
-      toast.error("Please upload a valid image file.");
+      toast.error(t("invalid_image"));
       return;
     }
     setIsProcessingImage(true);
@@ -86,14 +86,14 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
       if (res.ratioPercent > 0) {
         toast.success(t("clipboard_pasted", { ratio: res.ratioPercent }));
       } else {
-        toast.success("Screenshot attached!");
+        toast.success(t("screenshot_attached"));
       }
     } catch {
       const reader = new FileReader();
       reader.onload = (event) => {
         setScreenshot(event.target?.result as string);
         setScreenshotRemoved(false);
-        toast.success("Screenshot pasted successfully!");
+        toast.success(t("screenshot_pasted"));
       };
       reader.readAsDataURL(file);
     } finally {
@@ -169,7 +169,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
             ? null
             : (screenshot && screenshot.startsWith("data:") ? screenshot : undefined),
         });
-        toast.success("Trade updated successfully!");
+        toast.success(t("trade_updated"));
         onSaved();
         return;
       }
@@ -190,7 +190,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
           ? null
           : (screenshot && screenshot.startsWith("data:") ? screenshot : undefined),
       });
-      toast.success("Trade updated successfully!");
+      toast.success(t("trade_updated"));
       onSaved();
     } catch (err) {
       // Save failed: keep the form open with every entered value.
@@ -199,7 +199,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
       } else if (err instanceof SaveTradeError) {
         toast.error(tTrade("saveError.failed", { detail: err.detail }));
       } else {
-        toast.error("Failed to update trade.");
+        toast.error(t("trade_update_failed"));
       }
     } finally {
       setSaving(false);
@@ -280,7 +280,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
               "bg-white/5 border-white/10 text-gray-400"
             )}>
               <span>{calculatedR == null ? tRisk("noRiskSet") : calculatedR > 0 ? `+${calculatedR}R` : `${calculatedR}R`}</span>
-              <span className="text-xs text-gray-500 font-normal">PnL / Risk</span>
+              <span className="text-xs text-gray-500 font-normal">{t("pnl_risk_label")}</span>
             </div>
           </div>
 
@@ -428,7 +428,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
           {isProcessingImage ? (
             <div className="flex flex-col items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 h-[120px] p-3 text-center text-emerald-300 animate-pulse">
               <Loader2 className="w-5 h-5 animate-spin text-emerald-400 mb-1" />
-              <span className="text-xs font-semibold">Optimizing screenshot...</span>
+              <span className="text-xs font-semibold">{t("optimizing_screenshot")}</span>
             </div>
           ) : screenshot || (screenshotPath && !screenshotRemoved) ? (
             <div 
@@ -439,7 +439,7 @@ export function TradeEditForm({ trade, onCancel, onSaved, setZoomImageSrc, isOpe
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={previewSrc}
-                  alt="Trade setup"
+                  alt={t("screenshot_alt")}
                   className="w-full h-full object-cover transition-transform group-hover:scale-105"
                 />
               ) : signedShot.error ? (

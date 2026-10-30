@@ -14,6 +14,21 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useTranslations } from "next-intl";
 import OrphanCleanupCard from "@/components/OrphanCleanupCard";
+import TimezoneSuggestionBanner from "@/components/TimezoneSuggestionBanner";
+
+const CURRENCY_OPTIONS = ["USD", "EUR", "GBP", "AUD", "CAD", "JPY"] as const;
+const TIMEZONE_OPTIONS = [
+  { value: "UTC", key: "tz_utc" },
+  { value: "America/New_York", key: "tz_new_york" },
+  { value: "America/Chicago", key: "tz_chicago" },
+  { value: "America/Denver", key: "tz_denver" },
+  { value: "America/Los_Angeles", key: "tz_los_angeles" },
+  { value: "Europe/London", key: "tz_london" },
+  { value: "Europe/Berlin", key: "tz_berlin" },
+  { value: "Asia/Tokyo", key: "tz_tokyo" },
+  { value: "Asia/Ho_Chi_Minh", key: "tz_ho_chi_minh" },
+  { value: "Australia/Sydney", key: "tz_sydney" },
+] as const;
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -328,6 +343,7 @@ export default function SettingsPage() {
           {/* PROFILE TAB */}
           {activeTab === "profile" && (
             <div className="space-y-6">
+              <TimezoneSuggestionBanner userId={user?.id} savedTimezone={preferences?.timezone} />
               {/* Basic Info & Trading Preferences */}
               <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 sm:p-8">
                 <div className="mb-6 flex items-center justify-between">
@@ -339,7 +355,7 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-4">
                     <div className="h-16 w-16 rounded-full bg-gray-800 overflow-hidden border border-gray-700">
                       {preferences?.avatarUrl ? (
-                        <img src={preferences.avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+                        <img src={preferences.avatarUrl} alt={t("avatar_alt")} className="h-full w-full object-cover" />
                       ) : (
                         <div className="h-full w-full flex items-center justify-center text-gray-500">
                           <User className="w-8 h-8" />
@@ -368,7 +384,7 @@ export default function SettingsPage() {
                         type="text"
                         value={displayName}
                         onChange={(e) => setDisplayName(e.target.value)}
-                        placeholder="e.g. John Doe"
+                        placeholder={t("display_name_placeholder")}
                         className="mt-2 block w-full rounded-xl border-0 bg-white/5 py-2.5 px-4 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-green-500 sm:text-sm"
                       />
                     </div>
@@ -379,12 +395,9 @@ export default function SettingsPage() {
                         onChange={(e) => setBaseCurrency(e.target.value)}
                         className="mt-2 block w-full rounded-xl border-0 bg-gray-800 py-2.5 px-4 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-green-500 sm:text-sm [&>option]:bg-gray-900"
                       >
-                        <option value="USD">USD - US Dollar</option>
-                        <option value="EUR">EUR - Euro</option>
-                        <option value="GBP">GBP - British Pound</option>
-                        <option value="AUD">AUD - Australian Dollar</option>
-                        <option value="CAD">CAD - Canadian Dollar</option>
-                        <option value="JPY">JPY - Japanese Yen</option>
+                        {CURRENCY_OPTIONS.map((code) => (
+                          <option key={code} value={code}>{code} - {t(`currency_${code.toLowerCase()}`)}</option>
+                        ))}
                       </select>
                     </div>
                     <div className="sm:col-span-2">
@@ -394,16 +407,12 @@ export default function SettingsPage() {
                         onChange={(e) => setTimezone(e.target.value)}
                         className="mt-2 block w-full rounded-xl border-0 bg-gray-800 py-2.5 px-4 text-white ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-green-500 sm:text-sm [&>option]:bg-gray-900"
                       >
-                        <option value="UTC">UTC (Coordinated Universal Time)</option>
-                        <option value="America/New_York">EST/EDT (New York)</option>
-                        <option value="America/Chicago">CST/CDT (Chicago)</option>
-                        <option value="America/Denver">MST/MDT (Denver)</option>
-                        <option value="America/Los_Angeles">PST/PDT (Los Angeles)</option>
-                        <option value="Europe/London">GMT/BST (London)</option>
-                        <option value="Europe/Berlin">CET/CEST (Berlin)</option>
-                        <option value="Asia/Tokyo">JST (Tokyo)</option>
-                        <option value="Asia/Ho_Chi_Minh">ICT (Ho Chi Minh / Hanoi)</option>
-                        <option value="Australia/Sydney">AEST/AEDT (Sydney)</option>
+                        {!TIMEZONE_OPTIONS.some((o) => o.value === timezone) && (
+                          <option value={timezone}>{timezone}</option>
+                        )}
+                        {TIMEZONE_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{t(o.key)}</option>
+                        ))}
                       </select>
                       <p className="mt-2 text-xs text-gray-500">{t("timezone_desc")}</p>
                     </div>
@@ -491,7 +500,7 @@ export default function SettingsPage() {
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-white">{t("risk_title")}</h3>
                 <p className="text-sm text-gray-400 mt-1">
-                  {t("risk_desc")}<span className="text-green-400 font-medium">{activeAccount?.name || 'None'}</span>
+                  {t("risk_desc")}<span className="text-green-400 font-medium">{activeAccount?.name || t("no_active_account")}</span>
                 </p>
               </div>
 

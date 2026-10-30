@@ -572,7 +572,7 @@ export function CommandPaletteModal({
                 </span>
               </div>
               <div className="hidden sm:block text-[11px] text-gray-500">
-                <span>Spotlight Command Hub</span>
+                <span>{t("spotlight_hub")}</span>
               </div>
             </div>
           </motion.div>

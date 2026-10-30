@@ -4735,6 +4735,146 @@ it("44c: p7_prod_apply.mjs passes node --check and still refuses (exit 2) withou
 });
 // ===== END Section 44 =====
 
+// ===== BEGIN Section 45 (closeout G1: L1 legacy defence removed, L2a deleteAccount storage, L2b legacy names) =====
+console.log("\n--- Section 45: closeout G1 (orphan tool legacy names, deleteAccount DB-first storage cleanup) ---");
+
+it("45a: L1 - orphanScreenshots.ts has no legacy column defence left (no screenshot_url, no 42703 fallback)", () => {
+  const code = s40Read('src/lib/orphanScreenshots.ts');
+  assert.ok(!/screenshot_url|screenshotUrl|LEGACY_URL_COLUMN|isMissingLegacyColumn|withLegacy|42703/.test(code), 'legacy defence removed');
+  assert.ok(code.includes(".select('id, date, screenshot_path')"), 'used set selects path only');
+  assert.ok(!/legacy names are never deleted/.test(code), 'header comment updated');
+});
+
+it("45b: L2b - strict legacy regex is the only widening of the allow-list (10-14 digits, 4 extensions, anchored)", () => {
+  const code = s40Read('src/lib/orphanScreenshots.ts');
+  assert.ok(code.includes('const LEGACY_TRADE_FILE_RE = /^\\d{10,14}\\.(png|jpg|jpeg|webp)$/;'), 'legacy regex literal');
+  assert.ok(code.includes('return TRADE_FILE_RE.test(name) || LEGACY_TRADE_FILE_RE.test(name);'), 'allow-list = new OR legacy');
+  assert.ok(code.includes('    if (usedPaths.has(obj.path)) continue;\n'), 'used-set check applies to every allow-listed name');
+});
+
+it("45c: L2b - the three p6_prod_smoke allow-list sites carry the same legacy alternative (no new $n placeholder)", () => {
+  const code = s40Read('scripts/p6_prod_smoke.mjs');
+  const sqlAlt = "'^[0-9A-Za-z-]+/([0-9]{10,}-[0-9a-f]{8}\\\\.[0-9a-z]+|[0-9]{10,14}\\\\.(png|jpg|jpeg|webp))$'";
+  assert.strictEqual(code.split(sqlAlt).length - 1, 2, 'two SQL sites (allow_listed, candidate)');
+  assert.ok(code.includes('const allowRe = /^[0-9A-Za-z-]+\\/([0-9]{10,}-[0-9a-f]{8}\\.[0-9a-z]+|[0-9]{10,14}\\.(png|jpg|jpeg|webp))$/;'), 'JS allowRe site');
+  const allowRe = /^[0-9A-Za-z-]+\/([0-9]{10,}-[0-9a-f]{8}\.[0-9a-z]+|[0-9]{10,14}\.(png|jpg|jpeg|webp))$/;
+  assert.ok(allowRe.test('u-1/1782538922182.png') && allowRe.test('u-1/1700000000000-aabbccdd.webp'), 'legacy + new accepted');
+  for (const bad of ['u-1/1782538922182.png.bak', 'u-1/178253892.png', 'u-1/178253892218234.png', 'u-1/avatar.png', 'u-1/playbook_1782538922182.png', 'u-1/1782538922182.gif']) {
+    assert.ok(!allowRe.test(bad), `rejected: ${bad}`);
+  }
+});
+
+it("45d: L2a - deleteAccount collects paths, then deletes the DB row, then cleans storage (prefix-filtered; code-less error queued)", () => {
+  const code = s40Read('src/store/useAccountStore.ts');
+  const fn = code.slice(code.indexOf('deleteAccount: async (id) => {'));
+  const iCollect = fn.indexOf('await collectAccountScreenshotPaths(id);');
+  const iPrefix = fn.indexOf('// L2a: only {user.id}/ paths');
+  const iDb = fn.indexOf('// L2a: DB delete first');
+  const iQueue = fn.indexOf('// L2a: code-less error is queued, never removed');
+  const iRemove = fn.indexOf('await removeOrQueueStorageObjects(');
+  assert.ok(iCollect >= 0 && iCollect < iPrefix && iPrefix < iDb && iDb < iQueue && iQueue < iRemove, 'collect < prefix filter < DB delete < queue-on-error < storage remove');
+  assert.ok(code.includes(".select('id, date, screenshot_path').eq('account_id', accountId)"), 'account-scoped keyset select');
+  assert.ok(code.includes('const ACCOUNT_PATH_PAGE = 500;') && code.includes('if (data.length === 0) return paths;'), 'page 500, stop on empty page');
+  assert.ok(!/from ['"]\.\/useTradeStore['"]/.test(code), 'no useTradeStore import (no cycle)');
+  const trade = s40Read('src/store/useTradeStore.ts');
+  assert.ok(trade.includes('async function removeScreenshotsOrQueue(userId: string | undefined, paths: string[]): Promise<void> {'), 'trade-store wrapper signature kept (P6-M1)');
+});
+
+it("45e: mutations.json - 57 mutants, P7-M5 replaced by P8-M1, P8-M1..M7 present", () => {
+  const d = JSON.parse(s40Read('test-fixtures/mutations.json'));
+  const ids = d.mutants.map((m) => m.id);
+  assert.ok(ids.length >= 57, 'mutant total (exact total pinned in 46f)');
+  assert.ok(!ids.includes('P7-M5-legacy-url-not-protected'), 'P7-M5 removed');
+  for (let i = 1; i <= 7; i++) assert.ok(ids.some((x) => x.startsWith(`P8-M${i}-`)), `P8-M${i} present`);
+  assert.strictEqual(new Set(ids).size, ids.length, 'unique ids');
+});
+// ===== END Section 45 =====
+
+// ===== Section 46: closeout final merge - L3 i18n extraction + L4 timezone suggestion (static) =====
+const S46_HARNESS = path.resolve(S40_ROOT, '..', 'process', 'general-plans', 'active', 'remaining-limitations-closeout_30-10-26', 'harness');
+const s46Flat = (o, p = '') => Object.entries(o).flatMap(([k, v]) => (v && typeof v === 'object' ? s46Flat(v, `${p}${k}.`) : [`${p}${k}`]));
+const s46En = JSON.parse(s40Read('messages/en.json'));
+const s46Vi = JSON.parse(s40Read('messages/vi.json'));
+
+const s46Scan = await import(new URL('./i18n_hardcoded_scan.mjs', import.meta.url).href);
+it("46a: L3 - allow-list <= 40 entries and raw findings <= 215", () => {
+  const scan = s46Scan;
+  const list = scan.loadAllowlist();
+  const findings = scan.scanProject();
+  assert.ok(list.length <= 40, `allow-list entries ${list.length} <= 40`);
+  assert.ok(findings.length <= 215, `findings ${findings.length} <= 215`);
+  assert.strictEqual(scan.applyAllowlist(findings, list).length, 0, 'nothing outside the allow-list');
+});
+
+it("46b: L3/L4 - every key handed over by G2/G3 exists in both locales with identical ICU placeholders", () => {
+  const files = ['i18n-G2.json', 'i18n-G3.json'].map((f) => path.join(S46_HARNESS, f)).filter((f) => fs.existsSync(f));
+  const keys = [];
+  for (const f of files) {
+    const h = JSON.parse(fs.readFileSync(f, 'utf8'));
+    for (const [ns, obj] of Object.entries(h.en)) for (const k of Object.keys(obj)) keys.push([ns, k]);
+  }
+  if (files.length === 0) {
+    // the task folder is archived later; fall back to the fixed namespace list
+    for (const ns of ['TimezoneSuggestion']) for (const k of Object.keys(s46En[ns] || {})) keys.push([ns, k]);
+  }
+  assert.ok(keys.length > 0, 'key list not empty');
+  const ph = (s) => [...String(s).matchAll(/\{(\w+)/g)].map((m) => m[1]).sort().join(',');
+  for (const [ns, k] of keys) {
+    const e = s46En[ns]?.[k];
+    const v = s46Vi[ns]?.[k];
+    assert.ok(typeof e === 'string' && e.length > 0, `en ${ns}.${k}`);
+    assert.ok(typeof v === 'string' && v.length > 0, `vi ${ns}.${k}`);
+    assert.strictEqual(ph(e), ph(v), `placeholders ${ns}.${k}`);
+  }
+  assert.deepStrictEqual(s46Flat(s46En).sort(), s46Flat(s46Vi).sort(), 'full en/vi key parity');
+});
+
+it("46c: L3 - no message wraps a placeholder in single quotes; text_leak_warning escapes its quotes", () => {
+  const re = /(^|[^'])'\{[A-Za-z_]\w*\}'/;
+  for (const [loc, m] of [['en', s46En], ['vi', s46Vi]]) {
+    for (const k of s46Flat(m)) {
+      const val = k.split('.').reduce((o, p) => o[p], m);
+      assert.ok(!re.test(val), `${loc}:${k} has '{placeholder}'`);
+    }
+    assert.ok(m.Analytics.text_leak_warning.includes("''{mistake}''"), `${loc} text_leak_warning`);
+  }
+});
+
+it("46d: L3 - extracted literals are gone from the G2 files", () => {
+  const gone = [
+    ['src/app/[locale]/daily-review/page.tsx', 'Loading reviews...'],
+    ['src/components/CommandPaletteModal.tsx', 'Spotlight Command Hub'],
+    ['src/components/DailyExecutiveReportCard.tsx', 'Zero rule leakages detected today'],
+    ['src/components/TradeDetailsModal.tsx', 'alt="Zoomed trade setup"'],
+    ['src/components/MobileBottomNav.tsx', 'aria-label="Mobile Navigation"'],
+    ['src/components/TradeEditForm.tsx', 'Trade updated successfully!'],
+    ['src/app/[locale]/settings/page.tsx', 'Coordinated Universal Time'],
+  ];
+  for (const [f, s] of gone) assert.ok(!s40Read(f).includes(s), `${f} still contains ${s}`);
+});
+
+it("46e: L4 - shouldSuggestTimezone + banner wiring (direct updatePreferences, per-user dismiss key)", () => {
+  const lib = s40Read('src/lib/timezoneSuggestion.ts');
+  assert.ok(lib.includes('export function shouldSuggestTimezone('), 'shouldSuggestTimezone exported');
+  assert.ok(lib.includes('if (saved !== "UTC") return false;'), 'saved must be UTC');
+  assert.ok(lib.includes('"tz_suggestion_dismissed_v1:"'), 'dismiss key prefix');
+  const b = s40Read('src/components/TimezoneSuggestionBanner.tsx');
+  assert.ok(b.includes('updatePreferences({ timezone: browser })'), 'Apply calls updatePreferences directly');
+  assert.ok(!b.includes('handleSaveProfile'), 'banner does not call handleSaveProfile');
+  assert.ok(b.includes('"HARD_STOP_CONFIG_LOCKED"') && b.includes('tHardStop("configLocked")'), 'Hard Stop lock surfaced');
+  const catchBody = b.slice(b.indexOf('} catch (error) {'), b.indexOf('} finally {'));
+  assert.ok(!catchBody.includes('writeDismissed') && !catchBody.includes('setHidden(true)'), 'error neither dismisses nor hides');
+  assert.ok(s40Read('src/app/[locale]/settings/page.tsx').includes('TimezoneSuggestionBanner'), 'banner mounted in settings');
+});
+
+it("46f: mutations.json - 60 mutants, P8-M8..M10 (L4 x2, L3 x1) present", () => {
+  const d = JSON.parse(s40Read('test-fixtures/mutations.json'));
+  const ids = d.mutants.map((m) => m.id);
+  assert.strictEqual(ids.length, 60, 'mutant total');
+  for (const i of [8, 9, 10]) assert.ok(ids.some((x) => x.startsWith(`P8-M${i}-`)), `P8-M${i} present`);
+});
+// ===== END Section 46 =====
+
 
 console.log("\n-------------------------------------------------------");
 console.log(`TOTAL: ${total} | PASSED: ${passed} | FAILED: ${total - passed}`);

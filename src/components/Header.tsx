@@ -106,7 +106,7 @@ export function Header() {
             className="-m-2.5 p-2.5 text-gray-400 hover:text-white"
             onClick={() => setIsMobileMenuOpen(true)}
           >
-            <span className="sr-only">Open sidebar</span>
+            <span className="sr-only">{t("aria_open_sidebar")}</span>
             <Menu className="h-6 w-6" aria-hidden="true" />
           </button>
         </div>
@@ -128,7 +128,7 @@ export function Header() {
               </div>
               <div className="hidden sm:flex items-center gap-1 shrink-0 ml-2">
                 <kbd className="px-1.5 py-0.5 text-[11px] font-mono font-semibold text-gray-400 bg-white/5 border border-white/10 rounded-md shadow-xs group-hover:border-white/20 group-hover:text-gray-300 transition-colors">
-                  Ctrl
+                  {t("kbd_ctrl")}
                 </kbd>
                 <kbd className="px-1.5 py-0.5 text-[11px] font-mono font-semibold text-gray-400 bg-white/5 border border-white/10 rounded-md shadow-xs group-hover:border-white/20 group-hover:text-gray-300 transition-colors">
                   K
@@ -182,7 +182,7 @@ export function Header() {
                 : "text-gray-500 bg-white/5 hover:bg-white/10 border-white/5"
             )}
           >
-            <span className="sr-only">Toggle Sound</span>
+            <span className="sr-only">{t("aria_toggle_sound")}</span>
             {soundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
           </motion.button>
 
@@ -192,7 +192,7 @@ export function Header() {
             whileTap={{ scale: 0.95 }}
             type="button"
             onClick={() => setIsShieldOpen(true)}
-            title="Discipline Shield & Zen Cool-Down"
+            title={t("tooltip_zen_shield")}
             className="relative flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-indigo-300 hover:text-white bg-indigo-500/10 hover:bg-indigo-500/20 rounded-xl transition-all border border-indigo-500/25 shadow-sm cursor-pointer"
           >
             <ShieldAlert className="h-4 w-4 text-indigo-400" />
@@ -208,7 +208,7 @@ export function Header() {
               onClick={() => setIsNotifOpen(!isNotifOpen)}
               className="relative p-2.5 text-gray-400 hover:text-white bg-white/5 rounded-xl hover:bg-white/10 transition-all border border-white/5"
             >
-              <span className="sr-only">View notifications</span>
+              <span className="sr-only">{t("aria_view_notifications")}</span>
               <Bell className="h-5 w-5" aria-hidden="true" />
               {unreadCount > 0 && (
                 <span className="absolute top-1.5 right-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-red-500 ring-2 ring-gray-950">
@@ -309,7 +309,7 @@ export function Header() {
                 className="flex items-center justify-center h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 text-sm font-bold text-white shadow-lg cursor-pointer border border-white/20 overflow-hidden"
               >
                 {preferences?.avatarUrl ? (
-                  <img src={preferences.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  <img src={preferences.avatarUrl} alt={t("avatar_alt")} className="w-full h-full object-cover" />
                 ) : (
                   userInitial
                 )}
@@ -355,7 +355,7 @@ export function Header() {
                 className="ml-1 flex h-10 w-10 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                <span className="sr-only">Close sidebar</span>
+                <span className="sr-only">{t("aria_close_sidebar")}</span>
                 <X className="h-6 w-6 text-white" aria-hidden="true" />
               </button>
             </div>

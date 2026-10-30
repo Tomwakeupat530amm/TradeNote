@@ -103,7 +103,7 @@ export default function TradeDetailsModal({ isOpen, onClose, trade }: TradeDetai
               animate={{ scale: 1 }}
               exit={{ scale: 0.95 }}
               src={zoomImageSrc}
-              alt="Zoomed trade setup"
+              alt={t("zoomed_image_alt")}
               className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
             />
           </motion.div>

@@ -10,7 +10,7 @@ import { rMultiple as computeRMultiple } from '@/lib/risk';
 import { assertMutationAllowed, effectiveLimit, evaluateHardStop, HardStopError, type HardStopTrade } from '@/lib/hardStop';
 import { serverHardStopHint, toServerHardStopError } from '@/lib/hardStopServerError';
 import { isRated } from '@/lib/psychology';
-import { defaultQueueStore, enqueueOrphanPaths, removeStorageObjects } from '@/lib/orphanScreenshots';
+import { defaultQueueStore, enqueueOrphanPaths, removeOrQueueStorageObjects } from '@/lib/orphanScreenshots';
 
 // The Hard Stop error lives in the pure lib (E-3); re-exported for the forms.
 export { HardStopError } from '@/lib/hardStop';
@@ -185,14 +185,12 @@ async function rollbackUploadedScreenshot(
 /**
  * P6: remove screenshots AFTER the DB write decided their fate. Checks `{ error }` (remove() does
  * not throw on failure); failed paths go to the per-user orphan queue. Never throws.
+ * L2a: thin wrapper over the shared `removeOrQueueStorageObjects` (also used by useAccountStore).
  */
 async function removeScreenshotsOrQueue(userId: string | undefined, paths: string[]): Promise<void> {
   if (paths.length === 0) return;
-  const { failedPaths } = await removeStorageObjects(supabase.storage.from(SCREENSHOT_BUCKET), paths);
-  if (failedPaths.length > 0) {
-    console.warn('Could not remove screenshot(s) from storage; queued for cleanup:', failedPaths.length);
-    if (userId) enqueueOrphanPaths(defaultQueueStore(), userId, failedPaths);
-  }
+  const { failedPaths } = await removeOrQueueStorageObjects(supabase.storage.from(SCREENSHOT_BUCKET), defaultQueueStore(), userId, paths);
+  if (failedPaths.length > 0) console.warn('Could not remove screenshot(s) from storage; queued for cleanup:', failedPaths.length);
 }
 
 /** Never lets a notification failure escape the trade mutation (B3-v2 c). */
