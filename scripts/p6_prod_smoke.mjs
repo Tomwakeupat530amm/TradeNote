@@ -79,7 +79,15 @@ function redact(text) {
 }
 const lines = [];
 const log = (l = '') => { const s = redact(l); lines.push(s); console.log(s); };
-const flush = () => { fs.mkdirSync(path.dirname(OUT), { recursive: true }); fs.writeFileSync(OUT, lines.join('\n') + '\n', 'utf8'); };
+// Evidence is APPENDED as a new timestamped block (never overwritten); refused runs never flush.
+let written = 0;
+const flush = () => {
+  if (written >= lines.length) return;
+  fs.mkdirSync(path.dirname(OUT), { recursive: true });
+  const sep = written === 0 && fs.existsSync(OUT) && fs.statSync(OUT).size > 0 ? '\n' : '';
+  fs.appendFileSync(OUT, sep + lines.slice(written).join('\n') + '\n', 'utf8');
+  written = lines.length;
+};
 const errText = (e) => redact(e && e.message ? e.message : String(e)).slice(0, 300);
 const results = [];
 const record = (status, id, msg) => { results.push({ status, id }); log(`${status} ${id} - ${msg}`); };
@@ -350,14 +358,14 @@ async function residual(db, uid) {
 
 async function main() {
   log(`# p6_prod_smoke - ${new Date().toISOString()} - suite=${SUITE}`);
-  if (!CONFIRM) { log('REFUSED - missing --confirm-prod (runs on PROD with an isolated throwaway user).'); flush(); return 2; }
+  if (!CONFIRM) { log('REFUSED - missing --confirm-prod (runs on PROD with an isolated throwaway user).'); return 2; }
   const missing = [];
   if (!DB_URL) missing.push('PROD_DB_URL');
   if (['storage', 'seed', 'all'].includes(SUITE)) {
     if (!SB_URL) missing.push('NEXT_PUBLIC_SUPABASE_URL');
     if (!SB_ANON) missing.push('NEXT_PUBLIC_SUPABASE_ANON_KEY');
   }
-  if (missing.length) { log(`REFUSED - missing env: ${missing.join(', ')}`); flush(); return 2; }
+  if (missing.length) { log(`REFUSED - missing env: ${missing.join(', ')}`); return 2; }
 
   const pg = await loadPg();
   const db = new pg.Client({ connectionString: DB_URL });

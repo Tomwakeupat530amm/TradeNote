@@ -51,10 +51,16 @@ export function makeLogger(outPath) {
     lines.push(safe);
     console.log(safe);
   };
+  // Evidence is APPENDED (never overwritten): each flush writes only lines not yet written, so a
+  // later run adds a new timestamped block instead of destroying earlier evidence. Callers must
+  // NOT flush on a refused run (exit 2 before any PROD work) - see refusal branches.
+  let written = 0;
   const flush = () => {
-    if (!outPath) return;
+    if (!outPath || written >= lines.length) return;
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
-    fs.writeFileSync(outPath, lines.join('\n') + '\n', 'utf8');
+    const sep = written === 0 && fs.existsSync(outPath) && fs.statSync(outPath).size > 0 ? '\n' : '';
+    fs.appendFileSync(outPath, sep + lines.slice(written).join('\n') + '\n', 'utf8');
+    written = lines.length;
   };
   const errText = (e) => redact(e && e.message ? e.message : String(e)).slice(0, 300);
   return { log, flush, redact, errText };
@@ -419,8 +425,9 @@ async function cli() {
   const out = path.resolve(argVal('--out') || path.join(HARNESS_P5, `smoke-${suite}.txt`));
   const { log, flush, errText } = makeLogger(out);
   log(`# p5_prod_smoke --suite ${suite} - ${new Date().toISOString()}`);
-  if (!args.includes('--confirm-prod')) { log('REFUSED - thiếu --confirm-prod'); flush(); return 2; }
-  if (!process.env.PROD_DB_URL) { log('REFUSED - thiếu PROD_DB_URL'); flush(); return 2; }
+  // Refused runs never touch the evidence file (no flush).
+  if (!args.includes('--confirm-prod')) { log('REFUSED - thiếu --confirm-prod'); return 2; }
+  if (!process.env.PROD_DB_URL) { log('REFUSED - thiếu PROD_DB_URL'); return 2; }
   let code = 0;
   try {
     const pg = await loadPg();

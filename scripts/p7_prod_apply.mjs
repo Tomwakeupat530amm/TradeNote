@@ -197,11 +197,12 @@ async function main() {
   const { log, flush, errText } = smoke.makeLogger(OUT);
   const done = (code) => { flush(); return code; };
   log(`# p7_prod_apply --stage ${STAGE} - ${new Date().toISOString()}`);
-  if (!process.env.PROD_DB_URL) { log('REFUSED - thieu PROD_DB_URL.'); return done(2); }
+  // Refused runs (exit 2) never touch the evidence file: return without flush.
+  if (!process.env.PROD_DB_URL) { log('REFUSED - thieu PROD_DB_URL.'); return 2; }
   const BACKUP_RAW = argVal('--backup-dir') || process.env.P7_BACKUP_DIR || '';
   if (['0', '2'].includes(STAGE)) {
-    if (!BACKUP_RAW) { log('REFUSED - thieu thu muc sao luu (P7_BACKUP_DIR / --backup-dir).'); return done(2); }
-    if (isInside(path.resolve(BACKUP_RAW), REPO_ROOT)) { log('REFUSED - thu muc sao luu nam TRONG repo.'); return done(2); }
+    if (!BACKUP_RAW) { log('REFUSED - thieu thu muc sao luu (P7_BACKUP_DIR / --backup-dir).'); return 2; }
+    if (isInside(path.resolve(BACKUP_RAW), REPO_ROOT)) { log('REFUSED - thu muc sao luu nam TRONG repo.'); return 2; }
   }
   const pg = await smoke.loadPg();
   const db = await smoke.connect(pg);

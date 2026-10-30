@@ -591,14 +591,18 @@ async function stage6(db) {
 
 // ---------------------------------------------------------------- main
 
+// A refused run (exit 2 before any PROD work) must NOT write the evidence file.
+let refused = false;
+const refuse = (msg) => { refused = true; log(msg); };
+
 async function main() {
   log(`# p5_prod_apply --stage ${STAGE} - ${new Date().toISOString()}`);
-  if (!args.includes('--confirm-prod')) { log('REFUSED - thiếu --confirm-prod.'); return 2; }
-  if (!process.env.PROD_DB_URL) { log('REFUSED - thiếu PROD_DB_URL.'); return 2; }
-  if (!['0', '1', '2', '3', '4', '5', '6', 'rollback', 'rehearse'].includes(String(STAGE))) { log('REFUSED - --stage 0..6 | --rollback-all | --rehearse-disable'); return 2; }
+  if (!args.includes('--confirm-prod')) { refuse('REFUSED - thiếu --confirm-prod.'); return 2; }
+  if (!process.env.PROD_DB_URL) { refuse('REFUSED - thiếu PROD_DB_URL.'); return 2; }
+  if (!['0', '1', '2', '3', '4', '5', '6', 'rollback', 'rehearse'].includes(String(STAGE))) { refuse('REFUSED - --stage 0..6 | --rollback-all | --rehearse-disable'); return 2; }
   if (['0', '2', '3', '4', '5'].includes(STAGE)) {
-    if (!BACKUP_RAW) { log('REFUSED - thiếu thư mục sao lưu (P5_BACKUP_DIR / --backup-dir).'); return 2; }
-    if (isInside(path.resolve(BACKUP_RAW), REPO_ROOT)) { log('REFUSED - thư mục sao lưu nằm TRONG repo.'); return 2; }
+    if (!BACKUP_RAW) { refuse('REFUSED - thiếu thư mục sao lưu (P5_BACKUP_DIR / --backup-dir).'); return 2; }
+    if (isInside(path.resolve(BACKUP_RAW), REPO_ROOT)) { refuse('REFUSED - thư mục sao lưu nằm TRONG repo.'); return 2; }
   }
   const pg = await loadPg();
   const db = await connect(pg);
@@ -644,6 +648,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     log(`ERROR ${errText(e)}`);
     code = 2;
   }
-  flush();
+  if (!refused) flush();
   process.exit(code);
 }
